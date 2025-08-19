@@ -46,8 +46,10 @@
 #define DEFAULT_TIMEOUT_MS	20000	/* We do nothing on timeout anyway */
 
 #ifdef VENDOR_EDIT
+#ifdef CONFIG_OPPO_PHOENIX
 //#Bin.Li@BSP.Fingerprint.Secure 2019/08/16, Modify for keymaster fail by Drandroid crash
 extern int phx_is_system_boot_completed(void);
+#endif 
 #endif /* VENDOR_EDIT */
 
 static struct {
@@ -500,6 +502,7 @@ static void nq_dump_status(void)
 
 	mc_dev_info("  %-22s= 0x%s", "mcExcep.uuid", uuid_str);
     #ifdef VENDOR_EDIT
+#ifdef CONFIG_OPPO_PHOENIX
 	//#Bin.Li@BSP.Fingerprint.Secure 2019/08/16, Modify for keymaster fail by Drandroid crash
 	if(0 == strcmp(uuid_str, "07170000000000000000000000000000")) {
 		boot_completed_tee = phx_is_system_boot_completed();
@@ -509,7 +512,8 @@ static void nq_dump_status(void)
 			BUG();
 		}
 	}
-	#endif /* VENDOR_EDIT */
+#endif 
+#endif /* VENDOR_EDIT */
 	if (ret >= 0)
 		ret = kasnprintf(&l_ctx.dump, "%-22s= 0x%s\n", "mcExcep.uuid",
 				 uuid_str);
