@@ -2937,6 +2937,8 @@ PROC_FOPS_RW(current_cmd);
 PROC_FOPS_RW(en_power_path);
 PROC_FOPS_RW(en_safety_timer);
 #ifdef CONFIG_LIMIT_CHARGER
+//static ssize_t store_BatNotify(struct device *dev,
+//		struct device_attribute *attr, const char *buf, size_t size)
 static ssize_t show_charge_start_level(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
