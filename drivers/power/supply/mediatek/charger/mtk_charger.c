@@ -73,7 +73,10 @@
 
 #include "mtk_charger_intf.h"
 #include "mtk_charger_init.h"
-
+#ifdef CONFIG_LIMIT_CHARGER
+#include <mtk_battery_internal.h>
+//#include <mtk_gauge_class.h>
+#endif
 static struct charger_manager *pinfo;
 static struct list_head consumer_head = LIST_HEAD_INIT(consumer_head);
 static DEFINE_MUTEX(consumer_mutex);
@@ -1714,9 +1717,9 @@ pr_info("%s: info -- lowerbd=%d, upperbd=%d, capacity=%d\n",
 			disable_charging = 1;
 		if((pinfo->cmd_discharging == false)||s_pingpong==1)
 		{
-			info->cmd_discharging = true;
-			charger_dev_enable(info->chg1_dev, false);
-			charger_manager_notifier(info,
+			pinfo->cmd_discharging = true;
+			charger_dev_enable(pinfo->chg1_dev, false);
+			charger_manager_notifier(pinfo,
 						CHARGER_NOTIFY_STOP_CHARGING);
 		}
 		s_pingpong = 0;
@@ -1726,9 +1729,9 @@ pr_info("%s: info -- lowerbd=%d, upperbd=%d, capacity=%d\n",
 			disable_charging = 1;
 		if(pinfo->cmd_discharging == false)
 		{
-			info->cmd_discharging = true;
-			charger_dev_enable(info->chg1_dev, false);
-			charger_manager_notifier(info,
+			pinfo->cmd_discharging = true;
+			charger_dev_enable(pinfo->chg1_dev, false);
+			charger_manager_notifier(pinfo,
 						CHARGER_NOTIFY_STOP_CHARGING);
 		}
 		
@@ -1739,9 +1742,9 @@ pr_info("%s: info -- lowerbd=%d, upperbd=%d, capacity=%d\n",
 		
 		if((pinfo->cmd_discharging == true)||s_pingpong==0)
 		{
-			info->cmd_discharging = false;
-			charger_dev_enable(info->chg1_dev, true);
-			charger_manager_notifier(info,
+			pinfo->cmd_discharging = false;
+			charger_dev_enable(pinfo->chg1_dev, true);
+			charger_manager_notifier(pinfo,
 						CHARGER_NOTIFY_START_CHARGING);
 		}
 		s_pingpong = 1;
@@ -1750,9 +1753,9 @@ pr_info("%s: info -- lowerbd=%d, upperbd=%d, capacity=%d\n",
 				__func__, lowerbd, upperbd, capacity,s_pingpong );
 		if(pinfo->cmd_discharging == true)
 		{
-			info->cmd_discharging = false;
-			charger_dev_enable(info->chg1_dev, true);
-			charger_manager_notifier(info,
+			pinfo->cmd_discharging = false;
+			charger_dev_enable(pinfo->chg1_dev, true);
+			charger_manager_notifier(pinfo,
 						CHARGER_NOTIFY_START_CHARGING);
 		}
 
@@ -1761,27 +1764,40 @@ pr_info("%s: info -- lowerbd=%d, upperbd=%d, capacity=%d\n",
 
 	return disable_charging;
 }
+signed int battery_get_uisoc_v2(void)
+{
+	//int boot_mode = get_boot_mode();
+
+//	if ((boot_mode == META_BOOT) ||
+	//	(boot_mode == ADVMETA_BOOT) ||
+//		(boot_mode == FACTORY_BOOT) ||
+	//	(boot_mode == ATE_FACTORY_BOOT))
+	//	return 75;
+
+	return get_mtk_battery()->ui_soc;
+}
 static void chg_work()
 {
 	bool disable_pwrsrc = false;
 	int disable_charging = 0;
-	int rc;
-	union power_supply_propval pval = {0,};
+	int capacity = battery_get_uisoc_v2();
+//	int rc;
+//	union power_supply_propval pval = {0,};
 //struct charger_manager *pinfo = arg;
-	rc = power_supply_get_property(pinfo->psy_nb.notifier_call,
-			POWER_SUPPLY_PROP_CAPACITY, &pval);
-	if (rc < 0) {
-		pr_err("ffc Couldn't get bms capacity:%d\n", rc);
-		goto out;
-	}
+//	rc = power_supply_get_property(pinfo->psy_nb.notifier_call,
+//			POWER_SUPPLY_PROP_CAPACITY, &pval);
+//	if (rc < 0) {
+//		pr_err("ffc Couldn't get bms capacity:%d\n", rc);
+//		goto out;
+//	}
 	if (pinfo == NULL)
 	{
 		chr_err("pinfo==NULL\n");
 	}
 	else
 	{
-	disable_charging = is_charging_disabled( pval.intval);
-	if (disable_charging && pval.intval > pinfo->charge_stop_level)
+	disable_charging = is_charging_disabled(capacity);
+	if (disable_charging && capacity > pinfo->charge_stop_level)
 		disable_pwrsrc = true;
 	else
 		disable_pwrsrc = false;
@@ -1793,8 +1809,8 @@ static void chg_work()
 	//}
 //pinfo->disable_charger = disable_pwrsrc;
 	}
-	out:
-;
+//	out:
+//;
 }
 #endif
 static int charger_routine_thread(void *arg)
