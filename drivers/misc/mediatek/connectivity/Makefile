@@ -52,6 +52,8 @@ endif
     export CFG_FM_CHIP_ID=6765
     export CFG_FM_CHIP=mt6631
     obj-y += fmradio/
+    export WIFI_IP_SET=1
+    export WIFI_ECO_VER=1
     # Do build-in for Makefile checking
     # export CONFIG_WLAN_DRV_BUILD_IN=y
 
