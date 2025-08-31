@@ -4981,12 +4981,12 @@ static int binder_wait_for_work(struct binder_thread *thread,
 			list_add(&thread->waiting_thread_node,
 				 &proc->waiting_threads);
 		binder_inner_proc_unlock(proc);
-#if defined(VENDOR_EDIT) && defined(CONFIG_OPPO_HEALTHINFO)
+#if defined(VENDOR_EDIT) 
 // Liujie.Xie@TECH.Kernel.Sched, 2019/08/29, add for stuck monitor
         current->in_binder = 1;
 #endif
         schedule();
-#if defined(VENDOR_EDIT) && defined(CONFIG_OPPO_HEALTHINFO)
+#if defined(VENDOR_EDIT) 
 // Liujie.Xie@TECH.Kernel.Sched, 2019/08/29, add for stuck monitor
         current->in_binder = 0;
 #endif

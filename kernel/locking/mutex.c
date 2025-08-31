@@ -582,14 +582,14 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
 
 		/* didn't get the lock, go to sleep: */
 		spin_unlock_mutex(&lock->wait_lock, flags);
-#if defined(VENDOR_EDIT) && defined(CONFIG_OPPO_HEALTHINFO)
+#if defined(VENDOR_EDIT) 
 // Liujie.Xie@TECH.Kernel.Sched, 2019/08/29, add for stuck monitor
         if (state & TASK_UNINTERRUPTIBLE) {
             current->in_mutex = 1;
         }
 #endif
 		schedule_preempt_disabled();
-#if defined(VENDOR_EDIT) && defined(CONFIG_OPPO_HEALTHINFO)
+#if defined(VENDOR_EDIT) 
 // Liujie.Xie@TECH.Kernel.Sched, 2019/08/29, add for stuck monitor
         if (state & TASK_UNINTERRUPTIBLE) {
             current->in_mutex = 0;

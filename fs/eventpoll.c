@@ -1678,7 +1678,7 @@ fetch_events:
 
 			xgf_epoll_igather_timer(current, to, 1);
 
-#if defined(VENDOR_EDIT) && defined(CONFIG_OPPO_HEALTHINFO)
+#if defined(VENDOR_EDIT) 
 // Liujie.Xie@TECH.Kernel.Sched, 2019/08/29, add for stuck monitor
             current->in_epoll = 1;
 #endif
@@ -1686,7 +1686,7 @@ fetch_events:
 				HRTIMER_MODE_ABS);
 			if (!rc)
 				timed_out = 1;
-#if defined(VENDOR_EDIT) && defined(CONFIG_OPPO_HEALTHINFO)
+#if defined(VENDOR_EDIT) 
 // Liujie.Xie@TECH.Kernel.Sched, 2019/08/29, add for stuck monitor
             current->in_epoll = 0;
 #endif
