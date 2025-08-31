@@ -2339,7 +2339,7 @@ struct task_struct {
 #ifdef VENDOR_EDIT
     int static_ux;
 #endif /* VENDOR_EDIT */
-#if defined(VENDOR_EDIT) && defined(CONFIG_OPPO_HEALTHINFO)
+#if defined(VENDOR_EDIT)
 // Liujie.Xie@TECH.Kernel.Sched, 2019/08/29, add for stuck monitor
     int stuck_trace;
     struct oppo_uifirst_monitor_info oppo_stuck_info;
