@@ -1079,7 +1079,7 @@ static const struct file_operations proc_static_ux_operations = {
 };
 #endif
 
-#if defined(VENDOR_EDIT) && defined(CONFIG_OPPO_HEALTHINFO)
+#if defined(VENDOR_EDIT) 
 // Liujie.Xie@TECH.Kernel.Sched, 2019/08/29, add for stuck monitor
 static int proc_stuck_trace_show(struct seq_file *m, void *v)
 {
@@ -3212,7 +3212,7 @@ static const struct pid_entry tgid_base_stuff[] = {
 /* Wen.Luo@BSP.Kernel.Stability, 2019/04/26, Add for Process memory statistics */
 	REG("real_phymemory",    S_IRUGO, proc_pid_real_phymemory_ops),
 #endif
-#if defined(VENDOR_EDIT) && defined(CONFIG_OPPO_HEALTHINFO)
+#if defined(VENDOR_EDIT) 
 // Liujie.Xie@TECH.Kernel.Sched, 2019/08/29, add for stuck monitor
     REG("stuck_info", S_IRUGO | S_IWUGO, proc_stuck_trace_operations),
 #endif
