@@ -2762,6 +2762,10 @@ void wlanGetParseConfig(struct ADAPTER *prAdapter)
 			   WLAN_CFG_FILE_BUF_SIZE, &u4ConfigReadLen,
 			   prAdapter->prGlueInfo->prDev) == 0) {
 			/* ToDo:: Nothing */
+		} else if (kalRequestFirmware("wifi_206A1.cfg", pucConfigBuf,
+			   WLAN_CFG_FILE_BUF_SIZE, &u4ConfigReadLen,
+			   prAdapter->prGlueInfo->prDev) == 0) {
+			/* ToDo:: Nothing */
 		} else if (kalReadToFile("/data/misc/wifi.cfg",
 			   pucConfigBuf, WLAN_CFG_FILE_BUF_SIZE,
 			   &u4ConfigReadLen) == 0) {
