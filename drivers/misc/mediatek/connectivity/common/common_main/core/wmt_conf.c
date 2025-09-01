@@ -602,19 +602,20 @@ INT32 wmt_conf_read_file(VOID)
 	osal_memset(&gDevWmt.pWmtCfg, 0, osal_sizeof(gDevWmt.pWmtCfg));
 	chip_type = wmt_detect_get_chip_type();
 	if (chip_type == WMT_CHIP_TYPE_SOC) {
-		wmt_cfg_ver = wmt_detect_get_wmt_cfg_ver();
+	//	wmt_cfg_ver = wmt_detect_get_wmt_cfg_ver();
 		osal_memset(&gDevWmt.cWmtcfgName[0], 0, osal_sizeof(gDevWmt.cWmtcfgName));
-		if (wmt_cfg_ver) {
-			osal_strncat(&(gDevWmt.cWmtcfgName[0]), CUST_CFG_WMT_SOC_PREFIX,
-				     osal_sizeof(CUST_CFG_WMT_SOC_PREFIX));
-			osal_snprintf(&(str[0]), 10, "%d", wmt_cfg_ver);
-			osal_strncat(&(gDevWmt.cWmtcfgName[0]), &(str[0]), osal_strlen(&(str[0])));
-			osal_strncat(&(gDevWmt.cWmtcfgName[0]), CUST_CFG_WMT_SOC_SUFFIX,
-				     osal_sizeof(CUST_CFG_WMT_SOC_SUFFIX));
-		} else
+		
+		//if (wmt_cfg_ver) {
+	//		osal_strncat(&(gDevWmt.cWmtcfgName[0]), CUST_CFG_WMT_SOC_PREFIX,
+	//			     osal_sizeof(CUST_CFG_WMT_SOC_PREFIX));
+	//		osal_snprintf(&(str[0]), 10, "%d", wmt_cfg_ver);
+	//		osal_strncat(&(gDevWmt.cWmtcfgName[0]), &(str[0]), osal_strlen(&(str[0])));
+	//		osal_strncat(&(gDevWmt.cWmtcfgName[0]), CUST_CFG_WMT_SOC_SUFFIX,
+	//			     osal_sizeof(CUST_CFG_WMT_SOC_SUFFIX));
+	//	} else
 			osal_strncat(&(gDevWmt.cWmtcfgName[0]), CUST_CFG_WMT_SOC,
 				     osal_sizeof(CUST_CFG_WMT_SOC));
-	}
+//	}
 
 try_read:
 	if (!osal_strlen(&(gDevWmt.cWmtcfgName[0]))) {
