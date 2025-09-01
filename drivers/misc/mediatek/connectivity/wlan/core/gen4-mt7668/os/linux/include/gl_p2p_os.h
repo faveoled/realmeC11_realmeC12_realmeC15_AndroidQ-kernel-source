@@ -66,8 +66,6 @@
 #ifndef _GL_P2P_OS_H
 #define _GL_P2P_OS_H
 
-#define VENDOR_SPECIFIC_IE_LENGTH 300 /* 1(IE) + 1(length) + 0xff(max length) */
-#define MAX_MULTI_P2P_IE_COUNT 4
 /*******************************************************************************
 *                         C O M P I L E R   F L A G S
 ********************************************************************************
@@ -174,15 +172,11 @@ struct _GL_P2P_INFO_T {
 	UINT_32 u4CipherPairwise;
 	/*UINT_8 ucWSCRunning;*//* TH3 multiple P2P */
 
-	/* 0: beacon, 1: probe req, 2: probe response, 3: assoc response */
-	UINT_8 aucWSCIE[4][VENDOR_SPECIFIC_IE_LENGTH];
+	UINT_8 aucWSCIE[4][400];	/* 0 for beacon, 1 for probe req, 2 for probe response, 3 for assoc response */
 	UINT_16 u2WSCIELen[4];
 
-	UINT_8 aucP2PIE[MAX_MULTI_P2P_IE_COUNT][VENDOR_SPECIFIC_IE_LENGTH];
-	UINT_16 u2P2PIELen[MAX_MULTI_P2P_IE_COUNT];
-
 #if CFG_SUPPORT_WFD
-	UINT_8 aucWFDIE[VENDOR_SPECIFIC_IE_LENGTH];
+	UINT_8 aucWFDIE[400];	/* 0 for beacon, 1 for probe req, 2 for probe response */
 	UINT_16 u2WFDIELen;
 	/* UINT_8                      aucVenderIE[1024]; *//* Save the other IE for prove resp */
 /* UINT_16                     u2VenderIELen; */
@@ -204,7 +198,6 @@ struct _GL_P2P_INFO_T {
 #if (CFG_SUPPORT_DFS_MASTER == 1)
 	struct cfg80211_chan_def *chandef;
 	UINT_32 cac_time_ms;
-	BOOLEAN fgIsNetDevDetach;
 #endif
 
 #if CFG_SUPPORT_HOTSPOT_WPS_MANAGER

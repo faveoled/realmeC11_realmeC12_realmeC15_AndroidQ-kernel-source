@@ -1295,10 +1295,7 @@ WLAN_STATUS bssProcessProbeRequest(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwR
 #endif
 		}
 #if CFG_ENABLE_WIFI_DIRECT
-		else if ((prAdapter->fgIsP2PRegistered)
-		&& (prBssInfo->eNetworkType == NETWORK_TYPE_P2P)
-		&& (prAdapter->rP2PNetRegState
-			== ENUM_NET_REG_STATE_REGISTERED)) {
+		else if ((prAdapter->fgIsP2PRegistered) && (prBssInfo->eNetworkType == NETWORK_TYPE_P2P)) {
 
 			fgReplyProbeResp =
 			    p2pFuncValidateProbeReq(prAdapter, prSwRfb, &u4CtrlFlagsForProbeResp,

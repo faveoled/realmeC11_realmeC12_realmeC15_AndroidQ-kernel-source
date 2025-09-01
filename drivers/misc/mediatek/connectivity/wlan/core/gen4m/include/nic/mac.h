@@ -214,8 +214,6 @@
 	(ETH_HLEN + IP_HEADER_LEN + SOURCE_PORT_LEN)
 
 #endif
-/* DHCP */
-#define NORMAL_DHCP_UDP_LEN                     300
 
 /* Ethernet Frame Field Size, in byte */
 #define ETHER_HEADER_LEN                        14
@@ -608,7 +606,6 @@
 #define AUTH_ALGORITHM_NUM_SHARED_KEY           1	/* Shared Key */
 #define AUTH_ALGORITHM_NUM_FAST_BSS_TRANSITION  \
 	2	/* Fast BSS Transition */
-#define AUTH_ALGORITHM_NUM_SAE                  3	/* WPA3 - SAE */
 
 /* 7.3.1.2 Authentication Transaction Sequence Number field */
 #define AUTH_TRANSACTION_SEQENCE_NUM_FIELD_LEN      2
@@ -1302,9 +1299,6 @@
 #define VHT_OP_MODE_RX_NSS                          BITS(4, 6)
 #define VHT_OP_MODE_RX_NSS_TYPE                     BIT(7)
 
-#define VHT_OP_MODE_NSS_1	0x00
-#define VHT_OP_MODE_NSS_2	0x01
-
 #define VHT_OP_MODE_CHANNEL_WIDTH_OFFSET                   0
 #define VHT_OP_MODE_RX_NSS_OFFSET                   4
 #define VHT_OP_MODE_RX_NSS_TYPE_OFFSET              7
@@ -1559,8 +1553,6 @@
 /* 7.4.7 Public Action frame details */
 /* 20/40 BSS coexistence */
 #define ACTION_PUBLIC_20_40_COEXIST                 0
-/* 20/40 BSS coexistence */
-#define ACTION_PUBLIC_VENDOR_SPECIFIC               9
 
 #if CFG_SUPPORT_802_11W
 /* SA Query Action frame (IEEE 802.11w/D8.0, 7.4.9) */
@@ -1617,10 +1609,6 @@
 #define VENDOR_OUI_TYPE_WPS                         4
 #define VENDOR_OUI_TYPE_P2P                         9
 #define VENDOR_OUI_TYPE_WFD                         10
-
-/* Epigram IE */
-#define VENDOR_IE_EPIGRAM_OUI                      0x00904c
-#define VENDOR_IE_EPIGRAM_VHTTYPE                  0x0408
 
 #if CFG_SUPPORT_PASSPOINT
 #define VENDOR_OUI_TYPE_HS20                        16
@@ -2427,14 +2415,6 @@ struct IE_VHT_OP {
 	uint16_t u2VhtBasicMcsSet;
 } __KAL_ATTRIB_PACKED__;
 
-struct IE_VENDOR_EPIGRAM_IE {
-	uint8_t ucId;
-	uint8_t ucLength;
-	uint8_t aucOui[3];
-	uint8_t aucVendorType[2];
-	uint8_t pucData[1];
-} __KAL_ATTRIB_PACKED__;
-
 /*8.4.1.50 Operating Mode field*/
 struct IE_VHT_OP_MODE_NOTIFICATION {
 	uint8_t ucId;
@@ -2979,11 +2959,8 @@ struct WAPI_INFO_ELEM {
 	uint8_t ucElemId;
 	uint8_t ucLength;
 	uint16_t u2Version;
-	uint16_t u2AKMSuiteCount;
-	uint32_t u4AKMSuite;
-	uint16_t u2PairSuiteCount;
-	uint32_t u4PairSuite;
-	uint32_t u4GroupSuite;
+	uint16_t u2AuthKeyMgtSuiteCount;
+	uint8_t aucAuthKeyMgtSuite1[4];
 } __KAL_ATTRIB_PACKED__;
 
 /* Information Elements from MTK Synergies.*/

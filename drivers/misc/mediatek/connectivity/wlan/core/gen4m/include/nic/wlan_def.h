@@ -85,7 +85,6 @@
 #define DISCONNECT_REASON_CODE_NEW_CONNECTION   4
 #define DISCONNECT_REASON_CODE_REASSOCIATION    5
 #define DISCONNECT_REASON_CODE_ROAMING          6
-#define DISCONNECT_REASON_CODE_CHIPRESET        7
 
 /* The rate definitions */
 #define TX_MODE_CCK             0x00
@@ -375,8 +374,6 @@
 			BIT(AUTH_ALGORITHM_NUM_SHARED_KEY)
 #define AUTH_TYPE_FAST_BSS_TRANSITION \
 			BIT(AUTH_ALGORITHM_NUM_FAST_BSS_TRANSITION)
-#define AUTH_TYPE_SAE \
-			BIT(AUTH_ALGORITHM_NUM_SAE)
 
 /* Authentication Retry Limit */
 #define TX_AUTH_ASSOCI_RETRY_LIMIT                  2
@@ -658,17 +655,6 @@ enum ENUM_BAND {
 	BAND_NUM
 };
 
-enum ENUM_CH_REQ_TYPE {
-	CH_REQ_TYPE_JOIN,
-	CH_REQ_TYPE_ROC, /* requested by remain on channel type */
-	CH_REQ_TYPE_OFFCHNL_TX,
-	CH_REQ_TYPE_GO_START_BSS,
-#if (CFG_SUPPORT_DFS_MASTER == 1)
-	CH_REQ_TYPE_DFS_CAC,
-#endif
-	CH_REQ_TYPE_NUM
-};
-
 enum ENUM_DBDC_BN {
 	ENUM_BAND_0,
 	ENUM_BAND_1,
@@ -719,18 +705,6 @@ enum ENUM_MAC_BANDWIDTH {
 struct DEAUTH_INFO {
 	uint8_t aucRxAddr[MAC_ADDR_LEN];
 	OS_SYSTIME rLastSendTime;
-};
-
-enum ENUM_CHNL_SWITCH_POLICY {
-	CHNL_SWITCH_POLICY_NONE,
-	CHNL_SWITCH_POLICY_DEAUTH,
-	CHNL_SWITCH_POLICY_CSA
-};
-
-enum ENUM_CHNL_SORT_POLICY {
-	CHNL_SORT_POLICY_NONE,
-	CHNL_SORT_POLICY_ALL_CN,
-	CHNL_SORT_POLICY_BY_CH_DOMAIN
 };
 
 /*----------------------------------------------------------------------------*/
@@ -858,9 +832,8 @@ enum ENUM_PARAM_AP_MODE {
 /* Macros for obtaining the Network Type
  * or the Station Role, given the ENUM_STA_TYPE_T
  */
-#define IS_STA_IN_AIS(_prStaRec) \
-	(prAdapter->aprBssInfo[(_prStaRec)->ucBssIndex]->eNetworkType \
-	== NETWORK_TYPE_AIS)
+#define IS_STA_IN_AIS(_prStaRec)        ((prAdapter->prAisBssInfo != NULL) && \
+	((_prStaRec)->ucBssIndex == prAdapter->prAisBssInfo->ucBssIndex))
 #define IS_STA_IN_P2P(_prStaRec) \
 	(prAdapter->aprBssInfo[(_prStaRec)->ucBssIndex]->eNetworkType \
 	== NETWORK_TYPE_P2P)
@@ -924,7 +897,7 @@ enum ENUM_ANTENNA_NUM {
 #define MAX_NUM_SUPPORTED_CIPHER_SUITES 9
 #if CFG_SUPPORT_802_11W
 /* max number of supported AKM suites */
-#define MAX_NUM_SUPPORTED_AKM_SUITES    13
+#define MAX_NUM_SUPPORTED_AKM_SUITES    11
 #else
 /* max number of supported AKM suites */
 #define MAX_NUM_SUPPORTED_AKM_SUITES    9
@@ -1024,23 +997,6 @@ struct P2P_DEVICE_DESC {
 		uint8_t *__cp = (uint8_t *)(_memAddr_p); \
 		*(uint16_t *)(_value_p) = ((uint16_t)__cp[0] << 8) | \
 			((uint16_t)__cp[1]); \
-	}
-
-#define WLAN_GET_FIELD_24(_memAddr_p, _value_p) \
-	{ \
-		uint8_t *__cp = (uint8_t *)(_memAddr_p); \
-		*(uint32_t *)(_value_p) = 0; \
-		*(uint32_t *)(_value_p) = ((uint32_t)__cp[0]) | \
-			((uint32_t)__cp[1] << 8) | \
-			((uint32_t)__cp[2] << 16); \
-	}
-
-#define WLAN_GET_FIELD_BE24(_memAddr_p, _value_p) \
-	{ \
-		uint8_t *__cp = (uint8_t *)(_memAddr_p); \
-		*(uint32_t *)(_value_p) = 0; \
-		*(uint32_t *)(_value_p) = ((uint32_t)__cp[0] << 16) | \
-		    ((uint32_t)__cp[1] << 8) | (uint32_t)__cp[2]; \
 	}
 
 #define WLAN_GET_FIELD_32(_memAddr_p, _value_p) \

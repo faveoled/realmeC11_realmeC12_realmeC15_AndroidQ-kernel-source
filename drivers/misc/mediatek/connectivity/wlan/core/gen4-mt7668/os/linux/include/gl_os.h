@@ -93,14 +93,6 @@
 #define CFG_TX_STOP_NETIF_PER_QUEUE_THRESHOLD   512	/* packets */
 #define CFG_TX_START_NETIF_PER_QUEUE_THRESHOLD  128	/* packets */
 
-/* WMM Certification Related */
-#define CFG_CERT_WMM_MAX_TX_PENDING			20
-#define CFG_CERT_WMM_MAX_RX_NUM				10
-#define CFG_CERT_WMM_HIGH_STOP_TX_WITH_RX	(CFG_TX_STOP_NETIF_PER_QUEUE_THRESHOLD * 3)
-#define CFG_CERT_WMM_HIGH_STOP_TX_WO_RX		(CFG_TX_STOP_NETIF_PER_QUEUE_THRESHOLD * 2)
-#define CFG_CERT_WMM_LOW_STOP_TX_WITH_RX	(CFG_TX_STOP_NETIF_PER_QUEUE_THRESHOLD >> 4)
-#define CFG_CERT_WMM_LOW_STOP_TX_WO_RX		(CFG_TX_STOP_NETIF_PER_QUEUE_THRESHOLD >> 3)
-
 #define CHIP_NAME    "MT6632"
 
 #define DRV_NAME "["CHIP_NAME"]: "
@@ -115,8 +107,6 @@
 
 /* for CFG80211 IE buffering mechanism */
 #define CFG_CFG80211_IE_BUF_LEN     (512)
-/* for non-wfa vendor specific IE buffer */
-#define NON_WFA_VENDOR_IE_MAX_LEN	(128)
 
 /*******************************************************************************
 *                    E X T E R N A L   R E F E R E N C E S
@@ -126,10 +116,6 @@
 
 #include <linux/kernel.h>	/* bitops.h */
 
-#if KERNEL_VERSION(4, 11, 0) <= LINUX_VERSION_CODE
-#include <linux/sched.h> /* sched_setscheduler */
-#include <uapi/linux/sched/types.h>
-#endif
 #include <linux/timer.h>	/* struct timer_list */
 #include <linux/jiffies.h>	/* jiffies */
 #include <linux/delay.h>	/* udelay and mdelay macro */
@@ -138,9 +124,9 @@
 #include <linux/wakelock.h>
 #endif
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 12)
+
 #include <linux/irq.h>		/* IRQT_FALLING */
-#endif
+
 
 #include <linux/netdevice.h>	/* struct net_device, struct net_device_stats */
 #include <linux/etherdevice.h>	/* for eth_type_trans() function */
@@ -169,10 +155,6 @@
 
 #include <linux/interrupt.h>
 
-#if KERNEL_VERSION(4, 11, 0) <= LINUX_VERSION_CODE
-#include <uapi/linux/sched/types.h>
-#endif
-
 #if defined(_HIF_USB)
 #include <linux/usb.h>
 #include <linux/mmc/sdio.h>
@@ -184,7 +166,6 @@
 #endif
 
 #if defined(_HIF_SDIO)
-#include <linux/mmc/card.h>
 #include <linux/mmc/sdio.h>
 #include <linux/mmc/sdio_func.h>
 #endif
@@ -197,12 +178,10 @@
 #include <net/iw_handler.h>
 #endif
 
-#include <linux/math64.h>
-
 #ifdef CFG_CFG80211_VERSION
 #define CFG80211_VERSION_CODE CFG_CFG80211_VERSION
 #else
-#define CFG80211_VERSION_CODE LINUX_VERSION_CODE
+#define CFG80211_VERSION_CODE KERNEL_VERSION(4, 4, 0)
 #endif
 
 #include "version.h"
@@ -263,7 +242,6 @@
 extern BOOLEAN fgIsBusAccessFailed;
 extern const struct ieee80211_iface_combination *p_mtk_iface_combinations_sta;
 extern const INT_32 mtk_iface_combinations_sta_num;
-extern struct wireless_dev *gprWdev;
 
 /*******************************************************************************
 *                              C O N S T A N T S
@@ -312,38 +290,6 @@ extern struct wireless_dev *gprWdev;
 #define WAKE_LOCK_RX_TIMEOUT                            300	/* ms */
 #define WAKE_LOCK_THREAD_WAKEUP_TIMEOUT                 50	/* ms */
 
-/* EFUSE Auto Mode Support */
-#define LOAD_EFUSE 0
-#define LOAD_EEPROM_BIN 1
-#define LOAD_AUTO 2
-
-#if CFG_SUPPORT_CFG80211_AUTH
-#if KERNEL_VERSION(4, 0, 0) > CFG80211_VERSION_CODE
-#define WLAN_CIPHER_SUITE_GCMP_256			0x000FAC09
-#define WLAN_CIPHER_SUITE_CCMP_256			0x000FAC0A
-#define WLAN_CIPHER_SUITE_BIP_GMAC_128		0x000FAC0B
-#define WLAN_CIPHER_SUITE_BIP_GMAC_256		0x000FAC0C
-#define WLAN_CIPHER_SUITE_BIP_CMAC_256		0x000FAC0D
-#endif
-
-#if KERNEL_VERSION(4, 12, 0) > CFG80211_VERSION_CODE
-#define WLAN_AKM_SUITE_8021X_SUITE_B		0x000FAC0B
-#define WLAN_AKM_SUITE_8021X_SUITE_B_192	0x000FAC0C
-#endif
-
-#if KERNEL_VERSION(4, 2, 0) > CFG80211_VERSION_CODE
-#if CFG_SUPPORT_SAE
-#define WLAN_AKM_SUITE_SAE		0x000FAC08
-#endif
-#endif
-
-#if CFG_SUPPORT_OWE
-#define WLAN_AKM_SUITE_OWE		0x000FAC12
-#endif
-
-#define IW_AUTH_CIPHER_GCMP256  0x00000080
-#endif
-
 /*******************************************************************************
 *                             D A T A   T Y P E S
 ********************************************************************************
@@ -356,32 +302,13 @@ typedef struct _GL_WPA_INFO_T {
 	UINT_32 u4AuthAlg;
 	BOOLEAN fgPrivacyInvoke;
 #if CFG_SUPPORT_802_11W
-	UINT_32 u4CipherGroupMgmt;
 	UINT_32 u4Mfp;
 	UINT_8 ucRSNMfpCap;
 #endif
-	UINT_8 ucRsneLen;
 	UINT_8 aucKek[NL80211_KEK_LEN];
 	UINT_8 aucKck[NL80211_KCK_LEN];
 	UINT_8 aucReplayCtr[NL80211_REPLAY_CTR_LEN];
 } GL_WPA_INFO_T, *P_GL_WPA_INFO_T;
-
-#if CFG_SUPPORT_REPLAY_DETECTION
-struct SEC_REPLEY_PN_INFO {
-	UINT_8 auPN[16];
-	BOOLEAN fgRekey;
-	BOOLEAN fgFirstPkt;
-};
-struct SEC_DETECT_REPLAY_INFO {
-	UINT_8 ucCurKeyId;
-	UINT_8 ucKeyType;
-	struct SEC_REPLEY_PN_INFO arReplayPNInfo[4];
-	UINT_32 u4KeyLength;
-	UINT_8 aucKeyMaterial[32];
-	BOOLEAN fgPairwiseInstalled;
-	BOOLEAN fgKeyRscFresh;
-};
-#endif
 
 typedef enum _ENUM_NET_DEV_IDX_T {
 	NET_DEV_WLAN_IDX = 0,
@@ -493,8 +420,6 @@ struct _GLUE_INFO_T {
 
 	UINT_64 u8Cookie;
 
-	atomic_t cfgSuspend;
-
 	ULONG ulFlag;		/* GLUE_FLAG_XXX */
 	UINT_32 u4PendFlag;
 	/* UINT_32 u4TimeoutFlag; */
@@ -535,9 +460,6 @@ struct _GLUE_INFO_T {
 
 	/*! \brief wext wpa related information */
 	GL_WPA_INFO_T rWpaInfo;
-#if CFG_SUPPORT_REPLAY_DETECTION
-	struct SEC_DETECT_REPLAY_INFO prDetRplyInfo;
-#endif
 
 	/* Pointer to ADAPTER_T - main data structure of internal protocol stack */
 	P_ADAPTER_T prAdapter;
@@ -651,14 +573,6 @@ struct _GLUE_INFO_T {
 	UINT_32 u4ReqIeLength;
 	UINT_8 aucReqIe[CFG_CFG80211_IE_BUF_LEN];
 
-	/*
-	 * buffer to hold non-wfa vendor specific IEs set
-	 * from wpa_supplicant. This is used in sending
-	 * Association Request in AIS mode.
-	 */
-	u32 non_wfa_vendor_ie_len;
-	u8 non_wfa_vendor_ie_buf[NON_WFA_VENDOR_IE_MAX_LEN];
-
 #if CFG_SUPPORT_SDIO_READ_WRITE_PATTERN
 	BOOLEAN fgEnSdioTestPattern;
 	BOOLEAN fgSdioReadWriteMode;
@@ -698,11 +612,6 @@ struct _GLUE_INFO_T {
 
 	INT_32 i4RssiCache;
 	UINT_32 u4LinkSpeedCache;
-
-	/* FW Roaming */
-	/* store the FW roaming enable state which FWK determines */
-	/* if it's = 0, ignore the black/whitelists settings from FWK */
-	UINT_32 u4FWRoamingEnable;
 
 };
 
@@ -994,25 +903,10 @@ static inline u16 mtk_wlan_ndev_select_queue(struct sk_buff *skb)
 	return ieee8021d_to_queue[skb->priority];
 }
 
-#if KERNEL_VERSION(2, 6, 34) > LINUX_VERSION_CODE
-#define netdev_for_each_mc_addr(mclist, dev) \
-	for (mclist = dev->mc_list; mclist; mclist = mclist->next)
-#endif
-
-#if KERNEL_VERSION(2, 6, 34) > LINUX_VERSION_CODE
-#define GET_ADDR(ha) (ha->da_addr)
-#else
 #define GET_ADDR(ha) (ha->addr)
-#endif
 
-#if KERNEL_VERSION(2, 6, 35) <= LINUX_VERSION_CODE
 #define LIST_FOR_EACH_IPV6_ADDR(_prIfa, _ip6_ptr) \
 	list_for_each_entry(_prIfa, &((struct inet6_dev *) _ip6_ptr)->addr_list, if_list)
-#else
-#define LIST_FOR_EACH_IPV6_ADDR(_prIfa, _ip6_ptr) \
-	for (_prIfa = ((struct inet6_dev *) _ip6_ptr)->addr_list; _prIfa; _prIfa = _prIfa->if_next)
-#endif
-
 
 /*******************************************************************************
 *                  F U N C T I O N   D E C L A R A T I O N S
@@ -1043,21 +937,9 @@ void p2pSetMulticastListWorkQueueWrapper(P_GLUE_INFO_T prGlueInfo);
 
 P_GLUE_INFO_T wlanGetGlueInfo(VOID);
 
-BOOLEAN wlanGetHifState(P_GLUE_INFO_T prGlueInfo);
-
-#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
-u16 wlanSelectQueue(struct net_device *dev,
-		    struct sk_buff *skb, struct net_device *sb_dev,
-		    select_queue_fallback_t fallback);
-#elif KERNEL_VERSION(3, 14, 0) <= LINUX_VERSION_CODE
 u16 wlanSelectQueue(struct net_device *dev, struct sk_buff *skb,
 		    void *accel_priv, select_queue_fallback_t fallback);
-#elif KERNEL_VERSION(3, 13, 0) <= LINUX_VERSION_CODE
-u16 wlanSelectQueue(struct net_device *dev, struct sk_buff *skb,
-		    void *accel_priv);
-#else
-u16 wlanSelectQueue(struct net_device *dev, struct sk_buff *skb);
-#endif
+
 
 VOID wlanDebugInit(VOID);
 
@@ -1068,8 +950,6 @@ WLAN_STATUS wlanGetDebugLevel(IN UINT_32 u4DbgIdx, OUT PUINT_32 pu4DbgMask);
 VOID wlanSetSuspendMode(P_GLUE_INFO_T prGlueInfo, BOOLEAN fgEnable);
 
 VOID wlanGetConfig(P_ADAPTER_T prAdapter);
-
-WLAN_STATUS wlanExtractBufferBin(P_ADAPTER_T prAdapter);
 
 /*******************************************************************************
 *			 E X T E R N A L   F U N C T I O N S / V A R I A B L E

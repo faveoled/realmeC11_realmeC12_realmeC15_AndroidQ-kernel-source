@@ -294,13 +294,7 @@ typedef struct _MT6620_CFG_PARAM_STRUCT {
 	struct TXRX_STRONG_COMPENSATION_T rTxRxStrComp;	/* Start addr 0x200, offset is 0x43 */
 	/* support PCC feature */
 	struct DPD_INFO rDPDInfo;			/* Start addr 0x243, offset is 0xF */
-
-	/* support ANTSWAP feature */
-	struct TXRX_STRONG_COMPENSATION_T rTxRxStrCompAnt1; /* Start addr 0x252, offset is 0x43 */
-	/* support ANTSWAP feature */
-	struct DPD_INFO rDPDInfoAnt1;
-
-	UINT_8 aucTailPCCReserved[512-67-15-67-15];		/* Start addr 0x252, offset is 0x1AE */
+	UINT_8 aucTailPCCReserved[512-67-15];		/* Start addr 0x252, offset is 0x1AE */
 #endif
 } MT6620_CFG_PARAM_STRUCT, *P_MT6620_CFG_PARAM_STRUCT, WIFI_CFG_PARAM_STRUCT, *P_WIFI_CFG_PARAM_STRUCT;
 
@@ -363,7 +357,7 @@ static __KAL_INLINE__ VOID nvramOffsetCheck(VOID)
 	DATA_STRUCT_INSPECTING_ASSERT(OFFSET_OF(WIFI_CFG_PARAM_STRUCT, fgRssiCompensationVaildbit) == 266);
 	DATA_STRUCT_INSPECTING_ASSERT(OFFSET_OF(WIFI_CFG_PARAM_STRUCT, u2FeatureReserved) == 268);
 	DATA_STRUCT_INSPECTING_ASSERT(OFFSET_OF(WIFI_CFG_PARAM_STRUCT, aucTailReserved) == 271);
-	/*DATA_STRUCT_INSPECTING_ASSERT(OFFSET_OF(WIFI_CFG_PARAM_STRUCT, aucTailPCCReserved) == 0x252);*/
+	DATA_STRUCT_INSPECTING_ASSERT(OFFSET_OF(WIFI_CFG_PARAM_STRUCT, aucTailPCCReserved) == 0x252);
 #endif
 }
 #endif

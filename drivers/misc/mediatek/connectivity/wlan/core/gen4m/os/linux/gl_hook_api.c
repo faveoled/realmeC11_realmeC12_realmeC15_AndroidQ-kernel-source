@@ -226,45 +226,37 @@ int32_t MT_ICAPCommand(struct net_device *prNetDev, uint8_t *prInBuf)
 	} else if (prInBuf[0] == '3') {
 		if (prAteOps->getICapIQData) {
 			buf = kalMemAlloc(1024, VIR_MEM_TYPE);
-			if (buf) {
-				i4Status = prAteOps->getICapIQData(prGlueInfo,
+			i4Status = prAteOps->getICapIQData(prGlueInfo,
 						(uint8_t *) buf, CAP_I_TYPE, 0);
-				dumpMemory32((uint32_t *)buf, i4Status);
-				kalMemFree(buf, VIR_MEM_TYPE, 1024);
-			}
+			dumpMemory32((uint32_t *)buf, i4Status);
+			kalMemFree(buf, VIR_MEM_TYPE, 1024);
 		} else
 			i4Status = 1;
 	} else if (prInBuf[0] == '4') {
 		if (prAteOps->getICapIQData) {
 			buf = (uint32_t *) kalMemAlloc(1024, VIR_MEM_TYPE);
-			if (buf) {
-				i4Status = prAteOps->getICapIQData(prGlueInfo,
+			i4Status = prAteOps->getICapIQData(prGlueInfo,
 						(uint8_t *) buf, CAP_Q_TYPE, 0);
-				dumpMemory32((uint32_t *)buf, i4Status);
-				kalMemFree(buf, VIR_MEM_TYPE, 1024);
-			}
+			dumpMemory32((uint32_t *)buf, i4Status);
+			kalMemFree(buf, VIR_MEM_TYPE, 1024);
 		} else
 			i4Status = 1;
 	} else if (prInBuf[0] == '5') {
 		if (prAteOps->getICapIQData) {
 			buf = (uint32_t *) kalMemAlloc(1024, VIR_MEM_TYPE);
-			if (buf) {
-				i4Status = prAteOps->getICapIQData(prGlueInfo,
+			i4Status = prAteOps->getICapIQData(prGlueInfo,
 						(uint8_t *) buf, CAP_I_TYPE, 1);
-				dumpMemory32((uint32_t *)buf, i4Status);
-				kalMemFree(buf, VIR_MEM_TYPE, 1024);
-			}
+			dumpMemory32((uint32_t *)buf, i4Status);
+			kalMemFree(buf, VIR_MEM_TYPE, 1024);
 		} else
 			i4Status = 1;
 	} else if (prInBuf[0] == '6') {
 		if (prAteOps->getICapIQData) {
 			buf = (uint32_t *) kalMemAlloc(1024, VIR_MEM_TYPE);
-			if (buf) {
-				i4Status = prAteOps->getICapIQData(prGlueInfo,
+			i4Status = prAteOps->getICapIQData(prGlueInfo,
 						(uint8_t *) buf, CAP_Q_TYPE, 1);
-				dumpMemory32((uint32_t *)buf, i4Status);
-				kalMemFree(buf, VIR_MEM_TYPE, 1024);
-			}
+			dumpMemory32((uint32_t *)buf, i4Status);
+			kalMemFree(buf, VIR_MEM_TYPE, 1024);
 		} else
 			i4Status = 1;
 	}
@@ -2725,10 +2717,7 @@ int32_t MT_ATEWriteEfuse(struct net_device *prNetDev,
 	uint8_t  u4Index = 0, u4Loop = 0;
 
 	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-	if (!prGlueInfo) {
-		log_dbg(RFTEST, ERROR, "prGlueInfo is NULL\n");
-		return -EFAULT;
-	}
+	ASSERT(prGlueInfo);
 	kalMemSet(&rAccessEfuseInfoRead, 0,
 			sizeof(struct PARAM_CUSTOM_ACCESS_EFUSE));
 	kalMemSet(&rAccessEfuseInfoWrite, 0,
@@ -2838,57 +2827,6 @@ int32_t MT_ATESetTxTargetPower(struct net_device *prNetDev,
 
 	return i4Status;
 }
-
-#if CFG_SUPPORT_ANT_SWAP
-/*----------------------------------------------------------------------------*/
-/*!
- * \brief  Hook API for Set Antenna swap
- *
- * \param[in] prNetDev		 Pointer to the Net Device
- * \param[in] u4Ant		 The antenna to choose (0 for main, 1 for aux)
- * \param[out] None
- *
- * \retval 0				On success.
- * \retval -EFAULT			If kalIoctl return nonzero.
- * \retval -EINVAL			If invalid argument.
- */
-/*----------------------------------------------------------------------------*/
-int32_t MT_ATESetAntSwap(struct net_device *prNetDev,
-					     uint32_t u4Ant)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	struct PARAM_MTK_WIFI_TEST_STRUCT rRfATInfo;
-	uint32_t u4BufLen = 0;
-	int32_t i4Status = 0;
-
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-	if (!prGlueInfo) {
-		DBGLOG(RFTEST, ERROR, "prGlueInfo is NULL\n");
-		return WLAN_STATUS_ADAPTER_NOT_READY;
-	}
-
-	DBGLOG(RFTEST, INFO,
-	       "QA_AGENT MT_ATESetAntSwap u4Ant : %d\n", u4Ant);
-
-	rRfATInfo.u4FuncIndex = RF_AT_FUNCID_SET_ANT_SWP;
-	rRfATInfo.u4FuncData = (uint32_t) u4Ant;
-
-	i4Status = kalIoctl(prGlueInfo,	/* prGlueInfo */
-			 wlanoidRftestSetAutoTest,	/* pfnOidHandler */
-			 &rRfATInfo,	/* pvInfoBuf */
-			 sizeof(rRfATInfo),	/* u4InfoBufLen */
-			 FALSE,	/* fgRead */
-			 FALSE,	/* fgWaitResp */
-			 TRUE,	/* fgCmd */
-			 &u4BufLen);	/* pu4QryInfoLen */
-
-	if (i4Status != WLAN_STATUS_SUCCESS)
-		return -EFAULT;
-
-	return i4Status;
-
-}
-#endif /* CFG_SUPPORT_ANT_SWAP */
 
 #if (CFG_SUPPORT_DFS_MASTER == 1)
 /*----------------------------------------------------------------------------*/
@@ -3791,7 +3729,7 @@ int32_t TxBfProfilePnWrite(struct net_device *prNetDev,
 		BF_PN_WRITE;
 	rTxBfActionInfo.rProfilePnWrite.ucPfmuIdx = profileIdx;
 	rTxBfActionInfo.rProfilePnWrite.u2bw = u2bw;
-	memcpy(&rTxBfActionInfo.rProfilePnWrite.ucBuf[0], &au2XSTS[0],
+	memcpy(&rTxBfActionInfo.rProfilePnWrite.ucBuf[0], &au2XSTS,
 	       sizeof(uint16_t) * 12);
 
 	i4Status = kalIoctl(prGlueInfo, wlanoidTxBfAction, &rTxBfActionInfo,
@@ -4043,7 +3981,7 @@ int32_t TxBfBssInfoUpdate(struct net_device *prNetDev,
 	if (!prBssInfo)
 		return WLAN_STATUS_FAILURE;
 	prBssInfo->ucOwnMacIndex = ucOwnMacIdx;
-	memcpy(&prBssInfo->aucBSSID, &ucBssId[0], MAC_ADDR_LEN);
+	memcpy(&prBssInfo->aucBSSID, &ucBssId, MAC_ADDR_LEN);
 
 	nicUpdateBss(prAdapter, prBssInfo->ucBssIndex);
 

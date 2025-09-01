@@ -229,8 +229,7 @@ void mt6632PdmaConfig(struct GLUE_INFO *prGlueInfo, u_int8_t enable)
 		IntMask.field.rx_done_1 = 1;
 		IntMask.field.tx_done = BIT(prBusInfo->tx_ring_fwdl_idx) |
 			BIT(prBusInfo->tx_ring_cmd_idx) |
-			BIT(prBusInfo->tx_ring0_data_idx)|
-			BIT(prBusInfo->tx_ring1_data_idx);
+			BIT(prBusInfo->tx_ring_data_idx);
 	} else {
 		GloCfg.field.EnableRxDMA = 0;
 		GloCfg.field.EnableTxDMA = 0;
@@ -285,8 +284,7 @@ void mt6632EnableInterrupt(IN struct ADAPTER *prAdapter)
 	IntMask.field.rx_done_1 = 1;
 	IntMask.field.tx_done = BIT(prBusInfo->tx_ring_fwdl_idx) |
 		BIT(prBusInfo->tx_ring_cmd_idx) |
-		BIT(prBusInfo->tx_ring0_data_idx)|
-		BIT(prBusInfo->tx_ring1_data_idx);
+		BIT(prBusInfo->tx_ring_data_idx);
 	IntMask.field.tx_coherent = 0;
 	IntMask.field.rx_coherent = 0;
 	IntMask.field.tx_dly_int = 0;
@@ -346,15 +344,12 @@ struct BUS_INFO mt6632_bus_info = {
 	.bus2chip = mt6632_bus2chip_cr_mapping,
 	.tx_ring_fwdl_idx = 3,
 	.tx_ring_cmd_idx = 2,
-	.tx_ring0_data_idx = 0,
-	.tx_ring1_data_idx = 0, /* no used */
-	.max_static_map_addr = 0x00040000,
+	.tx_ring_data_idx = 0,
 	.fgCheckDriverOwnInt = TRUE,
 	.fgInitPCIeInt = FALSE,
 	.u4DmaMask = 32,
 
 	.pdmaSetup = mt6632PdmaConfig,
-	.updateTxRingMaxQuota = NULL,
 	.enableInterrupt = mt6632EnableInterrupt,
 	.disableInterrupt = mt6632DisableInterrupt,
 	.lowPowerOwnRead = mt6632LowPowerOwnRead,
@@ -412,7 +407,6 @@ struct CHIP_DBG_OPS mt6632_debug_ops = {
 	.showPleInfo = NULL,
 	.showCsrInfo = NULL,
 	.showDmaschInfo = NULL,
-	.showHifInfo = NULL,
 };
 
 /* Litien code refine to support multi chip */
@@ -446,11 +440,9 @@ struct mt66xx_chip_info mt66xx_chip_info_mt6632 = {
 	.asicEnableFWDownload = NULL,
 	.asicGetChipID = NULL,
 	.downloadBufferBin = wlanDownloadBufferBin,
-	.showTaskStack = NULL,
 	.features = 0,
 	.is_support_hw_amsdu = FALSE,
 	.ucMaxSwAmsduNum = 0,
-	.ucMaxSwapAntenna = 0,
 	.workAround = 0,
 };
 

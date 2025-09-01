@@ -68,21 +68,11 @@
 #define NUM_OF_RX_RING				2
 
 /* TODO: temp change tx ring size from 4095 to 256 */
-#ifdef CONNAC2X2
-#define TX_RING_SIZE				512
-#define RX_RING_SIZE				512	/* Max Rx ring size */
-#else
 #define TX_RING_SIZE				256
 #define RX_RING_SIZE				256	/* Max Rx ring size */
-#endif
 
 /* Data Rx ring */
-#ifdef CONNAC2X2
-#define RX_RING0_SIZE				512
-#else
 #define RX_RING0_SIZE				256
-#endif
-
 /* Event/MSDU_report Rx ring */
 #define RX_RING1_SIZE				16
 
@@ -128,17 +118,15 @@
 
 #define HIF_TX_INIT_CMD_PORT				TX_RING_FWDL_IDX_3
 
-#ifdef CONNAC2X2
-#define HIF_TX_MSDU_TOKEN_NUM				(TX_RING_SIZE * 3)
-#else
 #define HIF_TX_MSDU_TOKEN_NUM				(TX_RING_SIZE * 2)
-#endif
 
 #define HIF_TX_PAYLOAD_LENGTH				72
 
 #define HIF_MSDU_REPORT_DUMP_TIMEOUT		5	/* sec */
 #define HIF_MSDU_REPORT_RETURN_TIMEOUT		10	/* sec */
 #define HIF_SER_TIMEOUT				10000	/* msec */
+
+#define MAX_PCIE_BUS_STATIC_MAP_ADDR		0x00040000
 
 #define MT_RINGREG_DIFF		0x10
 #define MT_RINGREG_EXT_DIFF	0x04
@@ -174,20 +162,6 @@
 #define TXD_DW1_AMSDU_C         BIT(20)
 
 #define HIF_DEADFEED_VALUE      0xdeadfeed
-
-#ifdef CONNAC2X2
-/* Group0/Group1 may bot related to 2G/5G depending on WmmQ dispatch mechanism.
- * To simplify the design, we only change MaxQuotaSize under DBDC mode.
- */
-#define PLE_GROUP0_SIZE	0xFFF
-#define PLE_GROUP1_SIZE	0xFFF
-#else
-/* Don't config PLE size for 1*1 project */
-#define PLE_GROUP0_SIZE	0xFFF
-#define PLE_GROUP1_SIZE	0xFFF
-#endif
-
-#define PLE_GROUP_DBDC_SIZE 0x90
 
 /*******************************************************************************
  *                                 M A C R O S
@@ -369,7 +343,6 @@ struct MSDU_TOKEN_ENTRY {
 	uint32_t u4DmaLength;
 	phys_addr_t rPktDmaAddr;
 	uint32_t u4PktDmaLength;
-	uint16_t u2Port; /* tx ring number */
 };
 
 struct MSDU_TOKEN_INFO {
@@ -450,8 +423,7 @@ void halTxUpdateCutThroughDesc(struct GLUE_INFO *prGlueInfo,
 			       struct MSDU_TOKEN_ENTRY *prFillToken,
 			       struct MSDU_TOKEN_ENTRY *prDataToken,
 			       uint32_t u4Idx, bool fgIsLast);
-u_int8_t halIsStaticMapBusAddr(IN struct ADAPTER *prAdapter,
-					IN uint32_t u4Addr);
+u_int8_t halIsStaticMapBusAddr(IN uint32_t u4Addr);
 u_int8_t halChipToStaticMapBusAddr(IN struct GLUE_INFO *prGlueInfo,
 				   IN uint32_t u4ChipAddr,
 				   OUT uint32_t *pu4BusAddr);
@@ -500,11 +472,5 @@ void kalDumpRxRing(struct GLUE_INFO *prGlueInfo,
 		   uint32_t u4Num, bool fgDumpContent);
 void haldumpMacInfo(IN struct ADAPTER *prAdapter);
 void haldumpPhyInfo(struct ADAPTER *prAdapter);
-void halGetPleTxdInfo(IN struct ADAPTER *prAdapter,
-		      uint32_t fid, uint32_t *result);
-void halGetPsePayload(IN struct ADAPTER *prAdapter,
-		      uint32_t fid, uint32_t *result);
-void halDumpTxdInfo(IN struct ADAPTER *prAdapter, uint32_t *tmac_info);
-void halShowLitePleInfo(IN struct ADAPTER *prAdapter);
 
 #endif /* HIF_PDMA_H__ */

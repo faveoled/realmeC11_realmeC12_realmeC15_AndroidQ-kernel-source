@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016 MediaTek Inc.
+ *  Copyright (c) 2016,2017 MediaTek Inc.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -19,6 +19,8 @@
 #include <linux/slab.h>
 #include <net/bluetooth/bluetooth.h>
 
+#define SAVE_FW_DUMP_IN_KERNEL	1
+
 #define SUPPORT_FW_DUMP		1
 #define BTM_HEADER_LEN                  5
 #define BTM_UPLD_SIZE                   2312
@@ -31,19 +33,15 @@
 /* Time to wait for command response in millisecond */
 #define WAIT_UNTIL_CMD_RESP             msecs_to_jiffies(5000)
 
+#define BTMTK_BIN_FILE_MODE 1
+#if BTMTK_BIN_FILE_MODE
 /** For 7668 please storage cfg/bin file in ${firmware} */
 #define E2P_ACCESS_MODE_SWITCHER	"wifi.cfg"
 #define E2P_BIN_FILE			"EEPROM_MT%X.bin"
 
 #define E2P_MODE	"EfuseBufferModeCal"
-#define E2P_ACCESS_EPA	"BtUseExternalPA"
-#define E2P_ACCESS_DUPLEX	"BtDuplexMode"
 #define BIN_FILE_MODE	'1'
-#define AUTO_MODE		'2'
-#define TX_PWR_LIMIT	"BtTxPwrLimit.bin"
-#define KEEP_FULL_PWR	"KeepFullPwr"
-#define PWR_KEEP_NO_FW_OWN	'1'
-#define PWR_SWITCH_DRIVER_FW_OWN	'0'
+#endif
 
 enum rdwr_status {
 	RDWR_STATUS_SUCCESS = 0,
@@ -67,7 +65,6 @@ struct btmtk_thread {
 	struct task_struct *task;
 	wait_queue_head_t wait_q;
 	void *priv;
-	u8 thread_status;
 };
 
 struct btmtk_device {
@@ -75,8 +72,7 @@ struct btmtk_device {
 	/* struct hci_dev *hcidev; */
 
 	u8 dev_type;
-	u8 reset_progress;
-	u8 reset_dongle;
+
 	u8 tx_dnld_rdy;
 
 	u8 psmode;
@@ -97,8 +93,6 @@ struct btmtk_adapter {
 	u32 int_count;
 	struct sk_buff_head tx_queue;
 	struct sk_buff_head fops_queue;
-	struct sk_buff_head fwlog_fops_queue;
-	struct sk_buff_head fwlog_tx_queue;
 	u8 fops_mode;
 	u8 psmode;
 	u8 ps_state;
@@ -117,11 +111,8 @@ struct btmtk_private {
 	int (*hw_host_to_card)(struct btmtk_private *priv,
 				u8 *payload, u16 nb);
 
-	void (*start_reset_dongle_progress)(void);
-	int (*hw_sdio_reset_dongle)(void);
 	int (*hw_set_own_back)(int owntype);
 	int (*hw_process_int_status)(struct btmtk_private *priv);
-	void (*hci_snoop_save)(u8 type, u8 *buf, u32 len);
 	void (*firmware_dump)(struct btmtk_private *priv);
 	spinlock_t driver_lock;         /* spinlock used by driver */
 #ifdef CONFIG_DEBUG_FS
@@ -133,7 +124,6 @@ struct btmtk_private {
 	struct task_struct *fw_dump_tsk;
 	struct task_struct *fw_dump_end_check_tsk;
 #endif
-	bool no_fw_own;
 };
 
 #define MTK_VENDOR_PKT                 0xFE
@@ -184,6 +174,8 @@ struct btmtk_private {
 
 #define EVENT_COMPARE_SIZE     64
 
+
+/* #define SAVE_FW_DUMP_IN_KERNEL     1 */
 
 /* stpbt device node */
 #define BT_NODE "stpbt"

@@ -166,7 +166,7 @@ VOID rlmFsmEventUninit(P_ADAPTER_T prAdapter)
 		 */
 		rlmBssReset(prAdapter, prBssInfo);
 	}
-	rlmCancelRadioMeasurement(prAdapter);
+	rlmFreeMeasurementResources(prAdapter);
 }
 
 /*----------------------------------------------------------------------------*/
@@ -210,6 +210,8 @@ VOID rlmReqGenerateExtCapIE(P_ADAPTER_T prAdapter, P_MSDU_INFO_T prMsduInfo)
 {
 	P_BSS_INFO_T prBssInfo;
 	P_STA_RECORD_T prStaRec;
+	P_EXT_CAP_T prExtCap = NULL;
+	BOOLEAN fgExistExtCap = TRUE;
 
 	ASSERT(prAdapter);
 	ASSERT(prMsduInfo);
@@ -220,6 +222,8 @@ VOID rlmReqGenerateExtCapIE(P_ADAPTER_T prAdapter, P_MSDU_INFO_T prMsduInfo)
 
 	prStaRec = cnmGetStaRecByIndex(prAdapter, prMsduInfo->ucStaRecIndex);
 
+	prExtCap = (P_EXT_CAP_T)
+	    (((PUINT_8) prMsduInfo->prPacket) + prMsduInfo->u2FrameLength);
 	if ((prAdapter->rWifiVar.ucAvailablePhyTypeSet & PHY_TYPE_SET_802_11N) &&
 	    (!prStaRec || (prStaRec->ucPhyTypeSet & PHY_TYPE_SET_802_11N)))
 		rlmFillExtCapIE(prAdapter, prBssInfo, prMsduInfo);
@@ -227,6 +231,23 @@ VOID rlmReqGenerateExtCapIE(P_ADAPTER_T prAdapter, P_MSDU_INFO_T prMsduInfo)
 	else if (prAdapter->prGlueInfo->fgConnectHS20AP == TRUE)
 		hs20FillExtCapIE(prAdapter, prBssInfo, prMsduInfo);
 #endif /* CFG_SUPPORT_PASSPOINT */
+	else
+		fgExistExtCap = FALSE;
+
+#if CFG_SUPPORT_802_11V_BSS_TRANSITION_MGT
+	if (!fgExistExtCap) {
+		prExtCap->ucId = ELEM_ID_EXTENDED_CAP;
+		prExtCap->ucLength = ELEM_MAX_LEN_EXT_CAP;
+		/* Reset memory */
+		kalMemZero(prExtCap->aucCapabilities, ELEM_MAX_LEN_EXT_CAP);
+		prMsduInfo->u2FrameLength += IE_SIZE(prExtCap);
+	} else if (prExtCap->ucLength < ELEM_MAX_LEN_EXT_CAP) {
+		prMsduInfo->u2FrameLength += ELEM_MAX_LEN_EXT_CAP - prExtCap->ucLength;
+		prExtCap->ucLength = ELEM_MAX_LEN_EXT_CAP;
+	}
+
+	SET_EXT_CAP(prExtCap->aucCapabilities, ELEM_MAX_LEN_EXT_CAP, ELEM_EXT_CAP_BSS_TRANSITION_BIT);
+#endif
 
 }
 
@@ -682,14 +703,6 @@ static VOID rlmFillExtCapIE(P_ADAPTER_T prAdapter, P_BSS_INFO_T prBssInfo, P_MSD
 		SET_EXT_CAP(prExtCap->aucCapabilities, ELEM_MAX_LEN_EXT_CAP, ELEM_EXT_CAP_WNM_NOTIFICATION_BIT);
 	}
 #endif /* CFG_SUPPORT_PASSPOINT */
-
-#if CFG_SUPPORT_802_11V_BSS_TRANSITION_MGT
-	if (prExtCap->ucLength < ELEM_MAX_LEN_EXT_CAP)
-		prExtCap->ucLength = ELEM_MAX_LEN_EXT_CAP;
-
-	SET_EXT_CAP(prExtCap->aucCapabilities, ELEM_MAX_LEN_EXT_CAP, ELEM_EXT_CAP_BSS_TRANSITION_BIT);
-#endif
-
 	ASSERT(IE_SIZE(prExtCap) <= (ELEM_HDR_LEN + ELEM_MAX_LEN_EXT_CAP));
 
 	prMsduInfo->u2FrameLength += IE_SIZE(prExtCap);
@@ -1416,6 +1429,19 @@ static UINT_8 rlmRecIeInfoForClient(P_ADAPTER_T prAdapter, P_BSS_INFO_T prBssInf
 		PARAM_SSID_T rSsid;
 
 		prBssInfo->ucPrimaryChannel = prCsaParam->ucNewChannel;
+		COPY_SSID(rSsid.aucSsid, rSsid.u4SsidLen, prBssInfo->aucSSID, prBssInfo->ucSSIDLen);
+		prBssDesc = scanSearchBssDescByBssidAndSsid(prAdapter, prBssInfo->aucBSSID, TRUE, &rSsid);
+
+		if (prBssDesc) {
+			DBGLOG(RLM, INFO, "BSS " MACSTR " Desc found, channel update [%d]->[%d]\n",
+			       MAC2STR(prBssInfo->aucBSSID),
+			       prBssDesc->ucChannelNum,
+			       prCsaParam->ucNewChannel);
+			prBssDesc->ucChannelNum = prCsaParam->ucNewChannel;
+		} else {
+			DBGLOG(RLM, INFO, "BSS " MACSTR " Desc is not found\n", MAC2STR(prBssInfo->aucBSSID));
+		}
+
 		if (prCsaParam->fgHasWideBandIE) {
 			prBssInfo->ucVhtChannelWidth = prCsaParam->ucNewVhtBw;
 			prBssInfo->ucVhtChannelFrequencyS1 = prCsaParam->ucNewVhtS1;
@@ -1425,30 +1451,6 @@ static UINT_8 rlmRecIeInfoForClient(P_ADAPTER_T prAdapter, P_BSS_INFO_T prBssInf
 			prBssInfo->ucVhtChannelFrequencyS1 = 0;
 			prBssInfo->ucVhtChannelFrequencyS2 = 0;
 		}
-		COPY_SSID(rSsid.aucSsid, rSsid.u4SsidLen, prBssInfo->aucSSID, prBssInfo->ucSSIDLen);
-		prBssDesc = scanSearchBssDescByBssidAndSsid(prAdapter, prBssInfo->aucBSSID, TRUE, &rSsid);
-
-		if (prBssDesc) {
-			DBGLOG(RLM, INFO,
-				   "BSS " MACSTR " channel[%d]->[%d], BW[%d]->[%d] S1[%d]->[%d], S2[%d]->[%d]\n",
-				   MAC2STR(prBssInfo->aucBSSID),
-				   prBssDesc->ucChannelNum,
-				   prCsaParam->ucNewChannel,
-				   prBssDesc->eChannelWidth,
-				   prBssInfo->ucVhtChannelWidth,
-				   prBssDesc->ucCenterFreqS1,
-				   prBssInfo->ucVhtChannelFrequencyS1,
-				   prBssDesc->ucCenterFreqS2,
-				   prBssInfo->ucVhtChannelFrequencyS2);
-			prBssDesc->ucChannelNum = prCsaParam->ucNewChannel;
-			prBssDesc->eChannelWidth = prBssInfo->ucVhtChannelWidth;
-			prBssDesc->ucCenterFreqS1 = prBssInfo->ucVhtChannelFrequencyS1;
-			prBssDesc->ucCenterFreqS2 = prBssInfo->ucVhtChannelFrequencyS2;
-
-		} else {
-			DBGLOG(RLM, INFO, "BSS " MACSTR " Desc is not found\n", MAC2STR(prBssInfo->aucBSSID));
-		}
-
 
 		if (prCsaParam->fgHasSCOIE)
 			prBssInfo->eBssSCO = prCsaParam->eNewSCO;
@@ -1463,20 +1465,6 @@ static UINT_8 rlmRecIeInfoForClient(P_ADAPTER_T prAdapter, P_BSS_INFO_T prBssInf
 			qmSetStaRecTxAllowed(prAdapter, prStaRec, TRUE);
 			DBGLOG(RLM, INFO, "After switching, TxAllowed=%d\n", prStaRec->fgIsTxAllowed);
 		}
-
-		/*
-		 * In STA+SAP concurrent mode, to ensure the two BSSes are working in SCC,
-		 * we need to indicate Framework the channel switch event to let it restart SAP
-		 * on the new channel.
-		 */
-		if (cnmSapIsActive(prAdapter))
-			kalIndicateStatusAndComplete(prAdapter->prGlueInfo,
-						     WLAN_STATUS_BSS_CH_SWITCH, NULL, 0);
-
-		/*workaround sta dfs channel + sap turn on fail issue.*/
-		wlanUpdateDfsChannelTable(prAdapter->prGlueInfo,
-			prCsaParam->ucNewChannel);
-
 	}
 #endif
 
@@ -2538,6 +2526,21 @@ VOID rlmProcessSpecMgtAction(P_ADAPTER_T prAdapter, P_SW_RFB_T prSwRfb)
 			PARAM_SSID_T rSsid;
 
 			prBssInfo->ucPrimaryChannel = prCsaParam->ucNewChannel;
+			COPY_SSID(rSsid.aucSsid, rSsid.u4SsidLen, prBssInfo->aucSSID, prBssInfo->ucSSIDLen);
+			prBssDesc = scanSearchBssDescByBssidAndSsid(prAdapter, prStaRec->aucMacAddr, TRUE, &rSsid);
+
+			if (prBssDesc) {
+				DBGLOG(RLM, INFO,
+				       "BSS " MACSTR " Desc found, channel update [%d]->[%d]\n",
+				       MAC2STR(prBssInfo->aucBSSID),
+				       prBssDesc->ucChannelNum,
+				       prCsaParam->ucNewChannel);
+				prBssDesc->ucChannelNum = prCsaParam->ucNewChannel;
+			} else {
+				DBGLOG(RLM, INFO,
+				       "BSS " MACSTR " Desc is not found\n", MAC2STR(prBssInfo->aucBSSID));
+			}
+
 			if (prCsaParam->fgHasWideBandIE) {
 				prBssInfo->ucVhtChannelWidth = prCsaParam->ucNewVhtBw;
 				prBssInfo->ucVhtChannelFrequencyS1 = prCsaParam->ucNewVhtS1;
@@ -2546,29 +2549,6 @@ VOID rlmProcessSpecMgtAction(P_ADAPTER_T prAdapter, P_SW_RFB_T prSwRfb)
 				prBssInfo->ucVhtChannelWidth = VHT_OP_CHANNEL_WIDTH_20_40;
 				prBssInfo->ucVhtChannelFrequencyS1 = 0;
 				prBssInfo->ucVhtChannelFrequencyS2 = 0;
-			}
-			COPY_SSID(rSsid.aucSsid, rSsid.u4SsidLen, prBssInfo->aucSSID, prBssInfo->ucSSIDLen);
-			prBssDesc = scanSearchBssDescByBssidAndSsid(prAdapter, prStaRec->aucMacAddr, TRUE, &rSsid);
-			if (prBssDesc) {
-				DBGLOG(RLM, INFO,
-					"BSS " MACSTR " channel[%d]->[%d], BW[%d]->[%d] S1[%d]->[%d], S2[%d]->[%d]\n",
-					   MAC2STR(prBssInfo->aucBSSID),
-					   prBssDesc->ucChannelNum,
-					   prCsaParam->ucNewChannel,
-					   prBssDesc->eChannelWidth,
-					   prBssInfo->ucVhtChannelWidth,
-					   prBssDesc->ucCenterFreqS1,
-					   prBssInfo->ucVhtChannelFrequencyS1,
-					   prBssDesc->ucCenterFreqS2,
-					   prBssInfo->ucVhtChannelFrequencyS2);
-
-				prBssDesc->ucChannelNum = prCsaParam->ucNewChannel;
-				prBssDesc->eChannelWidth = prBssInfo->ucVhtChannelWidth;
-				prBssDesc->ucCenterFreqS1 = prBssInfo->ucVhtChannelFrequencyS1;
-				prBssDesc->ucCenterFreqS2 = prBssInfo->ucVhtChannelFrequencyS2;
-			} else {
-				DBGLOG(RLM, INFO,
-				       "BSS " MACSTR " Desc is not found\n", MAC2STR(prBssInfo->aucBSSID));
 			}
 
 			if (prCsaParam->fgHasSCOIE)
@@ -2584,24 +2564,7 @@ VOID rlmProcessSpecMgtAction(P_ADAPTER_T prAdapter, P_SW_RFB_T prSwRfb)
 				qmSetStaRecTxAllowed(prAdapter, prStaRec, TRUE);
 				DBGLOG(RLM, INFO, "After switching, TxAllowed=%d\n", prStaRec->fgIsTxAllowed);
 			}
-
-
-
-			/*
-			 * In STA+SAP concurrent mode, to ensure the two BSSes are working in SCC,
-			 * we need to indicate Framework the channel switch event to let it restart SAP
-			 * on the new channel.
-			 */
-			if (cnmSapIsActive(prAdapter))
-				kalIndicateStatusAndComplete(prAdapter->prGlueInfo,
-							     WLAN_STATUS_BSS_CH_SWITCH, NULL, 0);
-
-			/*workaround sta dfs channel + sap turn on fail issue.*/
-			wlanUpdateDfsChannelTable(prAdapter->prGlueInfo,
-				prCsaParam->ucNewChannel);
-
 		}
-
 		nicUpdateBss(prAdapter, prBssInfo->ucBssIndex);
 	}
 
@@ -2876,14 +2839,6 @@ schedule_next:
 			if (u2IeSize + prRmRep->u2ReportFrameLen > RM_REPORT_FRAME_MAX_LENGTH) {
 				rlmTxRadioMeasurementReport(prAdapter);
 				pucReportFrame = prRmRep->pucReportFrameBuff + prRmRep->u2ReportFrameLen;
-			}
-			/* rlmTxRadioMeasureMentReport fail will not reset u2ReportFrameLen.
-			 * It will cause to KE.
-			 */
-			if (u2IeSize + prRmRep->u2ReportFrameLen > RM_REPORT_FRAME_MAX_LENGTH) {
-				DBGLOG(RLM, WARN, "u2IeSize:0x%x, FrameLen:0x%x\n", u2IeSize,
-					prRmRep->u2ReportFrameLen);
-				break;
 			}
 			kalMemCopy(pucReportFrame, prReportEntry->aucMeasReport, u2IeSize);
 			pucReportFrame += u2IeSize;
@@ -3244,7 +3199,6 @@ VOID rlmProcessRadioMeasurementRequest(P_ADAPTER_T prAdapter, P_SW_RFB_T prSwRfb
 	struct RADIO_MEASUREMENT_REQ_PARAMS *prRmReqParam = NULL;
 	struct RADIO_MEASUREMENT_REPORT_PARAMS *prRmRepParam = NULL;
 	enum RM_REQ_PRIORITY eNewPriority;
-	P_STA_RECORD_T prStaRec = NULL;
 
 	ASSERT(prAdapter);
 	ASSERT(prSwRfb);
@@ -3255,11 +3209,6 @@ VOID rlmProcessRadioMeasurementRequest(P_ADAPTER_T prAdapter, P_SW_RFB_T prSwRfb
 
 	if (!rlmRmFrameIsValid(prSwRfb))
 		return;
-	prStaRec = prAdapter->prAisBssInfo->prStaRecOfAP;
-	if (!prStaRec) {
-		DBGLOG(RLM, WARN, "StaRec of Ais is NULL, ignore the Measurement\n");
-		return;
-	}
 	DBGLOG(RLM, INFO, "RM Request From %pM, DialogToken %d\n",
 			prRmReqFrame->aucSrcAddr, prRmReqFrame->ucDialogToken);
 	eNewPriority = rlmGetRmRequestPriority(prRmReqFrame->aucDestAddr);
@@ -3273,7 +3222,7 @@ VOID rlmProcessRadioMeasurementRequest(P_ADAPTER_T prAdapter, P_SW_RFB_T prSwRfb
 		DBGLOG(RLM, INFO, "Old RM is on-going, cancel it first\n");
 		rlmTxRadioMeasurementReport(prAdapter);
 		wmmRemoveAllTsmMeasurement(prAdapter, FALSE);
-		rlmCancelRadioMeasurement(prAdapter);
+		rlmFreeMeasurementResources(prAdapter);
 	}
 	prRmReqParam->fgRmIsOngoing = TRUE;
 	/* Step1: Save Measurement Request Params */

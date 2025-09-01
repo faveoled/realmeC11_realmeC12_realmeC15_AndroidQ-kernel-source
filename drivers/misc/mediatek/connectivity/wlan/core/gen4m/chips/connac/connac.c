@@ -71,11 +71,6 @@
 #include "precomp.h"
 
 #include "connac.h"
-#include "linux/sched.h"
-#if CFG_MTK_ANDROID_WMT
-extern void connectivity_export_show_stack(struct task_struct *tsk,
-				unsigned long *sp);
-#endif
 
 /*******************************************************************************
  *                              C O N S T A N T S
@@ -142,54 +137,26 @@ void connacConstructFirmwarePrio(struct GLUE_INFO *prGlueInfo,
 	uint8_t *pucNameIdx, uint8_t ucMaxNameIdx)
 {
 	uint8_t ucIdx = 0;
-	uint8_t ucFlavor = 0;
-	uint32_t u4IsFlavor = kalGetFwFlavor(&ucFlavor);
 
 	for (ucIdx = 0; apucConnacFwName[ucIdx]; ucIdx++) {
 		if ((*pucNameIdx + 3) < ucMaxNameIdx) {
-			if (!u4IsFlavor) {
-				/* Type 1. WIFI_RAM_CODE_soc1_0_1_1.bin */
-				snprintf(*(apucName + (*pucNameIdx)),
-						CFG_FW_NAME_MAX_LEN,
-						"%s_%u_%u.bin",
-						apucConnacFwName[ucIdx],
-						CFG_WIFI_IP_SET,
-						wlanGetEcoVersion(
-							prGlueInfo->prAdapter));
-				(*pucNameIdx) += 1;
+			/* Type 1. WIFI_RAM_CODE_soc1_0_1_1 */
+			snprintf(*(apucName + (*pucNameIdx)),
+					CFG_FW_NAME_MAX_LEN, "%s_%u_%u",
+					apucConnacFwName[ucIdx],
+					CFG_WIFI_IP_SET,
+					wlanGetEcoVersion(
+						prGlueInfo->prAdapter));
+			(*pucNameIdx) += 1;
 
-				/* Type 2. WIFI_RAM_CODE_soc1_0_1_1 */
-				snprintf(*(apucName + (*pucNameIdx)),
-						CFG_FW_NAME_MAX_LEN,
-						"%s_%u_%u",
-						apucConnacFwName[ucIdx],
-						CFG_WIFI_IP_SET,
-						wlanGetEcoVersion(
-							prGlueInfo->prAdapter));
-				(*pucNameIdx) += 1;
-			} else {
-				/* Type 1. WIFI_RAM_CODE_soc1_0_1a_1.bin */
-				snprintf(*(apucName + (*pucNameIdx)),
-						CFG_FW_NAME_MAX_LEN,
-						"%s_%u%c_%u.bin",
-						apucConnacFwName[ucIdx],
-						CFG_WIFI_IP_SET,
-						ucFlavor,
-						wlanGetEcoVersion(
-							prGlueInfo->prAdapter));
-				(*pucNameIdx) += 1;
-
-				/* Type 2. WIFI_RAM_CODE_soc1_0_1a_1 */
-				snprintf(*(apucName + (*pucNameIdx)),
-						CFG_FW_NAME_MAX_LEN,
-						"%s_%u%c_%u",
-						apucConnacFwName[ucIdx],
-						CFG_WIFI_IP_SET,
-						ucFlavor,
-						wlanGetEcoVersion(
-							prGlueInfo->prAdapter));
-				(*pucNameIdx) += 1;
-			}
+			/* Type 2. WIFI_RAM_CODE_soc1_0_1_1.bin */
+			snprintf(*(apucName + (*pucNameIdx)),
+					CFG_FW_NAME_MAX_LEN, "%s_%u_%u.bin",
+					apucConnacFwName[ucIdx],
+					CFG_WIFI_IP_SET,
+					wlanGetEcoVersion(
+						prGlueInfo->prAdapter));
+			(*pucNameIdx) += 1;
 
 			/* Type 3. WIFI_RAM_CODE_soc1_0 */
 			snprintf(*(apucName + (*pucNameIdx)),
@@ -225,15 +192,12 @@ struct BUS_INFO connac_bus_info = {
 	.bus2chip = connac_bus2chip_cr_mapping,
 	.tx_ring_fwdl_idx = 3,
 	.tx_ring_cmd_idx = 15,
-	.tx_ring0_data_idx = 0,
-	.tx_ring1_data_idx = 0, /* no used */
-	.max_static_map_addr = 0x00040000,
+	.tx_ring_data_idx = 0,
 	.fgCheckDriverOwnInt = FALSE,
 	.fgInitPCIeInt = FALSE,
 	.u4DmaMask = 36,
 
 	.pdmaSetup = asicPdmaConfig,
-	.updateTxRingMaxQuota = NULL,
 	.enableInterrupt = asicEnableInterrupt,
 	.disableInterrupt = asicDisableInterrupt,
 	.lowPowerOwnRead = asicLowPowerOwnRead,
@@ -296,7 +260,6 @@ struct CHIP_DBG_OPS connac_debug_ops = {
 	.showCsrInfo = NULL,
 	.showDmaschInfo = NULL,
 #endif
-	.showHifInfo = NULL,
 };
 
 struct mt66xx_chip_info mt66xx_chip_info_connac = {
@@ -326,19 +289,12 @@ struct mt66xx_chip_info mt66xx_chip_info_connac = {
 	/* IP info, should be overwrite by getNicCapabalityV2 */
 	.u4ChipIpVersion = CONNAC_CHIP_IP_VERSION,
 	.u4ChipIpConfig = CONNAC_CHIP_IP_CONFIG,
-	.u2ADieChipVersion = CONNAC_CHIP_ADIE_INFO,
 	.asicCapInit = asicCapInit,
 	.asicEnableFWDownload = asicEnableFWDownload,
 	.asicGetChipID = asicGetChipID,
 	.downloadBufferBin = NULL,
-#if CFG_MTK_ANDROID_WMT
-	.showTaskStack = connectivity_export_show_stack,
-#else
-	.showTaskStack = NULL,
-#endif
 	.is_support_hw_amsdu = FALSE,
 	.ucMaxSwAmsduNum = 4,
-	.ucMaxSwapAntenna = 2,
 	.workAround = 0,
 };
 

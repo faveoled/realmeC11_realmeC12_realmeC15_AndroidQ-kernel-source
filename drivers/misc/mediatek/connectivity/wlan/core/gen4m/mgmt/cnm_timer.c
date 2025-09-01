@@ -254,7 +254,7 @@ cnmTimerInitTimerOption(IN struct ADAPTER *prAdapter,
 	if (prTimer->pfMgmtTimeOutFunc == pfFunc
 		&& prTimer->rLinkEntry.prNext) {
 		log_dbg(CNM, WARN, "re-init timer, func %p\n", pfFunc);
-		kal_show_stack(prAdapter, NULL, NULL);
+		kal_show_stack(NULL, NULL);
 	}
 
 	LINK_ENTRY_INITIALIZE(&prTimer->rLinkEntry);
@@ -292,13 +292,33 @@ static void cnmTimerStopTimer_impl(IN struct ADAPTER *prAdapter,
 		LINK_REMOVE_KNOWN_ENTRY(&prRootTimer->rLinkHead,
 			&prTimer->rLinkEntry);
 
-		/* Reduce dummy timeout for power saving,
-		 * especially HIF activity. If two or more timers
-		 * exist and being removed timer is smallest,
-		 * this dummy timeout will still happen, but it is OK.
-		 */
 		if (LINK_IS_EMPTY(&prRootTimer->rLinkHead)) {
-			kalCancelTimer(prAdapter->prGlueInfo);
+		       /* kalCancelTimer(prAdapter->prGlueInfo); */
+
+		       /* Violate rule of del_timer_sync which cause DeadLock
+			* If no pending timer, let the dummpy timeout happen
+			* It would happen only one time
+			* Prevent call del_timer_sync with SPIN_LOCK_TIMER hold
+			* ===================================================
+			* Function: del_timer_sync
+			* Note: For !irqsafe timers, you must not hold locks
+			* that are held in interrupt context while calling
+			* this function. Even if the lock has nothing to do
+			* with the timer in question.
+			* Here's why:
+			*
+			* CPU0                    CPU1
+			* ----                    ----
+			*                         <SOFTIRQ>
+			*                         call_timer_fn();
+			*                         base->running_timer = mytimer;
+			*  spin_lock_irq(somelock);
+			*                         <IRQ>
+			*                         spin_lock(somelock);
+			*  del_timer_sync(mytimer);
+			*   while (base->running_timer == mytimer);
+			* ==================================================
+			*/
 
 			if (fgAcquireSpinlock && prRootTimer->fgWakeLocked) {
 				KAL_WAKE_UNLOCK(prAdapter,
@@ -306,6 +326,12 @@ static void cnmTimerStopTimer_impl(IN struct ADAPTER *prAdapter,
 				prRootTimer->fgWakeLocked = FALSE;
 			}
 		}
+
+		/* Reduce dummy timeout for power saving,
+		 * especially HIF activity. If two or more timers
+		 * exist and being removed timer is smallest,
+		 * this dummy timeout will still happen, but it is OK.
+		 */
 	}
 
 	if (fgAcquireSpinlock)
@@ -351,19 +377,6 @@ void cnmTimerStartTimer(IN struct ADAPTER *prAdapter, IN struct TIMER *prTimer,
 
 	ASSERT(prAdapter);
 	ASSERT(prTimer);
-
-#if (CFG_SUPPORT_STATISTICS == 1)
-	/* Do not print oid timer to avoid log too much.
-	 * We can deduce existence of OID timer from cmd and event.
-	 */
-	if ((prTimer != NULL) && (&(prAdapter->rOidTimeoutTimer) != prTimer)
-		&& (wlan_fb_power_down == TRUE)) {
-		log_dbg(CNM, INFO,
-			"[WLAN-LP] Start timer %u ms -handler(%pf)\n",
-			u4TimeoutMs,
-			prTimer->pfMgmtTimeOutFunc);
-	}
-#endif
 
 	KAL_ACQUIRE_SPIN_LOCK(prAdapter, SPIN_LOCK_TIMER);
 

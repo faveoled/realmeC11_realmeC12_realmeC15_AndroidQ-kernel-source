@@ -357,11 +357,11 @@ PVOID cnmMemAlloc(IN P_ADAPTER_T prAdapter, IN ENUM_RAM_TYPE_T eRamType, IN UINT
 		ASSERT(u4BlockNum <= MAX_NUM_OF_BUF_BLOCKS);
 	}
 
-	KAL_ACQUIRE_SPIN_LOCK(prAdapter, eRamType == RAM_TYPE_MSG ? SPIN_LOCK_MSG_BUF : SPIN_LOCK_MGT_BUF);
-
 #if CFG_DBG_MGT_BUF
 	prBufInfo->u4AllocCount++;
 #endif
+
+	KAL_ACQUIRE_SPIN_LOCK(prAdapter, eRamType == RAM_TYPE_MSG ? SPIN_LOCK_MSG_BUF : SPIN_LOCK_MGT_BUF);
 
 	if ((u4BlockNum > 0) && (u4BlockNum <= MAX_NUM_OF_BUF_BLOCKS)) {
 
@@ -392,24 +392,20 @@ PVOID cnmMemAlloc(IN P_ADAPTER_T prAdapter, IN ENUM_RAM_TYPE_T eRamType, IN UINT
 		}
 	}
 
-#if CFG_DBG_MGT_BUF
-	prBufInfo->u4AllocNullCount++;
-#endif
-
 	/* kalMemAlloc() shall not included in spin_lock */
 	KAL_RELEASE_SPIN_LOCK(prAdapter, eRamType == RAM_TYPE_MSG ? SPIN_LOCK_MSG_BUF : SPIN_LOCK_MGT_BUF);
 
 #ifdef LINUX
 	pvMemory = (PVOID) kalMemAlloc(u4Length, PHY_MEM_TYPE);
-	if (!pvMemory)
-		DBGLOG(MEM, WARN, "kmalloc fail: %u\n", u4Length);
 #else
 	pvMemory = (PVOID) NULL;
 #endif
 
 #if CFG_DBG_MGT_BUF
+	prBufInfo->u4AllocNullCount++;
+
 	if (pvMemory)
-		GLUE_INC_REF_CNT(prAdapter->u4MemAllocDynamicCount);
+		prAdapter->u4MemAllocDynamicCount++;
 #endif
 
 	return pvMemory;
@@ -465,7 +461,7 @@ VOID cnmMemFree(IN P_ADAPTER_T prAdapter, IN PVOID pvMemory)
 #endif
 
 #if CFG_DBG_MGT_BUF
-		GLUE_INC_REF_CNT(prAdapter->u4MemFreeDynamicCount);
+		prAdapter->u4MemFreeDynamicCount++;
 #endif
 		return;
 	}
@@ -513,7 +509,6 @@ VOID cnmStaRecInit(P_ADAPTER_T prAdapter)
 
 		prStaRec->ucIndex = (UINT_8) i;
 		prStaRec->fgIsInUse = FALSE;
-		prStaRec->eapol_re_enqueue_cnt = 0;
 	}
 }
 
@@ -532,11 +527,6 @@ P_STA_RECORD_T cnmStaRecAlloc(P_ADAPTER_T prAdapter, ENUM_STA_TYPE_T eStaType, U
 	UINT_16 i, k;
 
 	ASSERT(prAdapter);
-
-	prStaRec = cnmGetAnyStaRecByAddress(prAdapter, pucMacAddr);
-
-	if (prStaRec != NULL)
-		disconnect_sta(prAdapter, prStaRec);
 
 	for (i = 0; i < CFG_STA_REC_NUM; i++) {
 		prStaRec = &prAdapter->arStaRec[i];
@@ -751,38 +741,6 @@ P_STA_RECORD_T cnmGetStaRecByAddress(P_ADAPTER_T prAdapter, UINT_8 ucBssIndex, P
 
 		if (prStaRec->fgIsInUse &&
 		    prStaRec->ucBssIndex == ucBssIndex && EQUAL_MAC_ADDR(prStaRec->aucMacAddr, pucPeerMacAddr)) {
-			break;
-		}
-	}
-
-	return (i < CFG_STA_REC_NUM) ? prStaRec : NULL;
-}
-
-/*----------------------------------------------------------------------------*/
-/*!
-* @brief Get STA_RECORD_T by Peer MAC Address(Usually TA).
-*
-* @param[in] pucPeerMacAddr      Given Peer MAC Address.
-*
-* @retval   Pointer to STA_RECORD_T, if found. NULL, if not found
-*/
-/*----------------------------------------------------------------------------*/
-P_STA_RECORD_T cnmGetAnyStaRecByAddress(P_ADAPTER_T prAdapter,
-					PUINT_8 pucPeerMacAddr)
-{
-	P_STA_RECORD_T prStaRec;
-	UINT_16 i;
-
-	ASSERT(prAdapter);
-
-	if (!pucPeerMacAddr)
-		return NULL;
-
-	for (i = 0; i < CFG_STA_REC_NUM; i++) {
-		prStaRec = &prAdapter->arStaRec[i];
-
-		if (prStaRec->fgIsInUse &&
-		    EQUAL_MAC_ADDR(prStaRec->aucMacAddr, pucPeerMacAddr)) {
 			break;
 		}
 	}
@@ -1200,7 +1158,7 @@ VOID cnmDumpStaRec(IN P_ADAPTER_T prAdapter, IN UINT_8 ucStaRecIdx)
 	       prStaRec->fgIsInPS,
 	       prStaRec->fgIsTxAllowed, prStaRec->fgIsTxKeyReady, prStaRec->fgTxAmpduEn, prStaRec->fgRxAmpduEn);
 
-	DBGLOG(SW4, INFO, "TxQ LEN TC[0~5] [%03u:%03u:%03u:%03u]\n",
+	DBGLOG(SW4, INFO, "TxQ LEN TC[0~5] [%03u:%03u:%03u:%03u:%03u:%03u]\n",
 	       prStaRec->aprTargetQueue[0]->u4NumElem,
 	       prStaRec->aprTargetQueue[1]->u4NumElem,
 	       prStaRec->aprTargetQueue[2]->u4NumElem,
@@ -1299,12 +1257,6 @@ cnmPeerAdd(P_ADAPTER_T prAdapter, PVOID pvSetBuffer, UINT_32 u4SetBufferLen, PUI
 	prCmd = (CMD_PEER_ADD_T *) pvSetBuffer;
 
 	prAisBssInfo = prAdapter->prAisBssInfo;	/* for AIS only test */
-
-	if (prAisBssInfo == NULL) {
-		DBGLOG(TDLS, ERROR, "[%s]prAisBssInfo is NULL!", __func__);
-		return TDLS_STATUS_FAIL;
-	}
-
 	prStaRec = cnmGetStaRecByAddress(prAdapter, (UINT_8) prAdapter->prAisBssInfo->ucBssIndex, prCmd->aucPeerMac);
 
 	if (prStaRec == NULL) {
@@ -1318,6 +1270,8 @@ cnmPeerAdd(P_ADAPTER_T prAdapter, PVOID pvSetBuffer, UINT_32 u4SetBufferLen, PUI
 		if (prAisBssInfo) {
 			if (prAisBssInfo->ucBssIndex)
 				prStaRec->ucBssIndex = prAisBssInfo->ucBssIndex;
+		} else {
+			return TDLS_STATUS_FAIL;
 		}
 
 		/* init the prStaRec */
@@ -1329,15 +1283,10 @@ cnmPeerAdd(P_ADAPTER_T prAdapter, PVOID pvSetBuffer, UINT_32 u4SetBufferLen, PUI
 		prStaRec->u2DesiredNonHTRateSet = prAdapter->rWifiVar.ucAvailablePhyTypeSet;
 
 		prStaRec->u2OperationalRateSet = prAisBssInfo->u2OperationalRateSet;
-		prStaRec->ucNonHTBasicPhyType =
-				prAisBssInfo->ucNonHTBasicPhyType;
 		prStaRec->ucPhyTypeSet = prAisBssInfo->ucPhyTypeSet;
 		prStaRec->eStaType = prCmd->eStaType;
 
-		/* Init lowest rate to prevent CCK in 5G band */
-		nicTxUpdateStaRecDefaultRate(prStaRec);
-
-		/* Better to change state here, not at TX Done */
+		/* NOTE(Kevin): Better to change state here, not at TX Done */
 		cnmStaRecChangeState(prAdapter, prStaRec, STA_STATE_1);
 
 	} else {
@@ -1390,11 +1339,6 @@ cnmPeerUpdate(P_ADAPTER_T prAdapter, PVOID pvSetBuffer, UINT_32 u4SetBufferLen, 
 
 	prAisBssInfo = prAdapter->prAisBssInfo;
 
-	if (prAisBssInfo == NULL) {
-		DBGLOG(TDLS, ERROR, "[%s]prAisBssInfo is NULL!", __func__);
-		return TDLS_STATUS_FAIL;
-	}
-
 	prStaRec = cnmGetStaRecByAddress(prAdapter, (UINT_8) prAdapter->prAisBssInfo->ucBssIndex, prCmd->aucPeerMac);
 
 	if ((!prStaRec) || !(prStaRec->fgIsInUse))
@@ -1416,17 +1360,10 @@ cnmPeerUpdate(P_ADAPTER_T prAdapter, PVOID pvSetBuffer, UINT_32 u4SetBufferLen, 
 	prStaRec->u2AssocId = 0;	/* no use */
 	prStaRec->u2ListenInterval = 0;	/* unknown */
 	prStaRec->fgIsQoS = TRUE;
-	prStaRec->fgIsWmmSupported = TRUE;
 	prStaRec->fgIsUapsdSupported = (prCmd->UapsdBitmap == 0) ? FALSE : TRUE;
 	prStaRec->u4TxBeamformingCap = 0;	/* no use */
 	prStaRec->ucAselCap = 0;	/* no use */
-	/* In TDLS, it couldn't know peer TDLS device's RSSI before setup.
-	 * Temporality, we use the AP's RSSI to judge the initialize Tx rate.
-	 * Otherwise, the Tx rate would be the loweset rate CCK 1M.
-	 */
-	DBGLOG(TDLS, EVENT, "[TDLS] Change RCPI to to AP's RCPI: %d\n",
-		prAisBssInfo->prStaRecOfAP->ucRCPI);
-	prStaRec->ucRCPI = prAisBssInfo->prStaRecOfAP->ucRCPI;
+	prStaRec->ucRCPI = 0;
 	prStaRec->ucBmpTriggerAC = prCmd->UapsdBitmap;
 	prStaRec->ucBmpDeliveryAC = prCmd->UapsdBitmap;
 	prStaRec->ucUapsdSp = prCmd->UapsdMaxSp;

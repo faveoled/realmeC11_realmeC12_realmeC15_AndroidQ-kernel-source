@@ -80,8 +80,8 @@
 #define STATS_RX_PKT_INFO_DISPLAY			StatsRxPktInfoDisplay
 #define STATS_TX_PKT_INFO_DISPLAY			StatsTxPktInfoDisplay
 #else
-#define STATS_RX_PKT_INFO_DISPLAY
-#define STATS_TX_PKT_INFO_DISPLAY
+#define STATS_RX_PKT_INFO_DISPLAY(__Pkt__)
+#define STATS_TX_PKT_INFO_DISPLAY(__Pkt__)
 #endif /* CFG_SUPPORT_STATISTICS */
 
 /*******************************************************************************
@@ -119,7 +119,7 @@ void StatsEnvTxTime2Hif(IN struct ADAPTER *prAdapter,
 void StatsEnvRxTime2Host(IN struct ADAPTER *prAdapter,
 			 struct sk_buff *prSkb);
 
-void StatsRxPktInfoDisplay(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb);
+void StatsRxPktInfoDisplay(struct SW_RFB *prSwRfb);
 
 void StatsTxPktInfoDisplay(uint8_t *pPkt);
 

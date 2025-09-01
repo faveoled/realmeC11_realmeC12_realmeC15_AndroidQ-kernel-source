@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -134,34 +132,6 @@ static const struct wiphy_vendor_command mtk_p2p_vendor_ops[] = {
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
 		.doit = mtk_cfg80211_vendor_config_roaming
-	},
-#if CFG_AUTO_CHANNEL_SEL_SUPPORT
-	{
-		{
-			.vendor_id = OUI_QCA,
-			.subcmd = NL80211_VENDOR_SUBCMD_ACS
-		},
-		.flags = WIPHY_VENDOR_CMD_NEED_WDEV
-				| WIPHY_VENDOR_CMD_NEED_NETDEV
-				| WIPHY_VENDOR_CMD_NEED_RUNNING,
-		.doit = mtk_cfg80211_vendor_acs
-	},
-#endif
-	{
-		{
-			.vendor_id = OUI_QCA,
-			.subcmd = NL80211_VENDOR_SUBCMD_GET_FEATURES
-		},
-		.flags = WIPHY_VENDOR_CMD_NEED_WDEV
-				| WIPHY_VENDOR_CMD_NEED_NETDEV,
-		.doit = mtk_cfg80211_vendor_get_features
-	},
-};
-
-static const struct nl80211_vendor_cmd_info mtk_p2p_vendor_events[] = {
-	{
-		.vendor_id = OUI_QCA,
-		.subcmd = NL80211_VENDOR_SUBCMD_ACS
 	},
 };
 
@@ -745,15 +715,9 @@ BOOLEAN glP2pCreateWirelessDevice(P_GLUE_INFO_T prGlueInfo)
 	prWiphy->signal_type = CFG80211_SIGNAL_TYPE_MBM;
 	prWiphy->vendor_commands = mtk_p2p_vendor_ops;
 	prWiphy->n_vendor_commands = sizeof(mtk_p2p_vendor_ops) / sizeof(struct wiphy_vendor_command);
-	prWiphy->vendor_events = mtk_p2p_vendor_events;
-	prWiphy->n_vendor_events = ARRAY_SIZE(mtk_p2p_vendor_events);
 
 #ifdef CONFIG_PM
 	prWiphy->wowlan = &p2p_wowlan_support;
-#endif
-
-#if KERNEL_VERSION(3, 14, 0) < LINUX_VERSION_CODE
-	prWiphy->max_ap_assoc_sta = P2P_MAXIMUM_CLIENT_COUNT;
 #endif
 
 	/* 2.1 set priv as pointer to glue structure */
@@ -2088,8 +2052,8 @@ int p2pSetMACAddress(IN struct net_device *prDev, void *addr)
 {
 	P_ADAPTER_T prAdapter = NULL;
 	P_GLUE_INFO_T prGlueInfo = NULL;
-	P_BSS_INFO_T prBssInfo = NULL;
-	struct sockaddr *sa = NULL;
+
+	ASSERT(prDev);
 
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prDev));
 	ASSERT(prGlueInfo);
@@ -2097,37 +2061,8 @@ int p2pSetMACAddress(IN struct net_device *prDev, void *addr)
 	prAdapter = prGlueInfo->prAdapter;
 	ASSERT(prAdapter);
 
-	if (!prDev || !addr) {
-		DBGLOG(INIT, ERROR, "Set macaddr with ndev(%d) and addr(%d)\n",
-		       (prDev == NULL) ? 0 : 1, (addr == NULL) ? 0 : 1);
-		return WLAN_STATUS_INVALID_DATA;
-	}
-
-	prBssInfo
-		= &(prAdapter->rWifiVar.arBssInfo[NETWORK_TYPE_P2P_INDEX]);
-	if (!prBssInfo) {
-		DBGLOG(INIT, ERROR, "bss is not active\n");
-		return WLAN_STATUS_INVALID_DATA;
-	}
-
-	sa = (struct sockaddr *)addr;
-
-	COPY_MAC_ADDR(prBssInfo->aucOwnMacAddr, sa->sa_data);
-	COPY_MAC_ADDR(prDev->dev_addr, sa->sa_data);
-
-	COPY_MAC_ADDR(prAdapter->rWifiVar.aucDeviceAddress,
-		sa->sa_data);
-	COPY_MAC_ADDR(prAdapter->rWifiVar.aucInterfaceAddress,
-		sa->sa_data);
-
-	/* Unset p2p net to update OwnMacAddr in FSM */
-	UNSET_NET_ACTIVE(prAdapter, NETWORK_TYPE_P2P_INDEX);
-
-	DBGLOG(INIT, INFO,
-		"Set random macaddr to " MACSTR ".\n",
-		MAC2STR(prBssInfo->aucOwnMacAddr));
-
-	return WLAN_STATUS_SUCCESS;
+	/* @FIXME */
+	return eth_mac_addr(prDev, addr);
 }
 
 /*----------------------------------------------------------------------------*/

@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -64,9 +62,7 @@ int allocatedMemSize;
 *                           P R I V A T E   D A T A
 ********************************************************************************
 */
-
 /* #define MTK_DMA_BUF_MEMCPY_SUP */
-
 static PVOID pvIoBuffer;
 
 #ifdef MTK_DMA_BUF_MEMCPY_SUP
@@ -979,11 +975,7 @@ WLAN_STATUS kalRxIndicatePkts(IN P_GLUE_INFO_T prGlueInfo, IN PVOID apvPkts[], I
 
 		STATS_RX_PKT_INFO_DISPLAY(prSkb->data);
 
-#if KERNEL_VERSION(4, 11, 0) <= CFG80211_VERSION_CODE
-	/* ToDo jiffies assignment */
-#else
 		prNetDev->last_rx = jiffies;
-#endif
 		prSkb->protocol = eth_type_trans(prSkb, prNetDev);
 		prSkb->dev = prNetDev;
 		/* DBGLOG_MEM32(RX, TRACE, (PUINT_32)prSkb->data, prSkb->len); */
@@ -1049,11 +1041,6 @@ kalIndicateStatusAndComplete(IN P_GLUE_INFO_T prGlueInfo, IN WLAN_STATUS eStatus
 	UINT_16 u2StatusCode = WLAN_STATUS_AUTH_TIMEOUT;
 	OS_SYSTIME rCurrentTime;
 	BOOLEAN fgIsNeedUpdateBss = FALSE;
-	P_CONNECTION_SETTINGS_T prConnSettings;
-
-#if KERNEL_VERSION(4, 12, 0) <= CFG80211_VERSION_CODE
-	struct cfg80211_roam_info rRoamInfo = { 0 };
-#endif
 
 	GLUE_SPIN_LOCK_DECLARATION();
 
@@ -1187,24 +1174,11 @@ kalIndicateStatusAndComplete(IN P_GLUE_INFO_T prGlueInfo, IN WLAN_STATUS eStatus
 
 			/* CFG80211 Indication */
 			if (eStatus == WLAN_STATUS_ROAM_OUT_FIND_BEST) {
-#if KERNEL_VERSION(4, 12, 0) <= CFG80211_VERSION_CODE
-				rRoamInfo.bss = bss;
-				rRoamInfo.req_ie = prGlueInfo->aucReqIe;
-				rRoamInfo.req_ie_len =
-					prGlueInfo->u4ReqIeLength;
-				rRoamInfo.resp_ie = prGlueInfo->aucRspIe;
-				rRoamInfo.resp_ie_len =
-					prGlueInfo->u4RspIeLength;
-
-				cfg80211_roamed(prGlueInfo->prDevHandler,
-					&rRoamInfo, GFP_KERNEL);
-#else
 				cfg80211_roamed_bss(prGlueInfo->prDevHandler,
 						    bss,
 						    prGlueInfo->aucReqIe,
 						    prGlueInfo->u4ReqIeLength,
 						    prGlueInfo->aucRspIe, prGlueInfo->u4RspIeLength, GFP_KERNEL);
-#endif
 			} else {
 				/*
 				 * to support user space roaming, cfg80211 will change the sme_state to connecting
@@ -1263,12 +1237,6 @@ kalIndicateStatusAndComplete(IN P_GLUE_INFO_T prGlueInfo, IN WLAN_STATUS eStatus
 			cfg80211_disconnected(prGlueInfo->prDevHandler, u2DeauthReason, NULL, 0, GFP_KERNEL);
 #endif
 		}
-		prConnSettings = &prGlueInfo->prAdapter->rWifiVar.rConnSettings;
-		if (prConnSettings && prConnSettings->assocIeLen > 0) {
-			kalMemFree(prConnSettings->pucAssocIEs, VIR_MEM_TYPE,
-				   prConnSettings->assocIeLen);
-			prConnSettings->assocIeLen = 0;
-		}
 		kalMemFree(prGlueInfo->rFtIeForTx.pucIEBuf, VIR_MEM_TYPE, prGlueInfo->rFtIeForTx.u4IeLength);
 		kalMemZero(&prGlueInfo->rFtIeForTx, sizeof(prGlueInfo->rFtIeForTx));
 		prGlueInfo->eParamMediaStateIndicated = PARAM_MEDIA_STATE_DISCONNECTED;
@@ -1306,23 +1274,23 @@ kalIndicateStatusAndComplete(IN P_GLUE_INFO_T prGlueInfo, IN WLAN_STATUS eStatus
 		*if (prGlueInfo->prDevHandler->ieee80211_ptr->sme_state == CFG80211_SME_CONNECTING)
 		*/
 		if (prBssDesc && u2StatusCode
-		    && u2StatusCode != STATUS_CODE_AUTH_TIMEOUT
-		    && u2StatusCode != STATUS_CODE_ASSOC_TIMEOUT)
+			&& u2StatusCode != STATUS_CODE_AUTH_TIMEOUT
+			&& u2StatusCode != STATUS_CODE_ASSOC_TIMEOUT)
 			cfg80211_connect_result(prGlueInfo->prDevHandler,
-					arBssid,
-					prGlueInfo->aucReqIe,
-					prGlueInfo->u4ReqIeLength,
-					prGlueInfo->aucRspIe,
-					prGlueInfo->u4RspIeLength,
-					u2StatusCode, GFP_KERNEL);
+						arBssid,
+						prGlueInfo->aucReqIe,
+						prGlueInfo->u4ReqIeLength,
+						prGlueInfo->aucRspIe,
+						prGlueInfo->u4RspIeLength,
+						u2StatusCode, GFP_KERNEL);
 		else
 			cfg80211_connect_result(prGlueInfo->prDevHandler,
-					arBssid,
-					prGlueInfo->aucReqIe,
-					prGlueInfo->u4ReqIeLength,
-					prGlueInfo->aucRspIe,
-					prGlueInfo->u4RspIeLength,
-					STATUS_CODE_AUTH_TIMEOUT, GFP_KERNEL);
+						arBssid,
+						prGlueInfo->aucReqIe,
+						prGlueInfo->u4ReqIeLength,
+						prGlueInfo->aucRspIe,
+						prGlueInfo->u4RspIeLength,
+						STATUS_CODE_AUTH_TIMEOUT, GFP_KERNEL);
 		prGlueInfo->eParamMediaStateIndicated = PARAM_MEDIA_STATE_DISCONNECTED;
 		break;
 
@@ -1733,12 +1701,10 @@ kalQoSFrameClassifierAndPacketInfo(IN P_GLUE_INFO_T prGlueInfo,
 
 			ucIpTos = pucIpHdr[1];
 			/* Get the DSCP value from the header of IP packet. */
-			ucUserPriority = getUpFromDscp(prGlueInfo, *pucNetworkType, ucIpTos & 0x3F);
-
-
+			ucUserPriority = getUpFromDscp(prGlueInfo, *pucNetworkType, (ucIpTos >> 2) & 0x3F);
 
 #if (1 || defined(PPR2_TEST))
-		DBGLOG(TX, TRACE, "setUP ucIpTos: %d, ucUP: %d\n", ucIpTos, ucUserPriority);
+		/* DBGLOG(TX, TRACE, "setUP ucIpTos: %d, ucUP: %d\n", ucIpTos, ucUserPriority);*/
 		if (pucIpHdr[9] == IP_PRO_ICMP && pucIpPayload[0] == 0x08) {
 			DBGLOG(TX, INFO, "PING ipid: %d ucIpTos: %d, ucUP: %d\n",
 				(pucIpHdr[5] << 8 | pucIpHdr[4]),
@@ -1752,6 +1718,19 @@ kalQoSFrameClassifierAndPacketInfo(IN P_GLUE_INFO_T prGlueInfo,
 		}
 
 		/* TODO(Kevin): Add TSPEC classifier here */
+	}  else if (u2EtherTypeLen == ETH_P_IPV6) {
+		PUINT_8 pucIpHdr = &aucLookAheadBuf[ETH_HLEN];
+		UINT_16 u2Tmp;
+		UINT_8 ucIpTos;
+
+		WLAN_GET_FIELD_BE16(pucIpHdr, &u2Tmp);
+		ucIpTos = u2Tmp >> 4;
+
+		/* Get the DSCP value from the header of IP packet. */
+		ucUserPriority = getUpFromDscp(prGlueInfo, *pucNetworkType, (ucIpTos >> 2) & 0x3F);
+
+		if (ucUserPriority == 0xFF)
+			ucUserPriority = ((ucIpTos & IPTOS_PREC_MASK) >> IPTOS_PREC_OFFSET);
 	}  else if (u2EtherTypeLen == ETH_P_1X || u2EtherTypeLen == ETH_P_PRE_1X) {	/* For Port Control */
 		PUINT_8 pucEapol = &aucLookAheadBuf[ETH_HLEN];
 		UINT_8 ucEapolType = pucEapol[1];
@@ -2365,8 +2344,7 @@ int tx_thread(void *data)
 		if (test_and_clear_bit(GLUE_FLAG_SUB_MOD_MULTICAST_BIT, &prGlueInfo->ulFlag))
 			p2pSetMulticastListWorkQueueWrapper(prGlueInfo);
 
-		if (test_and_clear_bit(GLUE_FLAG_FRAME_FILTER_BIT, &prGlueInfo->ulFlag) &&
-				prGlueInfo->prP2PInfo) {
+		if (test_and_clear_bit(GLUE_FLAG_FRAME_FILTER_BIT, &prGlueInfo->ulFlag)) {
 			p2pFuncUpdateMgmtFrameRegister(prGlueInfo->prAdapter,
 						       prGlueInfo->prP2PInfo->u4OsMgmtFrameFilter);
 		}
@@ -3365,6 +3343,12 @@ BOOLEAN kalInitIOBuffer(VOID)
 	else
 		u4Size = CFG_RX_COALESCING_BUFFER_SIZE + sizeof(ENHANCE_MODE_DATA_STRUCT_T);
 
+#ifdef MTK_DMA_BUF_MEMCPY_SUP
+	pvDmaBuffer = dma_alloc_coherent(NULL, CFG_RX_MAX_PKT_SIZE, &pvDmaPhyBuf, GFP_KERNEL);
+	if (pvDmaBuffer == NULL)
+		return FALSE;
+#endif /* MTK_DMA_BUF_MEMCPY_SUP */
+
 	pvIoBuffer = kmalloc(u4Size, GFP_KERNEL);
 	/* pvIoBuffer = dma_alloc_coherent(NULL, u4Size, &pvIoPhyBuf, GFP_KERNEL); */
 	if (pvIoBuffer) {
@@ -3392,7 +3376,7 @@ VOID kalUninitIOBuffer(VOID)
 {
 	kfree(pvIoBuffer);
 #ifdef MTK_DMA_BUF_MEMCPY_SUP
-	dma_free_coherent(NULL, CFG_RX_COALESCING_BUFFER_SIZE, pvDmaBuffer, pvDmaPhyBuf);
+	dma_free_coherent(NULL, CFG_RX_MAX_PKT_SIZE, pvDmaBuffer, pvDmaPhyBuf);
 #endif /* MTK_DMA_BUF_MEMCPY_SUP */
 	/* dma_free_coherent(NULL, pvIoBufferSize, pvIoBuffer, pvIoPhyBuf); */
 
@@ -3650,17 +3634,8 @@ ULONG kalIOPhyAddrGet(IN ULONG VirtAddr)
  * \return physical addr
  */
 /*----------------------------------------------------------------------------*/
-VOID kalDmaBufGet(IN VOID *dev, OUT VOID **VirtAddr, OUT VOID **PhyAddr)
+VOID kalDmaBufGet(OUT VOID **VirtAddr, OUT VOID **PhyAddr)
 {
-	if (pvDmaBuffer == NULL) {
-		dma_addr_t rAddr;
-
-		pvDmaBuffer = dma_alloc_coherent(dev, CFG_RX_COALESCING_BUFFER_SIZE, &rAddr, GFP_KERNEL);
-		pvDmaPhyBuf = (PVOID) rAddr;
-		if (pvDmaBuffer == NULL)
-			DBGLOG(INIT, ERROR, "pvDmaBuffer is still NULL.\n");
-	}
-
 	*VirtAddr = pvDmaBuffer;
 	*PhyAddr = pvDmaPhyBuf;
 }
@@ -3716,11 +3691,9 @@ UINT_32 kalFileRead(struct file *file, UINT_64 offset, UINT_8 *data, UINT_32 siz
 
 	oldfs = get_fs();
 	set_fs(get_ds());
-#if KERNEL_VERSION(4, 13, 0) <= CFG80211_VERSION_CODE
-	ret = kernel_read(file, data, size, &offset);
-#else
+
 	ret = vfs_read(file, data, size, &offset);
-#endif
+
 	set_fs(oldfs);
 	return ret;
 }
@@ -3732,11 +3705,8 @@ UINT_32 kalFileWrite(struct file *file, UINT_64 offset, UINT_8 *data, UINT_32 si
 
 	oldfs = get_fs();
 	set_fs(get_ds());
-#if KERNEL_VERSION(4, 13, 0) <= CFG80211_VERSION_CODE
-	ret = kernel_write(file, data, size, &offset);
-#else
+
 	ret = vfs_write(file, data, size, &offset);
-#endif
 
 	set_fs(oldfs);
 	return ret;
@@ -4343,11 +4313,9 @@ UINT_64 kalGetBootTime(void)
 VOID kalSchedScanResults(IN P_GLUE_INFO_T prGlueInfo)
 {
 	ASSERT(prGlueInfo);
-#if KERNEL_VERSION(4, 12, 0) <= CFG80211_VERSION_CODE
-	cfg80211_sched_scan_results(priv_to_wiphy(prGlueInfo), 0);
-#else
+
 	cfg80211_sched_scan_results(priv_to_wiphy(prGlueInfo));
-#endif
+
 }
 
 /*----------------------------------------------------------------------------*/
@@ -4920,85 +4888,4 @@ VOID kalChangeSchedParams(P_GLUE_INFO_T prGlueInfo, BOOLEAN fgNormalThread)
 		set_user_nice(prGlueInfo->rx_thread, PRIO_TO_NICE(DEFAULT_PRIO - 19));
 	}
 #endif
-}
-
-#if CFG_SUPPORT_WPA3
-int kalExternalAuthRequest(IN P_ADAPTER_T prAdapter)
-{
-	struct cfg80211_external_auth_params params;
-	P_AIS_FSM_INFO_T prAisFsmInfo;
-	P_BSS_DESC_T prBssDesc;
-	struct net_device *ndev = NULL;
-
-	prAisFsmInfo = &(prAdapter->rWifiVar.rAisFsmInfo);
-	if (!prAisFsmInfo) {
-		DBGLOG(SAA, WARN,
-		       "SAE auth failed with NULL prAisFsmInfo\n");
-		return WLAN_STATUS_INVALID_DATA;
-	}
-
-	prBssDesc = prAisFsmInfo->prTargetBssDesc;
-	if (!prBssDesc) {
-		DBGLOG(SAA, WARN,
-		       "SAE auth failed without prTargetBssDesc\n");
-		return WLAN_STATUS_INVALID_DATA;
-	}
-
-	ndev = prAdapter->prGlueInfo->prDevHandler;
-	params.action = NL80211_EXTERNAL_AUTH_START;
-	COPY_MAC_ADDR(params.bssid, prBssDesc->aucBSSID);
-	COPY_SSID(params.ssid.ssid, params.ssid.ssid_len,
-		  prBssDesc->aucSSID, prBssDesc->ucSSIDLen);
-	params.key_mgmt_suite = RSN_CIPHER_SUITE_SAE;
-	DBGLOG(AIS, INFO, "[WPA3] "MACSTR" %s %d %d %02x-%02x-%02x-%02x",
-	       params.bssid, params.ssid.ssid,
-	       params.ssid.ssid_len, params.action,
-	       (uint8_t) (params.key_mgmt_suite & 0x000000FF),
-	       (uint8_t) ((params.key_mgmt_suite >> 8) & 0x000000FF),
-	       (uint8_t) ((params.key_mgmt_suite >> 16) & 0x000000FF),
-	       (uint8_t) ((params.key_mgmt_suite >> 24) & 0x000000FF));
-	return cfg80211_external_auth_request(ndev, &params, GFP_KERNEL);
-}
-#endif
-
-int kalMaskMemCmp(const void *cs, const void *ct,
-	const void *mask, size_t count)
-{
-	const uint8_t *su1, *su2, *su3;
-	int res = 0;
-
-	for (su1 = cs, su2 = ct, su3 = mask;
-		count > 0; ++su1, ++su2, ++su3, count--) {
-		if (mask != NULL)
-			res = ((*su1)&(*su3)) - ((*su2)&(*su3));
-		else
-			res = (*su1) - (*su2);
-		if (res != 0)
-			break;
-	}
-	return res;
-}
-
-const uint8_t *kalFindIeMatchMask(uint8_t eid,
-				const uint8_t *ies, int len,
-				const uint8_t *match,
-				int match_len, int match_offset,
-				const uint8_t *match_mask)
-{
-	/* match_offset can't be smaller than 2, unless match_len is
-	 * zero, in which case match_offset must be zero as well.
-	 */
-	if (WARN_ON((match_len && match_offset < 2) ||
-		(!match_len && match_offset)))
-		return NULL;
-	while (len >= 2 && len >= ies[1] + 2) {
-		if ((ies[0] == eid) &&
-			(ies[1] + 2 >= match_offset + match_len) &&
-			!kalMaskMemCmp(ies + match_offset,
-			match, match_mask, match_len))
-			return ies;
-		len -= ies[1] + 2;
-		ies += ies[1] + 2;
-	}
-	return NULL;
 }

@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -18,6 +16,7 @@ p2pStateInit_IDLE(IN P_ADAPTER_T prAdapter,
 		  IN P_P2P_FSM_INFO_T prP2pFsmInfo, IN P_BSS_INFO_T prP2pBssInfo, OUT P_ENUM_P2P_STATE_T peNextState)
 {
 	BOOLEAN fgIsTransOut = FALSE;
+	P_P2P_CHNL_REQ_INFO_T prChnlReqInfo = (P_P2P_CHNL_REQ_INFO_T) NULL;
 
 	do {
 		ASSERT_BREAK((prAdapter != NULL) &&

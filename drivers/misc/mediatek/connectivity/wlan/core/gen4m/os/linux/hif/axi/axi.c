@@ -226,14 +226,11 @@ static int hifAxiProbe(void)
 
 	DBGLOG(INIT, TRACE, "driver.name = %s\n", prPlatDev->id_entry->name);
 
-#ifdef CFG_MTK_ANDROID_WMT
-	mtk_wcn_consys_hw_wifi_paldo_ctrl(1);
-#endif
-
 	if (pfWlanProbe((void *)prPlatDev,
 			(void *)prPlatDev->id_entry->driver_data) !=
 			WLAN_STATUS_SUCCESS) {
-		DBGLOG(INIT, INFO, "pfWlanProbe fail!\n");
+		DBGLOG(INIT, INFO, "pfWlanProbe fail!call pfWlanRemove()\n");
+		pfWlanRemove();
 		ret = -1;
 		goto out;
 	}
@@ -250,11 +247,6 @@ static int hifAxiRemove(void)
 
 	if (g_fgDriverProbed)
 		pfWlanRemove();
-
-#ifdef CFG_MTK_ANDROID_WMT
-	mtk_wcn_consys_hw_wifi_paldo_ctrl(0);
-#endif
-
 	DBGLOG(INIT, TRACE, "pfWlanRemove done\n");
 	DBGLOG(INIT, TRACE, "hifAxiRemove() done\n");
 	return 0;
@@ -280,16 +272,9 @@ static int hifAxiClrBusCnt(void)
 
 static int hifAxiSetMpuProtect(bool enable)
 {
-	kalSetEmiMpuProtection(gConEmiPhyBase, enable);
+	kalSetEmiMpuProtection(gConEmiPhyBase, WIFI_EMI_MEM_OFFSET,
+			       WIFI_EMI_MEM_SIZE, enable);
 	return 0;
-}
-
-static int hifAxiIsWifiDrvOwn(void)
-{
-	if (!g_prGlueInfo || !g_prGlueInfo->prAdapter)
-		return 0;
-
-	return (g_prGlueInfo->prAdapter->fgIsFwOwn == FALSE) ? 1 : 0;
 }
 
 static void axiDmaSetup(struct platform_device *pdev)
@@ -361,18 +346,15 @@ static bool axiCsrIoremap(struct platform_device *pdev)
 #endif
 
 	if (!CSRBaseAddress) {
-#define LOG_TEMP "ioremap failed for device %s, region 0x%X @ 0x" PRIx64 "\n"
 		DBGLOG(INIT, INFO,
-			LOG_TEMP,
+			"ioremap failed for device %s, region 0x%X @ 0x%lX\n",
 			axi_name(pdev), g_u4CsrSize, g_u8CsrOffset);
-#undef LOG_TEMP
 		release_mem_region(g_u8CsrOffset, g_u4CsrSize);
 		return false;
 	}
 
-	DBGLOG(INIT, INFO,
-		"CSRBaseAddress:0x%lX ioremap region 0x%X @ 0x" PRIx64 "\n",
-		CSRBaseAddress, g_u4CsrSize, g_u8CsrOffset);
+	DBGLOG(INIT, INFO, "CSRBaseAddress:0x%lX ioremap region 0x%X @ 0x%lX\n",
+	       CSRBaseAddress, g_u4CsrSize, g_u8CsrOffset);
 
 	return true;
 }
@@ -517,7 +499,7 @@ static void axiFreeHifMem(struct platform_device *pdev)
 static irqreturn_t mtk_axi_interrupt(int irq, void *dev_instance)
 {
 	struct GLUE_INFO *prGlueInfo = NULL;
-	static DEFINE_RATELIMIT_STATE(_rs, 2 * HZ, 1);
+
 	prGlueInfo = (struct GLUE_INFO *)dev_instance;
 	if (!prGlueInfo) {
 		DBGLOG(HAL, INFO, "No glue info in mtk_axi_interrupt()\n");
@@ -532,9 +514,6 @@ static irqreturn_t mtk_axi_interrupt(int irq, void *dev_instance)
 	}
 
 	kalSetIntEvent(prGlueInfo);
-
-	if (__ratelimit(&_rs))
-		pr_info("[wlan] In HIF ISR.\n");
 
 	return IRQ_HANDLED;
 }
@@ -553,7 +532,6 @@ static int mtk_axi_probe(IN struct platform_device *pdev)
 {
 #if CFG_MTK_ANDROID_WMT
 	struct MTK_WCN_WMT_WLAN_CB_INFO rWmtCb;
-	memset(&rWmtCb, 0, sizeof(struct MTK_WCN_WMT_WLAN_CB_INFO));
 #endif
 
 	axiDmaSetup(pdev);
@@ -569,7 +547,6 @@ static int mtk_axi_probe(IN struct platform_device *pdev)
 	rWmtCb.wlan_bus_cnt_get_cb = hifAxiGetBusCnt;
 	rWmtCb.wlan_bus_cnt_clr_cb = hifAxiClrBusCnt;
 	rWmtCb.wlan_emi_mpu_set_protection_cb = hifAxiSetMpuProtect;
-	rWmtCb.wlan_is_wifi_drv_own_cb = hifAxiIsWifiDrvOwn;
 	mtk_wcn_wmt_wlan_reg(&rWmtCb);
 #else
 	hifAxiProbe();

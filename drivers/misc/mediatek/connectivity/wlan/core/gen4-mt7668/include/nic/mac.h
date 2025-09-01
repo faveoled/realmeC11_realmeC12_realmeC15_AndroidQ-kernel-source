@@ -77,9 +77,6 @@
 *                              C O N S T A N T S
 ********************************************************************************
 */
-#if CFG_SUPPORT_CFG80211_AUTH
-#define AUTH_DATA_MAX_LEN 1024 /* temp defined */
-#endif
 /* 3 --------------- Constants for Ethernet/802.11 MAC --------------- */
 /* MAC Address */
 #define MAC_ADDR_LEN                            6
@@ -550,9 +547,6 @@
 #define AUTH_ALGORITHM_NUM_OPEN_SYSTEM              0	/* Open System */
 #define AUTH_ALGORITHM_NUM_SHARED_KEY               1	/* Shared Key */
 #define AUTH_ALGORITHM_NUM_FAST_BSS_TRANSITION      2	/* Fast BSS Transition */
-#if CFG_SUPPORT_CFG80211_AUTH
-#define AUTH_ALGORITHM_NUM_SAE                      3	/* SAE */
-#endif
 
 /* 7.3.1.2 Authentication Transaction Sequence Number field */
 #define AUTH_TRANSACTION_SEQENCE_NUM_FIELD_LEN      2
@@ -919,10 +913,6 @@
 #define ELEM_MAX_LEN_WAPI                           38	/* one pairwise, one AKM suite, one BKID */
 #define ELEM_MAX_LEN_WSC                            200	/* one pairwise, one AKM suite, one BKID */
 
-/* 802.11i */
-/* length of one PMKID */
-#define RSN_PMKID_LEN                               16
-
 #if CFG_SUPPORT_802_11W
 #define ELEM_WPA_CAP_MFPR                           BIT(6)
 #define ELEM_WPA_CAP_MFPC                           BIT(7)
@@ -1016,10 +1006,9 @@
 
 #define VHT_CAP_INFO_SU_BEAMFORMER_CAPABLE						BIT(11)
 #define VHT_CAP_INFO_SU_BEAMFORMEE_CAPABLE						BIT(12)
-#define VHT_CAP_INFO_SU_BEAMFORMEE_CAPABLE_OFFSET			12
 
-#define VHT_CAP_INFO_COMP_STEERING_NUM_OF_BFER_ANT_SUP_OFFSET 13
-#define VHT_CAP_INFO_COMP_STEERING_NUM_OF_BFER_ANT_SUP BITS(13, 15)
+#define VHT_CAP_INFO_COMPRESSED_STEERING_NUMBER_OF_BEAMFORMER_ANTENNAS_SUPPOERTED_OFFSET 13
+#define VHT_CAP_INFO_COMPRESSED_STEERING_NUMBER_OF_BEAMFORMER_ANTENNAS_SUPPOERTED BITS(13, 15)
 #define VHT_CAP_INFO_COMPRESSED_STEERING_NUMBER_OF_BEAMFORMER_ANTENNAS_2_SUPPOERTED BIT(13)
 #define VHT_CAP_INFO_COMPRESSED_STEERING_NUMBER_OF_BEAMFORMER_ANTENNAS_3_SUPPOERTED BIT(14)
 #define VHT_CAP_INFO_COMPRESSED_STEERING_NUMBER_OF_BEAMFORMER_ANTENNAS_4_SUPPOERTED BITS(13, 14)
@@ -1151,7 +1140,6 @@
 #define TXBF_IMPLICIT_RX_CAPABLE                    BIT(0)
 #define TXBF_RX_STAGGERED_SOUNDING_CAPABLE          BIT(1)
 #define TXBF_TX_STAGGERED_SOUNDING_CAPABLE          BIT(2)
-#define TXBF_RX_NDP_CAPABLE_OFFSET                  3
 #define TXBF_RX_NDP_CAPABLE                         BIT(3)
 #define TXBF_TX_NDP_CAPABLE                         BIT(4)
 #define TXBF_IMPLICIT_TX_CAPABLE                    BIT(5)
@@ -1162,7 +1150,6 @@
 #define TXBF_EXPLICIT_CSI_FEEDBACK_CAPABLE          BITS(11, 12)
 #define TXBF_EXPLICIT_NONCOMPRESSED_FEEDBACK_CAPABLE BITS(13, 14)
 
-#define TXBF_EXPLICIT_COMPRESSED_FEEDBACK_CAPABLE_OFFSET 15
 #define TXBF_EXPLICIT_COMPRESSED_FEEDBACK_CAPABLE   BITS(15, 16)
 #define TXBF_EXPLICIT_COMPRESSED_FEEDBACK_IMMEDIATE_CAPABLE BIT(16)
 
@@ -1172,7 +1159,6 @@
 #define TXBF_CSI_BFER_ANTENNANUM_SUPPORTED          BITS(19, 20)
 #define TXBF_NONCOMPRESSED_TX_ANTENNANUM_SUPPORTED  BITS(21, 22)
 
-#define TXBF_COMPRESSED_TX_ANTENNANUM_SUPPORTED_OFFSET  23
 #define TXBF_COMPRESSED_TX_ANTENNANUM_SUPPORTED     BITS(23, 24)
 #define TXBF_COMPRESSED_TX_ANTENNANUM_4_SUPPORTED   BITS(23, 24)
 
@@ -1656,12 +1642,8 @@ typedef struct _WLAN_AUTH_FRAME_T {
 	UINT_16 u2SeqCtrl;	/* Sequence Control */
 	/* Authentication frame body */
 	UINT_16 u2AuthAlgNum;	/* Authentication algorithm number */
-#if CFG_SUPPORT_CFG80211_AUTH
-	BOOLEAN aucAuthData[AUTH_DATA_MAX_LEN];
-#else
 	UINT_16 u2AuthTransSeqNo;	/* Authentication transaction sequence number */
 	UINT_16 u2StatusCode;	/* Status code */
-#endif
 	UINT_8 aucInfoElem[1];	/* Various IEs for Fast BSS Transition */
 } __KAL_ATTRIB_PACKED__ WLAN_AUTH_FRAME_T, *P_WLAN_AUTH_FRAME_T;
 

@@ -193,8 +193,7 @@ P_CMD_INFO_T cmdBufAllocateCmdInfo(IN P_ADAPTER_T prAdapter, IN UINT_32 u4Length
 		DBGLOG(MEM, LOUD, "CMD[0x%p] allocated! LEN[%04u], Rest[%u]\n",
 		       prCmdInfo, u4Length, prAdapter->rFreeCmdList.u4NumElem);
 	} else {
-		DBGLOG(MEM, WARN,
-		       "CMD allocation failed! LEN[%04u], Rest[%u]\n",
+		DBGLOG(MEM, LOUD, "CMD allocation failed! LEN[%04u], Rest[%u]\n",
 		       u4Length, prAdapter->rFreeCmdList.u4NumElem);
 	}
 

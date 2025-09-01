@@ -47,7 +47,7 @@
 
 UINT32 gStpDbgLogOut;
 UINT32 gStpDbgDumpType = STP_DBG_PKT;
-INT32 gStpDbgDbgLevel = STP_DBG_LOG_INFO;
+UINT32 gStpDbgDbgLevel = STP_DBG_LOG_INFO;
 
 MTKSTP_DBG_T *g_stp_dbg;
 
@@ -401,8 +401,8 @@ static _osal_inline_ INT32 stp_dbg_core_dump_post_handle(P_WCN_CORE_DUMP_T dmp)
 		if (pStr != NULL) {
 			pDtr = osal_strchr(pStr, '-');
 			if (pDtr != NULL) {
-				tmp = STP_CORE_DUMP_INFO_SZ - osal_strlen(INFO_HEAD);
-				tmp = ((pDtr - pStr) > tmp) ? tmp : (pDtr - pStr);
+				tmp = pDtr - pStr;
+				tmp = (tmp > STP_CORE_DUMP_INFO_SZ) ? STP_CORE_DUMP_INFO_SZ : tmp;
 				osal_memcpy(&dmp->info[osal_strlen(INFO_HEAD)], pStr, tmp);
 				dmp->info[osal_strlen(dmp->info) + 1] = '\0';
 			} else {
@@ -1783,7 +1783,6 @@ INT32 stp_dbg_dump_num(LONG dmp_num)
 
 static _osal_inline_ INT32 stp_dbg_parser_assert_str(PINT8 str, ENUM_ASSERT_INFO_PARSER_TYPE type)
 {
-#define WDT_INFO_HEAD "Watch Dog Timeout"
 	PINT8 pStr = NULL;
 	PINT8 pDtr = NULL;
 	PINT8 pTemp = NULL;
@@ -1972,10 +1971,10 @@ static _osal_inline_ INT32 stp_dbg_parser_assert_str(PINT8 str, ENUM_ASSERT_INFO
 		osal_memcpy(&tempBuf[0], pDtr, len);
 		tempBuf[len] = '\0';
 
-		if (osal_memcmp(tempBuf, "*", osal_strlen("*")) == 0)
+		if (osal_memcmp(tempBuf, "*", len) == 0)
 			osal_memcpy(&g_stp_dbg_cpupcr->assert_type[0], "general assert",
 					osal_strlen("general assert"));
-		if (osal_memcmp(tempBuf, WDT_INFO_HEAD, osal_strlen(WDT_INFO_HEAD)) == 0)
+		if (osal_memcmp(tempBuf, "Watch Dog Timeout", len) == 0)
 			osal_memcpy(&g_stp_dbg_cpupcr->assert_type[0], "wdt", osal_strlen("wdt"));
 		if (osal_memcmp(tempBuf, "RB_FULL", osal_strlen("RB_FULL")) == 0) {
 			osal_memcpy(&g_stp_dbg_cpupcr->assert_type[0], tempBuf, len);
@@ -2115,7 +2114,7 @@ INT32 stp_dbg_poll_cpupcr(UINT32 times, UINT32 sleep, UINT32 cmd)
 	osal_unlock_sleepable_lock(&g_stp_dbg_cpupcr->lock);
 
 	if (cmd) {
-		UINT8 str[DBG_LOG_STR_SIZE] = {""};
+		UINT8 str[160] = {""};
 		PUINT8 p = str;
 		INT32 str_len = 0;
 
@@ -2174,56 +2173,6 @@ INT32 stp_dbg_poll_cpupcr(UINT32 times, UINT32 sleep, UINT32 cmd)
 		mtk_stp_dump_sdio_register();
 	}
 	return 0;
-}
-
-INT32 stp_dbg_dump_cpupcr_reg_info(PUINT8 buf, UINT32 consys_lp_reg)
-{
-	INT32 i = 0;
-	INT32 count = 0;
-	UINT32 len = 0;
-
-	/* never retrun negative value */
-	if (!g_stp_dbg_cpupcr || !buf) {
-		STP_DBG_PR_DBG("NULL pointer, g_stp_dbg_cpupcr:%p, buf:%p\n",
-				g_stp_dbg_cpupcr, buf);
-		return 0;
-	}
-
-	for (i = 0; i < STP_DBG_CPUPCR_NUM; i++) {
-		if (g_stp_dbg_cpupcr->sec_buffer[i] == 0 &&
-				g_stp_dbg_cpupcr->nsec_buffer[i] == 0)
-			continue;
-		count++;
-		if (count == 1)
-			len += osal_sprintf(buf + len, "0x%08x", g_stp_dbg_cpupcr->buffer[i]);
-		else
-			len += osal_sprintf(buf + len, ";0x%08x", g_stp_dbg_cpupcr->buffer[i]);
-	}
-
-	if (count == 0)
-		len += osal_sprintf(buf + len, "0x%08x\n", consys_lp_reg);
-	else
-		len += osal_sprintf(buf + len, ";0x%08x\n", consys_lp_reg);
-
-	stp_dbg_clear_cpupcr_reg_info();
-
-	return len;
-}
-
-VOID stp_dbg_clear_cpupcr_reg_info(VOID)
-{
-	if (osal_lock_sleepable_lock(&g_stp_dbg_cpupcr->lock)) {
-		STP_DBG_PR_DBG("lock failed\n");
-		return;
-	}
-
-	osal_memset(&g_stp_dbg_cpupcr->buffer[0], 0, STP_DBG_CPUPCR_NUM);
-	g_stp_dbg_cpupcr->count = 0;
-	g_stp_dbg_cpupcr->host_assert_info.reason = 0;
-	g_stp_dbg_cpupcr->host_assert_info.drv_type = 0;
-	g_stp_dbg_cpupcr->issue_type = STP_FW_ISSUE_TYPE_INVALID;
-	g_stp_dbg_cpupcr->keyword[0] = '\0';
-	osal_unlock_sleepable_lock(&g_stp_dbg_cpupcr->lock);
 }
 
 INT32 stp_dbg_poll_dmaregs(UINT32 times, UINT32 sleep)
@@ -2350,7 +2299,7 @@ VOID stp_dbg_set_keyword(PINT8 keyword)
 		else if (osal_strchr(keyword, '<') != NULL || osal_strchr(keyword, '>') != NULL)
 			STP_DBG_PR_INFO("Keyword has < or >, keywrod: %s\n", keyword);
 		else
-			osal_strncat(&g_stp_dbg_cpupcr->keyword[0], keyword, osal_strlen(keyword));
+			osal_strncat(&g_stp_dbg_cpupcr->keyword[0], keyword, STP_DBG_KEYWORD_SIZE);
 	} else {
 		g_stp_dbg_cpupcr->keyword[0] = '\0';
 	}
@@ -2654,8 +2603,6 @@ INT32 stp_dbg_cpupcr_infor_format(PUINT8 buf, UINT32 max_len)
 	g_stp_dbg_cpupcr->host_assert_info.drv_type = 0;
 	g_stp_dbg_cpupcr->issue_type = STP_FW_ISSUE_TYPE_INVALID;
 	g_stp_dbg_cpupcr->keyword[0] = '\0';
-	g_stp_dbg_cpupcr->fwRrq = 0;
-	g_stp_dbg_cpupcr->fwIsr = 0;
 	osal_unlock_sleepable_lock(&g_stp_dbg_cpupcr->lock);
 
 	return len;
@@ -2790,8 +2737,6 @@ INT32 stp_dbg_start_emi_dump(VOID)
 
 	if (mtk_wcn_wlan_emi_mpu_set_protection)
 		(*mtk_wcn_wlan_emi_mpu_set_protection)(false);
-	/* Disable MCIF EMI protection */
-	mtk_wcn_wmt_set_mcif_mpu_protection(false);
 	stp_dbg_set_coredump_timer_state(CORE_DUMP_DOING);
 	osal_timer_modify(&g_core_dump->dmp_emi_timer, STP_EMI_DUMP_TIMEOUT);
 	ret = stp_dbg_nl_send_data(EMICOREDUMP_CMD, sizeof(EMICOREDUMP_CMD));
@@ -2814,8 +2759,6 @@ INT32 stp_dbg_stop_emi_dump(VOID)
 	}
 
 	mtk_wcn_stp_emi_dump_flag_ctrl(1);
-	/* Enable MCIF EMI protection */
-	mtk_wcn_wmt_set_mcif_mpu_protection(true);
 	if (mtk_wcn_wlan_emi_mpu_set_protection)
 		(*mtk_wcn_wlan_emi_mpu_set_protection)(true);
 	osal_timer_stop(&g_core_dump->dmp_emi_timer);

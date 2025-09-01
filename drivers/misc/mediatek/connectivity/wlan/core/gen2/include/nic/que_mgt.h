@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -553,6 +551,19 @@ typedef enum _ENUM_WMM_ACI_T {
 	WMM_AC_VO_INDEX,
 	WMM_AC_INDEX_NUM
 } ENUM_WMM_ACI_T, *P_ENUM_WMM_ACI_T;
+
+/* WMM QOS user priority from 802.1D/802.11e */
+enum ENUM_WMM_UP_T {
+	WMM_UP_BE_INDEX = 0,
+	WMM_UP_BK_INDEX,
+	WMM_UP_RESV_INDEX,
+	WMM_UP_EE_INDEX,
+	WMM_UP_CL_INDEX,
+	WMM_UP_VI_INDEX,
+	WMM_UP_VO_INDEX,
+	WMM_UP_NC_INDEX,
+	WMM_UP_INDEX_NUM
+};
 
 /* Used for CMD Queue Operation */
 typedef enum _ENUM_FRAME_ACTION_T {

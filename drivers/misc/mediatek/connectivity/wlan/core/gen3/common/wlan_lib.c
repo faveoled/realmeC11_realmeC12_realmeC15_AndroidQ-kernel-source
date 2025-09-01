@@ -168,7 +168,7 @@ UINT_32 dumpCrBeforeReset(P_GLUE_INFO_T prGlueInfo, UINT_16 u2ChipID)
 
 	if (prGlueInfo == NULL) {
 		DBGLOG(INIT, WARN, "prGlueInfo == NULL\n");
-		return 1;
+		return -1;
 	}
 
 	/*Pin-Hao need check some cr.*/
@@ -191,10 +191,6 @@ UINT_32 dumpCrBeforeReset(P_GLUE_INFO_T prGlueInfo, UINT_16 u2ChipID)
 		break;
 	}
 
-	if (prGlueInfo->rHifInfo.HifRegBaseAddr == NULL) {
-		DBGLOG(INIT, ERROR, "prGlueInfo->rHifInfo.InfraRegBaseAddr == NULL.\n");
-		return 1;
-	}
 
 	DBGLOG(INIT, ERROR,
 	       "HIF_BASE_ADDR+0x300: 0x%08x\n",
@@ -236,11 +232,6 @@ UINT_32 dumpCrBeforeReset(P_GLUE_INFO_T prGlueInfo, UINT_16 u2ChipID)
 	       CONNSYS_REG_READ(prGlueInfo->rHifInfo.HifRegBaseAddr,
 				0x330));
 
-	if (prGlueInfo->rHifInfo.InfraRegBaseAddr == NULL) {
-		DBGLOG(INIT, ERROR, "prGlueInfo->rHifInfo.InfraRegBaseAddr == NULL.\n");
-		return 1;
-	}
-
 	DBGLOG(INIT, ERROR, "INFRASYS_AO_REG_BASE+0x0394 write 0x800c.\n");
 	if (u2ChipID == 0x6771) {
 		val = 0x800c;
@@ -251,11 +242,6 @@ UINT_32 dumpCrBeforeReset(P_GLUE_INFO_T prGlueInfo, UINT_16 u2ChipID)
 		CONNSYS_REG_WRITE(prGlueInfo->rHifInfo.InfraRegBaseAddr, u4InfraPseOffset,
 				  CONNSYS_REG_READ(prGlueInfo->rHifInfo.InfraRegBaseAddr,
 						   u4InfraPseOffset) | val);
-	}
-
-	if (prGlueInfo->rHifInfo.ConnCfgRegBaseAddr == NULL) {
-		DBGLOG(INIT, ERROR, "prGlueInfo->rHifInfo.ConnCfgRegBaseAddr == NULL.\n");
-		return 1;
 	}
 
 	DBGLOG(INIT, ERROR, "CONNSYS_CONFIG+0x6c write 0x6\n");
@@ -1300,10 +1286,7 @@ WLAN_STATUS wlanProcessCommandQueue(IN P_ADAPTER_T prAdapter, IN P_QUE_T prCmdQu
 	QUEUE_REMOVE_HEAD(prTempCmdQue, prQueueEntry, P_QUE_ENTRY_T);
 	while (prQueueEntry) {
 		prCmdInfo = (P_CMD_INFO_T) prQueueEntry;
-		DBGLOG(TX, TRACE,
-			"CMD: CID=0x%x, SEQ=%d, CMD type=%d\n",
-			prCmdInfo->ucCID, prCmdInfo->ucCmdSeqNum,
-			prCmdInfo->eCmdType);
+
 		switch (prCmdInfo->eCmdType) {
 		case COMMAND_TYPE_NETWORK_IOCTL:
 			if (prCmdInfo->ucCID == CMD_ID_ADD_REMOVE_KEY) {
@@ -1390,11 +1373,7 @@ WLAN_STATUS wlanProcessCommandQueue(IN P_ADAPTER_T prAdapter, IN P_QUE_T prCmdQu
 				cmdBufFreeCmdInfo(prAdapter, prCmdInfo);
 				DBGLOG(TX, WARN, "TX CMD FAILED, Status[%u] TYPE[%u] ID[0x%02X] SEQ[%u]\n",
 				       rStatus, prCmdInfo->eCmdType, prCmdInfo->ucCID, prCmdInfo->ucCmdSeqNum);
-			} else
-				DBGLOG(TX, TRACE,
-					"Send CMD, status=%u, CID=0x%x, SEQ=%d, CMD type=%d, OID=%d\n",
-					rStatus, prCmdInfo->ucCID, prCmdInfo->ucCmdSeqNum,
-					prCmdInfo->eCmdType, prCmdInfo->fgIsOid);
+			}
 #else
 			rStatus = wlanSendCommand(prAdapter, prCmdInfo);
 
@@ -2105,9 +2084,8 @@ VOID wlanReleasePendingOid(IN P_ADAPTER_T prAdapter, IN ULONG ulParamPtr)
 #if (CFG_SUPPORT_TRACE_TC4 == 1)
 					wlanDumpTcResAndTxedCmd(NULL, 0);
 #endif
-					#if defined(MT6631)
-					HAL_DUMP_AHB_INFO(prAdapter, prAdapter->u2ChipID);
-					#endif
+					if (prAdapter != NULL)
+						dumpCrBeforeReset(prAdapter->prGlueInfo, prAdapter->u2ChipID);
 					GL_RESET_TRIGGER(prAdapter, RST_FLAG_DO_CORE_DUMP);
 				}
 
@@ -4055,11 +4033,6 @@ WLAN_STATUS wlanQueryNicCapability(IN P_ADAPTER_T prAdapter)
 	prAdapter->u4FwFeatureFlag0 = prEventNicCapability->u4FeatureFlag0;
 	prAdapter->u4FwFeatureFlag1 = prEventNicCapability->u4FeatureFlag1;
 
-#if CFG_SUPPORT_ANT_SWAP
-	prAdapter->fgIsAntSwpSupport = prEventNicCapability->ucAntSwapEn;
-	DBGLOG(NIC, INFO, "prAdapter->fgIsAntSwpSupport = %u\n", prAdapter->fgIsAntSwpSupport);
-#endif
-
 	g_u2FwIDVersion = (prAdapter->rVerInfo.u2FwProductID << 16) | (prAdapter->rVerInfo.u2FwOwnVersion);
 #if CFG_ENABLE_CAL_LOG
 	DBGLOG(NIC, LOUD, " RF CAL FAIL  = (%d),BB CAL FAIL  = (%d)\n",
@@ -4343,6 +4316,7 @@ WLAN_STATUS wlanLoadManufactureData(IN P_ADAPTER_T prAdapter, IN P_REG_INFO_T pr
 		/* 2. Load TX power gain parameters if valid */
 		if (prRegInfo->ucTxPwrValid != 0) {
 			/* send to F/W */
+
 			nicUpdateTxPower(prAdapter, (P_CMD_TX_PWR_T) (&(prRegInfo->rTxPwr)));
 		}
 	}
@@ -4491,10 +4465,6 @@ WLAN_STATUS wlanLoadManufactureData(IN P_ADAPTER_T prAdapter, IN P_REG_INFO_T pr
 			/* dumpMemory8(&rCmdAcPwr,9); */
 		}
 	}
-#if CFG_MODIFY_TX_POWER_BY_BAT_VOLT
-	if (wlan_bat_volt == 3550)
-		kalSetTxPwrBackoffByBattVolt(prAdapter, TRUE);
-#endif
 	/* 9. Send the full Parameters of NVRAM to FW */
 
 #if CFG_SUPPORT_PCC
@@ -5019,7 +4989,7 @@ WLAN_STATUS wlanCheckSystemConfiguration(IN P_ADAPTER_T prAdapter)
 		prBeacon->u2FrameCtrl = MAC_FRAME_BEACON;
 		COPY_MAC_ADDR(prBeacon->aucDestAddr, aucBCAddr);
 		COPY_MAC_ADDR(prBeacon->aucSrcAddr, aucZeroMacAddr);
-		COPY_MAC_ADDR(prBeacon->aucBSSID, aucBCAddr);
+		COPY_MAC_ADDR(prBeacon->aucBSSID, aucZeroMacAddr);
 		prBeacon->u2BeaconInterval = 100;
 		prBeacon->u2CapInfo = CAP_INFO_ESS;
 
@@ -5263,7 +5233,6 @@ VOID wlanDumpAllBssStatistics(IN P_ADAPTER_T prAdapter)
 	for (ucIdx = 0; ucIdx < BSS_INFO_NUM; ucIdx++)
 		wlanDumpBssStatistics(prAdapter, ucIdx);
 }
-
 WLAN_STATUS
 wlanoidQueryStaStatistics(IN P_ADAPTER_T prAdapter,
 			  IN PVOID pvQueryBuffer, IN UINT_32 u4QueryBufferLen, OUT PUINT_32 pu4QueryInfoLen)
@@ -5331,7 +5300,7 @@ WLAN_STATUS wlanQueryStaStatistics(IN P_ADAPTER_T prAdapter, IN PVOID pvQueryBuf
 
 #if CFG_ENABLE_PER_STA_STATISTICS
 
-		DBGLOG(TX, TRACE, "skbToDriver %lld, skbFreed: %lld\n",
+		DBGLOG(TX, INFO, "skbToDriver %lld, skbFreed: %lld\n",
 			prAdapter->prGlueInfo->u8SkbToDriver,
 			prAdapter->prGlueInfo->u8SkbFreed);
 		prAdapter->prGlueInfo->u8SkbFreed = 0;
@@ -5467,75 +5436,6 @@ WLAN_STATUS wlanQueryStaStatistics(IN P_ADAPTER_T prAdapter, IN PVOID pvQueryBuf
 
 	return rResult;
 }				/* wlanoidQueryP2pVersion */
-WLAN_STATUS
-wlanQueryStatistics(IN P_ADAPTER_T prAdapter, IN PVOID pvQueryBuffer,
-	IN UINT_32 u4QueryBufferLen, OUT PUINT_32 pu4QueryInfoLen, BOOLEAN fgIsOid)
-{
-	DEBUGFUNC("wlanoidQueryStatistics");
-	DBGLOG(OID, LOUD, "\n");
-
-	ASSERT(prAdapter);
-	if (u4QueryBufferLen)
-		ASSERT(pvQueryBuffer);
-	ASSERT(pu4QueryInfoLen);
-
-	*pu4QueryInfoLen = sizeof(PARAM_802_11_STATISTICS_STRUCT_T);
-
-	if (prAdapter->rAcpiState == ACPI_STATE_D3) {
-		DBGLOG(OID, WARN,
-		       "Fail in query receive error! (Adapter not ready). ACPI=D%d, Radio=%d\n",
-		       prAdapter->rAcpiState, prAdapter->fgIsRadioOff);
-		*pu4QueryInfoLen = sizeof(UINT_32);
-		return WLAN_STATUS_ADAPTER_NOT_READY;
-	} else if (u4QueryBufferLen < sizeof(PARAM_802_11_STATISTICS_STRUCT_T)) {
-		DBGLOG(OID, WARN, "Too short length %u\n", u4QueryBufferLen);
-		return WLAN_STATUS_INVALID_LENGTH;
-	}
-#if CFG_ENABLE_STATISTICS_BUFFERING
-	if (IsBufferedStatisticsUsable(prAdapter) == TRUE) {
-		P_PARAM_802_11_STATISTICS_STRUCT_T prStatistics;
-
-		*pu4QueryInfoLen = sizeof(PARAM_802_11_STATISTICS_STRUCT_T);
-		prStatistics = (P_PARAM_802_11_STATISTICS_STRUCT_T) pvQueryBuffer;
-
-		prStatistics->u4Length = sizeof(PARAM_802_11_STATISTICS_STRUCT_T);
-		prStatistics->rTransmittedFragmentCount = prAdapter->rStatStruct.rTransmittedFragmentCount;
-		prStatistics->rMulticastTransmittedFrameCount = prAdapter->rStatStruct.rMulticastTransmittedFrameCount;
-		prStatistics->rFailedCount = prAdapter->rStatStruct.rFailedCount;
-		prStatistics->rRetryCount = prAdapter->rStatStruct.rRetryCount;
-		prStatistics->rMultipleRetryCount = prAdapter->rStatStruct.rMultipleRetryCount;
-		prStatistics->rRTSSuccessCount = prAdapter->rStatStruct.rRTSSuccessCount;
-		prStatistics->rRTSFailureCount = prAdapter->rStatStruct.rRTSFailureCount;
-		prStatistics->rACKFailureCount = prAdapter->rStatStruct.rACKFailureCount;
-		prStatistics->rFrameDuplicateCount = prAdapter->rStatStruct.rFrameDuplicateCount;
-		prStatistics->rReceivedFragmentCount = prAdapter->rStatStruct.rReceivedFragmentCount;
-		prStatistics->rMulticastReceivedFrameCount = prAdapter->rStatStruct.rMulticastReceivedFrameCount;
-		prStatistics->rFCSErrorCount = prAdapter->rStatStruct.rFCSErrorCount;
-		prStatistics->rTKIPLocalMICFailures.QuadPart = 0;
-		prStatistics->rTKIPICVErrors.QuadPart = 0;
-		prStatistics->rTKIPCounterMeasuresInvoked.QuadPart = 0;
-		prStatistics->rTKIPReplays.QuadPart = 0;
-		prStatistics->rCCMPFormatErrors.QuadPart = 0;
-		prStatistics->rCCMPReplays.QuadPart = 0;
-		prStatistics->rCCMPDecryptErrors.QuadPart = 0;
-		prStatistics->rFourWayHandshakeFailures.QuadPart = 0;
-		prStatistics->rWEPUndecryptableCount.QuadPart = 0;
-		prStatistics->rWEPICVErrorCount.QuadPart = 0;
-		prStatistics->rDecryptSuccessCount.QuadPart = 0;
-		prStatistics->rDecryptFailureCount.QuadPart = 0;
-	} else
-#endif
-	{
-		return wlanSendSetQueryCmd(prAdapter,
-					   CMD_ID_GET_STATISTICS,
-					   FALSE,
-					   TRUE,
-					   fgIsOid,
-					   nicCmdEventQueryStatistics,
-					   nicOidCmdTimeoutCommon, 0, NULL, pvQueryBuffer, u4QueryBufferLen);
-	}
-	return WLAN_STATUS_SUCCESS;
-}				/* wlanoidQueryStatistics */
 
 /*----------------------------------------------------------------------------*/
 /*!
@@ -5644,26 +5544,6 @@ PVOID wlanGetNetInterfaceByBssIdx(IN P_GLUE_INFO_T prGlueInfo, IN UINT_8 ucBssIn
 	if (ucBssIndex < HW_BSSID_NUM)
 		return prGlueInfo->arNetInterfaceInfo[ucBssIndex].pvNetInterface;
 	return NULL;
-}
-
-uint8_t wlanGetBssIdx(struct net_device *ndev)
-{
-	if (ndev) {
-		struct _NETDEV_PRIVATE_GLUE_INFO *prNetDevPrivate
-			= (struct _NETDEV_PRIVATE_GLUE_INFO *)
-			netdev_priv(ndev);
-
-		DBGLOG(REQ, LOUD,
-			"ucBssIndex = %d\n",
-			prNetDevPrivate->ucBssIdx);
-
-		return prNetDevPrivate->ucBssIdx;
-	}
-
-	DBGLOG(REQ, LOUD,
-		"ucBssIndex = 0xff\n");
-
-	return 0xff;
 }
 
 /*----------------------------------------------------------------------------*/
@@ -5841,7 +5721,6 @@ VOID wlanInitFeatureOption(IN P_ADAPTER_T prAdapter)
 	prWifiVar->u4HifIstLoopCount = (UINT_32) wlanCfgGetUint32(prAdapter, "IstLoop", CFG_IST_LOOP_COUNT);
 	prWifiVar->u4Rx2OsLoopCount = (UINT_32) wlanCfgGetUint32(prAdapter, "Rx2OsLoop", 4);
 	prWifiVar->u4HifTxloopCount = (UINT_32) wlanCfgGetUint32(prAdapter, "HifTxLoop", 1);
-	prWifiVar->u4HifTxDataloopCount = (UINT_32) wlanCfgGetUint32(prAdapter, "HifTxDataLoop", 1);
 	prWifiVar->u4TxFromOsLoopCount = (UINT_32) wlanCfgGetUint32(prAdapter, "OsTxLoop", 1);
 	prWifiVar->u4TxRxLoopCount = (UINT_32) wlanCfgGetUint32(prAdapter, "Rx2ReorderLoop", 1);
 
@@ -5915,33 +5794,6 @@ VOID wlanInitFeatureOption(IN P_ADAPTER_T prAdapter)
 	prWifiVar->ePowerMode = (PARAM_POWER_MODE) wlanCfgGetUint32(prAdapter, "PowerSave", Param_PowerModeMax);
 	prWifiVar->rScanInfo.rScanParam.u2DefaultDwellTime =
 	    (UINT_16)wlanCfgGetUint32(prAdapter, "DefaultDwellTime", 0);
-#ifdef CFG_SUPPORT_DATA_STALL
-	prWifiVar->u4PerHighThreshold = (uint32_t) wlanCfgGetUint32(
-			prAdapter, "PerHighThreshold",
-			EVENT_PER_HIGH_THRESHOLD);
-	prWifiVar->u4TxLowRateThreshold = (uint32_t) wlanCfgGetUint32(
-			prAdapter, "TxLowRateThreshold",
-			EVENT_TX_LOW_RATE_THRESHOLD);
-	prWifiVar->u4RxLowRateThreshold = (uint32_t) wlanCfgGetUint32(
-			prAdapter, "RxLowRateThreshold",
-			EVENT_RX_LOW_RATE_THRESHOLD);
-	prWifiVar->u4ReportEventInterval = (uint32_t) wlanCfgGetUint32(
-			prAdapter, "ReportEventInterval",
-			REPORT_EVENT_INTERVAL);
-	prWifiVar->u4TrafficThreshold = (uint32_t) wlanCfgGetUint32(
-			prAdapter, "TrafficThreshold",
-			TRAFFIC_RHRESHOLD);
-#endif
-#if ARP_MONITER_ENABLE
-	prWifiVar->uArpMonitorNumber = (uint32_t) wlanCfgGetUint32(
-		prAdapter, "ArpMonitorNumber", 20);
-	prWifiVar->uArpMonitorRxPktNum = (uint32_t) wlanCfgGetUint32(
-		prAdapter, "ArpMonitorRxPktNum", 0);
-#endif /* ARP_MONITER_ENABLE */
-
-#ifdef CFG_SUPPORT_COEX_IOT_AP
-	prWifiVar->ucEnCoexIotAP = (UINT_8) wlanCfgGetUint32(prAdapter, "EnCoexIotAP", 1);
-#endif
 }
 
 VOID wlanCfgSetSwCtrl(IN P_ADAPTER_T prAdapter)
@@ -7303,285 +7155,4 @@ integer_part:
 	}
 	return u4Ret;
 }
-#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
-/* link quality monitor */
-void wlanLinkQualityMonitor(P_GLUE_INFO_T prGlueInfo)
-{
-	P_ADAPTER_T prAdapter;
-	struct WIFI_LINK_QUALITY_INFO *prLinkQualityInfo = NULL;
-	P_PARAM_GET_STA_STATISTICS prQueryStaStatistics;
-	P_PARAM_802_11_STATISTICS_STRUCT_T prStat;
-	UINT_32 u4BufLen = 0;
-	UINT_8 arBssid[PARAM_MAC_ADDR_LEN];
-
-	prAdapter = prGlueInfo->prAdapter;
-	if (prAdapter == NULL) {
-		DBGLOG(SW4, ERROR, "prAdapter is null\n");
-		return;
-	}
-	/* Completely record the Link quality and store the current time */
-	prAdapter->u4LastLinkQuality = kalGetTimeTick();
-	DBGLOG(NIC, TRACE, "LastLinkQuality:%u\n", prAdapter->u4LastLinkQuality);
-
-	kalMemZero(arBssid, MAC_ADDR_LEN);
-	wlanQueryInformation(prAdapter, wlanoidQueryBssid,
-			     &arBssid[0], sizeof(arBssid), &u4BufLen);
-
-	/* send cmd to firmware */
-	prQueryStaStatistics = &(prAdapter->rQueryStaStatistics);
-	prStat = &(prAdapter->rStat);
-	kalMemZero(prQueryStaStatistics,
-			sizeof(PARAM_GET_STA_STA_STATISTICS));
-	kalMemZero(prStat, sizeof(PARAM_802_11_STATISTICS_STRUCT_T));
-	COPY_MAC_ADDR(prQueryStaStatistics->aucMacAddr, arBssid);
-	prQueryStaStatistics->ucReadClear = TRUE;
-	wlanQueryStaStatistics(prAdapter,
-			prQueryStaStatistics,
-			sizeof(PARAM_GET_STA_STA_STATISTICS),
-			&(prAdapter->u4BufLen),
-			FALSE);
-	wlanQueryStatistics(prAdapter, prStat, sizeof(PARAM_802_11_STATISTICS_STRUCT_T),
-		&(prAdapter->u4BufLen), FALSE);
-	if (prAdapter->u4LastLinkQuality == 0)
-		return;
-
-	/* prepare to set/get statistics from BSSInfo's rLinkQualityInfo */
-	prLinkQualityInfo = &(prAdapter->rLinkQualityInfo);
-
-	DBGLOG(SW4, INFO,
-	       "Link Quality: Tx(rate:%u, total:%lu, retry:%lu, fail:%u, RTS fail:%lu, ACK fail:%lu), Rx(rate:%u, total:%lu, dup:%u, error:%lu), PER(%u), Congestion(idle slot:%u, diff:%u)\n",
-	       prLinkQualityInfo->u4CurTxRate, /* tx rate, current tx link speed */
-	       prLinkQualityInfo->u8TxTotalCount, /* tx total packages */
-	       prLinkQualityInfo->u8TxRetryCount, /* tx retry count */
-	       prLinkQualityInfo->u8TxFailCount, /* tx fail count */
-	       prLinkQualityInfo->u8TxRtsFailCount, /* tx RTS fail count */
-	       prLinkQualityInfo->u8TxAckFailCount, /* tx ACK fail count */
-	       prLinkQualityInfo->u4CurRxRate, /* rx rate */
-	       prLinkQualityInfo->u8RxTotalCount, /* rx total packages */
-	       prLinkQualityInfo->u4RxDupCount, /* rx duplicate package count */
-	       prLinkQualityInfo->u8RxErrCount, /* rx error count */
-	       prLinkQualityInfo->u4CurTxPer, /* PER */
-	       prLinkQualityInfo->u8IdleSlotCount,  /* congestion stats: idle slot */
-	       prLinkQualityInfo->u8DiffIdleSlotCount
-	);
-}
-/* link quality monitor */
-void wlanFinishCollectingLinkQuality(P_GLUE_INFO_T prGlueInfo)
-{
-	P_ADAPTER_T prAdapter;
-	struct WIFI_LINK_QUALITY_INFO *prLinkQualityInfo = NULL;
-	P_RX_CTRL_T prRxCtrl;
-	UINT_32 u4CurRxRate, u4MaxRxRate;
-	UINT_64 u8TxFailCntDif, u8TxTotalCntDif;
-	int rv;
-
-	prAdapter = prGlueInfo->prAdapter;
-	if (prAdapter == NULL) {
-		DBGLOG(SW4, ERROR, "prAdapter is null\n");
-		return;
-	}
-
-	prLinkQualityInfo = &(prAdapter->rLinkQualityInfo);
-	u8TxTotalCntDif = (prLinkQualityInfo->u8TxTotalCount >
-			   prLinkQualityInfo->u8LastTxTotalCount) ?
-			  (prLinkQualityInfo->u8TxTotalCount -
-			   prLinkQualityInfo->u8LastTxTotalCount) : 0;
-	u8TxFailCntDif = (prLinkQualityInfo->u8TxFailCount >
-			  prLinkQualityInfo->u8LastTxFailCount) ?
-			 (prLinkQualityInfo->u8TxFailCount -
-			  prLinkQualityInfo->u8LastTxFailCount) : 0;
-	if (u8TxTotalCntDif >= u8TxFailCntDif)
-		prLinkQualityInfo->u4CurTxPer = (u8TxTotalCntDif == 0) ? 0 :
-				(int)((u8TxFailCntDif * 100) / (u8TxTotalCntDif));
-	else
-		prLinkQualityInfo->u4CurTxPer = 0;
-	if (prLinkQualityInfo->u8IdleSlotCount < prLinkQualityInfo->u8LastIdleSlotCount) {
-		prLinkQualityInfo->u8DiffIdleSlotCount = 0;
-		DBGLOG(NIC, WARN, "idle slot is error\n");
-	} else
-		prLinkQualityInfo->u8DiffIdleSlotCount = prLinkQualityInfo->u8IdleSlotCount -
-				prLinkQualityInfo->u8LastIdleSlotCount;
-
-	/* Get Rx Dup Count from RxCtrl */
-	prRxCtrl = &prAdapter->rRxCtrl;
-	prLinkQualityInfo->u4RxDupCount =
-			(uint32_t)RX_GET_CNT(prRxCtrl, RX_DUPICATE_DROP_COUNT);
-
-	/* Get Rx Rate */
-	rv = kalGetRxRate(prGlueInfo, &u4CurRxRate, &u4MaxRxRate);
-	if (rv < 0) {
-		DBGLOG(NIC, ERROR, "kalGetRxRate error\n");
-		prLinkQualityInfo->u4CurRxRate = 0;
-	} else
-		prLinkQualityInfo->u4CurRxRate = u4CurRxRate;
-
-	prLinkQualityInfo->u8LastTxFailCount = prLinkQualityInfo->u8TxFailCount;
-	prLinkQualityInfo->u8LastTxTotalCount = prLinkQualityInfo->u8TxTotalCount;
-	prLinkQualityInfo->u8LastIdleSlotCount = prLinkQualityInfo->u8IdleSlotCount;
-#ifdef CFG_SUPPORT_DATA_STALL
-	/* Just for Station mode */
-	if (!(prAdapter->prAisBssInfo->prStaRecOfAP))
-		return;
-	if (u8TxTotalCntDif >= (UINT_64)prAdapter->rWifiVar.u4TrafficThreshold) {
-		if (prLinkQualityInfo->u4CurTxPer > prAdapter->rWifiVar.u4PerHighThreshold)
-			mtk_cfg80211_vendor_event_driver_error(prGlueInfo->prAdapter,
-				EVENT_PER_HIGH, (UINT_16)sizeof(UINT_8));
-		else if (prLinkQualityInfo->u4CurTxRate < prAdapter->rWifiVar.u4TxLowRateThreshold)
-			mtk_cfg80211_vendor_event_driver_error(prGlueInfo->prAdapter,
-				EVENT_TX_LOW_RATE, (UINT_16)sizeof(UINT_8));
-		else if (prLinkQualityInfo->u4CurRxRate &&
-					(prLinkQualityInfo->u4CurRxRate < prAdapter->rWifiVar.u4RxLowRateThreshold))
-			mtk_cfg80211_vendor_event_driver_error(prGlueInfo->prAdapter,
-				EVENT_RX_LOW_RATE, (UINT_16)sizeof(UINT_8));
-		}
-#endif
-}
-
-UINT_32 wlanGetStaIdxByWlanIdx(IN P_ADAPTER_T prAdapter,
-		       IN UINT_8 ucIndex, OUT PUINT_8 pucStaIdx)
-{
-	P_WLAN_TABLE_T prWtbl;
-
-	ASSERT(prAdapter);
-	prWtbl = prAdapter->rWifiVar.arWtbl;
-
-	if (ucIndex < WTBL_SIZE) {
-		if (prWtbl[ucIndex].ucUsed && prWtbl[ucIndex].ucPairwise) {
-			*pucStaIdx = prWtbl[ucIndex].ucStaIndex;
-			return WLAN_STATUS_SUCCESS;
-		}
-	}
-	return WLAN_STATUS_FAILURE;
-}
-#endif
-
-
-/*----------------------------------------------------------------------------*/
-/*!
- * \brief This routine is called to query LTE safe channels.
- *
- * \param[in]  pvAdapter        Pointer to the Adapter structure.
- * \param[out] pvQueryBuffer    A pointer to the buffer that holds the result of
- *                              the query.
- * \param[in]  u4QueryBufferLen The length of the query buffer.
- * \param[out] pu4QueryInfoLen  If the call is successful, returns the number of
- *                              bytes written into the query buffer. If the call
- *                              failed due to invalid length of the query
- *                              buffer, returns the amount of storage needed.
- *
- * \retval WLAN_STATUS_PENDING
- * \retval WLAN_STATUS_FAILURE
- */
-/*----------------------------------------------------------------------------*/
-UINT_32
-wlanQueryLteSafeChannel(IN P_ADAPTER_T prAdapter,
-		IN UINT_8 ucRoleIndex)
-{
-	UINT_32 rResult = WLAN_STATUS_FAILURE;
-	P_P2P_ROLE_FSM_INFO_T prP2pRoleFsmInfo;
-
-
-	DBGLOG(P2P, TRACE, "[ACS] Get safe LTE Channels\n");
-
-	do {
-		if (!prAdapter)
-			break;
-
-		prP2pRoleFsmInfo = P2P_ROLE_INDEX_2_ROLE_FSM_INFO(prAdapter,
-			ucRoleIndex);
-		kalMemZero(&(prP2pRoleFsmInfo->rLteSafeChnInfo), sizeof(PARAM_GET_CHN_INFO));
-		prP2pRoleFsmInfo->rLteSafeChnInfo.ucRoleIndex = ucRoleIndex;
-
-		/* Get LTE safe channel list */
-		wlanSendSetQueryCmd(prAdapter,
-			CMD_ID_GET_LTE_CHN,
-			FALSE,
-			TRUE,
-			FALSE, /* Query ID */
-			nicCmdEventQueryLteSafeChn, /* The handler to receive
-						     * firmware notification
-						     */
-			nicOidCmdTimeoutCommon,
-			0,
-			NULL,
-			&(prP2pRoleFsmInfo->rLteSafeChnInfo),
-			0);
-		rResult = WLAN_STATUS_SUCCESS;
-	} while (FALSE);
-	return rResult;
-}				/* wlanoidQueryLteSafeChannel */
-
-UINT_8
-wlanGetChannelIndex(IN UINT_8 channel)
-{
-	UINT_8 ucIdx = 1;
-
-	if (channel <= 14)
-		ucIdx = channel - 1;
-	else if (channel >= 36 && channel <= 64)
-		ucIdx = 14 + (channel - 36) / 4;
-	else if (channel >= 100 && channel <= 140)
-		ucIdx = 14 + 8 + (channel - 100) / 4;
-	else if (channel >= 149 && channel <= 173)
-		ucIdx = 14 + 8 + 11 + (channel - 149) / 4;
-	else if (channel >= 184 && channel <= 216)
-		ucIdx = 14 + 8 + 11 + 7 + (channel - 184) / 4;
-	else{
-		/* if channel num=2,the return inx is 1; if invalid,will also return 1.need to distinguish */
-		DBGLOG(SCN, ERROR, "Invalid ch %u\n", channel);
-		return 255;
-	}
-	return ucIdx;
-}
-
-#if CFG_SUPPORT_REPORT_MISC
-UINT_32 wlanExtSrcReportMisc(P_GLUE_INFO_T prGlueInfo)
-{
-	if ((prGlueInfo == NULL) || (prGlueInfo->prAdapter == NULL)) {
-		DBGLOG(INIT, WARN, "Invalid parameter.\n");
-		return 1;
-	}
-	if (test_and_clear_bit(EXT_SRC_DHCP_BIT,
-		&(prGlueInfo->prAdapter->rReportMiscSet.ulExtSrcFlag))) {
-		if (prGlueInfo->prAdapter->rReportMiscSet.eQueryNum
-			!= REPORT_DHCP_START) {
-			wlanSendSetQueryCmd(prGlueInfo->prAdapter,
-						CMD_ID_GET_REPORT_MISC,
-						FALSE,
-						TRUE,
-						FALSE,
-						nicCmdEventReportMisc,
-						NULL,
-						0,
-						NULL,
-						NULL,
-						0);
-			prGlueInfo->prAdapter->rReportMiscSet.i4Rssi = 0;
-			prGlueInfo->prAdapter->rReportMiscSet.eQueryNum
-				= REPORT_DHCP_START;
-		}
-	}
-
-	if (test_and_clear_bit(EXT_SRC_DISCONNCT_BIT,
-		&(prGlueInfo->prAdapter->rReportMiscSet.ulExtSrcFlag))) {
-		if (prGlueInfo->prAdapter->rReportMiscSet.eQueryNum
-			== REPORT_4WAYHS_START) {
-			wlanSendSetQueryCmd(prGlueInfo->prAdapter,
-						CMD_ID_GET_REPORT_MISC,
-						FALSE,
-						TRUE,
-						FALSE,
-						nicCmdEventReportMisc,
-						NULL,
-						0,
-						NULL,
-						NULL,
-						0);
-			prGlueInfo->prAdapter->rReportMiscSet.eQueryNum
-				= REPORT_4WAYHS_END;
-		}
-	}
-	return 0;
-}
-#endif
 

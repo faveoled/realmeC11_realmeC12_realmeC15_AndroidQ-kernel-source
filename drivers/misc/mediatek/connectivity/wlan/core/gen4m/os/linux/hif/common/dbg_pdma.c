@@ -75,7 +75,6 @@
 #include "wf_ple.h"
 #include "host_csr.h"
 #include "dma_sch.h"
-#include "mt_dmac.h"
 
 /*******************************************************************************
  *                              C O N S T A N T S
@@ -123,16 +122,11 @@ void halPrintHifDbgInfo(IN struct ADAPTER *prAdapter)
 
 static void halCheckHifState(struct ADAPTER *prAdapter)
 {
-	uint32_t u4DebugLevel = 0;
 	if (prAdapter->u4HifChkFlag & HIF_CHK_TX_HANG) {
 		if (halIsTxHang(prAdapter)) {
 			DBGLOG(HAL, ERROR,
 			       "Tx timeout, set hif debug info flag\n");
-			wlanGetDriverDbgLevel(DBG_TX_IDX, &u4DebugLevel);
-			if (u4DebugLevel & DBG_CLASS_TRACE)
-				prAdapter->u4HifDbgFlag |= DEG_HIF_ALL;
-			else
-				halShowLitePleInfo(prAdapter);
+			prAdapter->u4HifDbgFlag |= DEG_HIF_ALL;
 		}
 	}
 
@@ -230,7 +224,7 @@ uint32_t halDumpHifStatus(IN struct ADAPTER *prAdapter,
 {
 	struct GLUE_INFO *prGlueInfo = prAdapter->prGlueInfo;
 	struct GL_HIF_INFO *prHifInfo = &prGlueInfo->rHifInfo;
-	uint32_t u4Idx, u4DmaIdx = 0, u4CpuIdx = 0, u4MaxCnt = 0;
+	uint32_t u4Idx, u4DmaIdx, u4CpuIdx, u4MaxCnt;
 	uint32_t u4Len = 0;
 	struct RTMP_TX_RING *prTxRing;
 	struct RTMP_RX_RING *prRxRing;
@@ -250,13 +244,6 @@ uint32_t halDumpHifStatus(IN struct ADAPTER *prAdapter,
 			u4DmaIdx, prTxRing->TxSwUsedIdx, prTxRing->u4UsedCnt);
 
 		if (u4Idx == TX_RING_DATA0_IDX_0) {
-			halDumpTxRing(prGlueInfo, u4Idx, prTxRing->TxCpuIdx);
-			halDumpTxRing(prGlueInfo, u4Idx, u4CpuIdx);
-			halDumpTxRing(prGlueInfo, u4Idx, u4DmaIdx);
-			halDumpTxRing(prGlueInfo, u4Idx, prTxRing->TxSwUsedIdx);
-		}
-
-		if (u4Idx == TX_RING_DATA1_IDX_1) {
 			halDumpTxRing(prGlueInfo, u4Idx, prTxRing->TxCpuIdx);
 			halDumpTxRing(prGlueInfo, u4Idx, u4CpuIdx);
 			halDumpTxRing(prGlueInfo, u4Idx, u4DmaIdx);
@@ -333,15 +320,13 @@ static bool halIsTxHang(struct ADAPTER *prAdapter)
 	struct timeval rNowTs, rTime, rLongest, rTimeout;
 	uint32_t u4Idx = 0, u4TokenId = 0;
 	bool fgIsTimeout = false;
-	struct WIFI_VAR *prWifiVar;
 
 	ASSERT(prAdapter);
 	ASSERT(prAdapter->prGlueInfo);
 
 	prTokenInfo = &prAdapter->prGlueInfo->rHifInfo.rTokenInfo;
-	prWifiVar = &prAdapter->rWifiVar;
 
-	rTimeout.tv_sec = prWifiVar->ucMsduReportTimeout;
+	rTimeout.tv_sec = HIF_MSDU_REPORT_DUMP_TIMEOUT;
 	rTimeout.tv_usec = 0;
 	rLongest.tv_sec = 0;
 	rLongest.tv_usec = 0;
@@ -388,6 +373,12 @@ static bool halIsTxHang(struct ADAPTER *prAdapter)
 		if (prToken->prPacket)
 			DBGLOG_MEM32(HAL, INFO, prToken->prPacket, 64);
 	}
+
+	/* Return token to free stack */
+	rTimeout.tv_sec = HIF_MSDU_REPORT_RETURN_TIMEOUT;
+	rTimeout.tv_usec = 0;
+	if (halTimeCompare(&rLongest, &rTimeout) >= 0)
+		halReturnTimeoutMsduToken(prAdapter);
 
 	return fgIsTimeout;
 }
@@ -500,18 +491,12 @@ void halShowPdmaInfo(IN struct ADAPTER *prAdapter)
 	DBGLOG(HAL, INFO, "%10s%12s%18s%10s%10s%10s\n",
 		"Tx Ring", "Reg", "Base", "Cnt", "CIDX", "DIDX");
 
-	for (i = 0; i < 4; i++) {
+	for (i = 0; i < 3; i++) {
 		if (i == 0) {
-			offset = prBus_info->tx_ring0_data_idx *
-						MT_RINGREG_DIFF;
-			offset_ext = prBus_info->tx_ring0_data_idx *
+			offset = prBus_info->tx_ring_data_idx * MT_RINGREG_DIFF;
+			offset_ext = prBus_info->tx_ring_data_idx *
 					MT_RINGREG_EXT_DIFF;
 		} else if (i == 1) {
-			offset = prBus_info->tx_ring1_data_idx *
-					MT_RINGREG_DIFF;
-			offset_ext = prBus_info->tx_ring1_data_idx *
-					MT_RINGREG_EXT_DIFF;
-		} else if (i == 2) {
 			offset = prBus_info->tx_ring_fwdl_idx * MT_RINGREG_DIFF;
 			offset_ext = prBus_info->tx_ring_fwdl_idx *
 					MT_RINGREG_EXT_DIFF;
@@ -538,27 +523,27 @@ void halShowPdmaInfo(IN struct ADAPTER *prAdapter)
 	DBGLOG(HAL, INFO, "Rx Ring configuration\n");
 	DBGLOG(HAL, INFO, "%10s%12s%18s%10s%10s%10s\n",
 		"Rx Ring", "Reg", "Base", "Cnt", "CIDX", "DIDX");
-	HAL_MCR_RD(prAdapter, WPDMA_RX_RING0_CTRL0, &Base[4]);
-	HAL_MCR_RD(prAdapter, WPDMA_RX_RING0_BASE_PTR_EXT, &Base_Ext[4]);
-	HAL_MCR_RD(prAdapter, WPDMA_RX_RING0_CTRL1, &Cnt[4]);
-	HAL_MCR_RD(prAdapter, WPDMA_RX_RING0_CTRL2, &Cidx[4]);
-	HAL_MCR_RD(prAdapter, WPDMA_RX_RING0_CTRL3, &Didx[4]);
+	HAL_MCR_RD(prAdapter, WPDMA_RX_RING0_CTRL0, &Base[3]);
+	HAL_MCR_RD(prAdapter, WPDMA_RX_RING0_BASE_PTR_EXT, &Base_Ext[3]);
+	HAL_MCR_RD(prAdapter, WPDMA_RX_RING0_CTRL1, &Cnt[3]);
+	HAL_MCR_RD(prAdapter, WPDMA_RX_RING0_CTRL2, &Cidx[3]);
+	HAL_MCR_RD(prAdapter, WPDMA_RX_RING0_CTRL3, &Didx[3]);
 	kalSprintf(buf, "%10d  0x%08x  0x%016llx%10d%10d%10d",
 		0, WPDMA_RX_RING0_CTRL0,
-		(Base[4] + ((uint64_t)Base_Ext[4] << 32)),
-		Cnt[4], Cidx[4], Didx[4]);
+		(Base[3] + ((uint64_t)Base_Ext[3] << 32)),
+		Cnt[3], Cidx[3], Didx[3]);
 	DBGLOG(HAL, INFO, "%s\n", buf);
 
-	HAL_MCR_RD(prAdapter, WPDMA_RX_RING0_CTRL0 + MT_RINGREG_DIFF, &Base[5]);
+	HAL_MCR_RD(prAdapter, WPDMA_RX_RING0_CTRL0 + MT_RINGREG_DIFF, &Base[4]);
 	HAL_MCR_RD(prAdapter, WPDMA_RX_RING0_BASE_PTR_EXT + MT_RINGREG_EXT_DIFF,
-			&Base_Ext[5]);
-	HAL_MCR_RD(prAdapter, WPDMA_RX_RING0_CTRL1 + MT_RINGREG_DIFF, &Cnt[5]);
-	HAL_MCR_RD(prAdapter, WPDMA_RX_RING0_CTRL2 + MT_RINGREG_DIFF, &Cidx[5]);
-	HAL_MCR_RD(prAdapter, WPDMA_RX_RING0_CTRL3 + MT_RINGREG_DIFF, &Didx[5]);
+			&Base_Ext[4]);
+	HAL_MCR_RD(prAdapter, WPDMA_RX_RING0_CTRL1 + MT_RINGREG_DIFF, &Cnt[4]);
+	HAL_MCR_RD(prAdapter, WPDMA_RX_RING0_CTRL2 + MT_RINGREG_DIFF, &Cidx[4]);
+	HAL_MCR_RD(prAdapter, WPDMA_RX_RING0_CTRL3 + MT_RINGREG_DIFF, &Didx[4]);
 	kalSprintf(buf, "%10d  0x%08x  0x%016llx%10d%10d%10d",
 		1, WPDMA_RX_RING0_CTRL0 + MT_RINGREG_DIFF,
-		(Base[5] + ((uint64_t)Base_Ext[5] << 32)),
-		Cnt[5], Cidx[5], Didx[5]);
+		(Base[4] + ((uint64_t)Base_Ext[4] << 32)),
+		Cnt[4], Cidx[4], Didx[4]);
 	DBGLOG(HAL, INFO, "%s\n", buf);
 
 	/* PDMA Tx/Rx descriptor & packet content */
@@ -630,8 +615,6 @@ void halShowPdmaInfo(IN struct ADAPTER *prAdapter)
 		DBGLOG(HAL, INFO, "Set[19:16]:0x%02x, result = 0x%08x\n",
 		       i, u4Value);
 	}
-	if (prAdapter->chip_info->prDebugOps->showHifInfo)
-		prAdapter->chip_info->prDebugOps->showHifInfo(prAdapter);
 }
 
 void halShowPseInfo(IN struct ADAPTER *prAdapter)
@@ -641,7 +624,6 @@ void halShowPseInfo(IN struct ADAPTER *prAdapter)
 	uint32_t fpg_cnt, ffa_cnt, fpg_head, fpg_tail;
 	uint32_t max_q, min_q, rsv_pg, used_pg;
 	uint32_t i, page_offset, addr, value;
-	uint32_t txd_payload_info[16] = {0};
 
 	HAL_MCR_RD(prAdapter, PSE_PBUF_CTRL, &pse_buf_ctrl);
 	HAL_MCR_RD(prAdapter, PSE_QUEUE_EMPTY, &pse_stat);
@@ -875,7 +857,6 @@ void halShowPseInfo(IN struct ADAPTER *prAdapter)
 			DBGLOG(HAL, INFO,
 				"tail/head fid = 0x%03x/0x%03x, pkt cnt = %x\n",
 				tfid, hfid, pktcnt);
-			halGetPsePayload(prAdapter, hfid, txd_payload_info);
 		}
 	}
 
@@ -936,7 +917,6 @@ void halShowPleInfo(IN struct ADAPTER *prAdapter)
 	uint32_t fpg_cnt, ffa_cnt, fpg_head, fpg_tail, hif_max_q, hif_min_q;
 	uint32_t rpg_hif, upg_hif, cpu_max_q, cpu_min_q, rpg_cpu, upg_cpu;
 	uint32_t i, j, addr, value;
-	uint32_t txd_info[16] = {0};
 
 	HAL_MCR_RD(prAdapter, PLE_PBUF_CTRL, &ple_buf_ctrl[0]);
 	HAL_MCR_RD(prAdapter, PLE_RELEASE_CTRL, &ple_buf_ctrl[1]);
@@ -981,8 +961,6 @@ void halShowPleInfo(IN struct ADAPTER *prAdapter)
 	DBGLOG(HAL, INFO, "\tINT_STS(0x82060024): 0x%08x\n", value);
 	HAL_MCR_RD(prAdapter, PLE_INT_ERR_STS, &value);
 	DBGLOG(HAL, INFO, "\tINT_ERR_STS(0x82060028): 0x%08x\n", value);
-	HAL_MCR_RD(prAdapter, PLE_QUEUE_CMD_ERR_STS, &value);
-	DBGLOG(HAL, INFO, "\tQUEUE_CMD_ERR_STS(0x82060550): 0x%08x\n", value);
 
 	DBGLOG(HAL, INFO,
 		"\tPacket Buffer Control(0x82060014): 0x%08x\n",
@@ -1160,8 +1138,7 @@ void halShowPleInfo(IN struct ADAPTER *prAdapter)
 				DBGLOG(HAL, INFO,
 					"tail/head fid = 0x%03x/0x%03x, pkt cnt = %x",
 					 tfid, hfid, pktcnt);
-				halGetPleTxdInfo(prAdapter, hfid, txd_info);
-				halDumpTxdInfo(prAdapter, txd_info);
+
 				if (((sta_pause[j % 4] & 0x1 << i) >> i) == 1)
 					ctrl = 2;
 
@@ -1506,8 +1483,6 @@ void haldumpPhyInfo(struct ADAPTER *prAdapter)
 	for (i = 0; i < 20; i++) {
 		HAL_MCR_RD(prAdapter, 0x82072644, &value);
 		DBGLOG(HAL, INFO, "0x82072644: 0x%08x\n", value);
-		HAL_MCR_RD(prAdapter, 0x82072644, &value);
-		DBGLOG(HAL, INFO, "0x82072654: 0x%08x\n", value);
 		kalMdelay(1);
 	}
 }
@@ -1541,24 +1516,14 @@ void haldumpMacInfo(struct ADAPTER *prAdapter)
 		/* 1: empty, 0: non-empty */
 		HAL_MCR_RD(prAdapter, 0x82060220, &value);
 		DBGLOG(HAL, INFO, "queue empty: 0x82060220: 0x%08x\n", value);
-		HAL_MCR_RD(prAdapter, 0x820603EC, &value);
-		DBGLOG(HAL, INFO,
-			"PLE MACTX CurState: 0x820603EC: 0x%08x\n", value);
 		kalMdelay(1);
 	}
 
 	HAL_MCR_RD(prAdapter, 0x820F4124, &value);
 	DBGLOG(HAL, INFO, "TXV count: 0x820F4124 = %08x\n", value);
 
-	/* Band 0 TXV1-TXV7 */
+	/* TXV1-TXV7 */
 	for (j = 0x820F4130; j < 0x820F4148; j += 4) {
-		HAL_MCR_RD(prAdapter, j, &value);
-		DBGLOG(HAL, INFO, "0x%08x: 0x%08x\n", j, value);
-		kalMdelay(1);
-	}
-
-	/* Band 1 TXV1-TXV7 */
-	for (j = 0x820F414C; j < 0x820F4164; j += 4) {
 		HAL_MCR_RD(prAdapter, j, &value);
 		DBGLOG(HAL, INFO, "0x%08x: 0x%08x\n", j, value);
 		kalMdelay(1);
@@ -1597,30 +1562,18 @@ void haldumpMacInfo(struct ADAPTER *prAdapter)
 	}
 
 	DBGLOG(HAL, INFO, "Dump ARB\n");
-	for (i = 0; i < 20; i++) {
-		HAL_MCR_RD(prAdapter, 0x802f3190, &value);
-		DBGLOG(HAL, INFO, "0x802f3190: 0x%08x\n", value);
-	}
+	HAL_MCR_RD(prAdapter, 0x802f3190, &value);
+	DBGLOG(HAL, INFO, "0x802f3190: 0x%08x\n", value);
 
 	HAL_MCR_WR(prAdapter, 0x820f082C, 0xf);
 	HAL_MCR_WR(prAdapter, 0x80025100, 0x1f);
 	HAL_MCR_WR(prAdapter, 0x80025104, 0x04040404);
 
-	HAL_MCR_WR(prAdapter, 0x80025108, 0x41414040);
-	HAL_MCR_RD(prAdapter, 0x820f0024, &value);
-	DBGLOG(HAL, INFO, "0x820f0024: 0x%08x\n", value);
-	HAL_MCR_RD(prAdapter, 0x820f20d0, &value);
-	DBGLOG(HAL, INFO, "0x820f20d0: 0x%08x\n", value);
-	HAL_MCR_RD(prAdapter, 0x820f20d4, &value);
-	DBGLOG(HAL, INFO, "0x820f20d4: 0x%08x\n", value);
-
 	queue = 0;
-	flag = 0x00000101;
+	flag = 0x01010000;
 	for (i = 0; i < 25; i++) {
 		HAL_MCR_WR(prAdapter, 0x820f3060, queue);
-		flag = 0x00000101;
-		for (j = 0; j < 8; j++) {
-			HAL_MCR_WR(prAdapter, 0x80025108, flag);
+		for (j = 0; j < 15; j++) {
 			HAL_MCR_RD(prAdapter, 0x820f0024, &value);
 			DBGLOG(HAL, INFO,
 			       "write queue = 0x%08x flag = 0x%08x, 0x820f0024: 0x%08x\n",
@@ -1630,21 +1583,9 @@ void haldumpMacInfo(struct ADAPTER *prAdapter)
 		queue += 0x01010101;
 	}
 
-	queue = 0x01010000;
-	flag = 0x04040505;
-	HAL_MCR_WR(prAdapter, 0x820f3060, queue);
-	for (i = 0; i < 3; i++) {
-		HAL_MCR_WR(prAdapter, 0x80025104, flag);
-		HAL_MCR_RD(prAdapter, 0x820f0024, &value);
-		DBGLOG(HAL, INFO, "write flag = 0x%08x, 0x820f0024: 0x%08x\n",
-		       flag, value);
-		flag += 0x02020202;
-	}
-
-	flag = 0x00000101;
-	HAL_MCR_WR(prAdapter, 0x820f3060, 0); /* BSSID = 0 */
+	flag = 0x01010000;
 	for (i = 0; i < 128; i++) {
-		HAL_MCR_WR(prAdapter, 0x80025108, flag);
+		HAL_MCR_WR(prAdapter, 0x80025104, flag);
 		HAL_MCR_RD(prAdapter, 0x820f0024, &value);
 		DBGLOG(HAL, INFO, "write flag = 0x%08x, 0x820f0024: 0x%08x\n",
 		       flag, value);
@@ -1684,294 +1625,13 @@ void haldumpMacInfo(struct ADAPTER *prAdapter)
 		flag += 0x02020202;
 	}
 
-}
-
-static char *q_idx_mcu_str[] = {"RQ0", "RQ1", "RQ2", "RQ3", "Invalid"};
-static char *pkt_ft_str[] = {"cut_through", "store_forward",
-	"cmd", "PDA_FW_Download"};
-static char *hdr_fmt_str[] = {
-	"Non-80211-Frame",
-	"Command-Frame",
-	"Normal-80211-Frame",
-	"enhanced-80211-Frame",
-};
-static char *p_idx_str[] = {"LMAC", "MCU"};
-static char *q_idx_lmac_str[] = {"WMM0_AC0", "WMM0_AC1", "WMM0_AC2", "WMM0_AC3",
-	"WMM1_AC0", "WMM1_AC1", "WMM1_AC2", "WMM1_AC3",
-	"WMM2_AC0", "WMM2_AC1", "WMM2_AC2", "WMM2_AC3",
-	"WMM3_AC0", "WMM3_AC1", "WMM3_AC2", "WMM3_AC3",
-	"Band0_ALTX", "Band0_BMC", "Band0_BNC", "Band0_PSMP",
-	"Band1_ALTX", "Band1_BMC", "Band1_BNC", "Band1_PSMP",
-	"Invalid"};
-
-void halGetPsePayload(
-	IN struct ADAPTER *prAdapter, uint32_t fid, uint32_t *result) {
-	uint32_t u4Start_txd = 0;
-	uint32_t u4High_txd = 0;
-	uint32_t u4Remap_txd = 0;
-	uint32_t u4Pse_offset = 0;
-	uint32_t i = 0, value = 0;
-
-	HAL_MCR_RD(prAdapter, 0x82060014, &value);
-	u4Pse_offset = (value & 0x3FF0000) << 10;
-	u4High_txd = (u4Pse_offset >> 16);
-	HAL_MCR_WR(prAdapter, 0x0000700C, u4High_txd);
-	u4Start_txd = 0x40000000 + u4Pse_offset + (fid << 7);
-	u4Remap_txd = 0x000D0000 + (u4Start_txd & 0xFFFF);
-	for (i = 0; i < 16; i++)
-		HAL_MCR_RD(prAdapter, u4Remap_txd + (i * 4), &result[i]);
-	DBGLOG(HAL, INFO, "Dump fid=%d PSE payload\n", fid);
-	dumpMemory32(result, 64);
-}
-
-void halGetPleTxdInfo(
-	IN struct ADAPTER *prAdapter, uint32_t fid, uint32_t *result) {
-	uint32_t u4Start_txd = 0;
-	uint32_t u4High_txd = 0;
-	uint32_t u4Remap_txd = 0;
-	uint32_t i = 0;
-
-	u4Start_txd = 0x40000000 + (fid << 6);
-	u4High_txd = (u4Start_txd >> 16);
-	HAL_MCR_WR(prAdapter, 0x0000700C, u4High_txd);
-	u4Remap_txd = 0x000D0000 + (fid << 6);
-	for (i = 0; i < 16; i++) {
-		HAL_MCR_RD(prAdapter,
-			u4Remap_txd + (i * 4), &result[i]);
+	DBGLOG(HAL, INFO, "Read TXV\n");
+	for (i = 0x820F4120; i <= 0x820F412C; i += 4) {
+		HAL_MCR_RD(prAdapter, i, &value);
+		DBGLOG(HAL, INFO, "0x%08x: 0x%08x\n", i, value);
 	}
-	DBGLOG(HAL, INFO, "Dump fid=%d PLE TXD\n", fid);
-	dumpMemory32(result, 64);
-}
-
-void halDumpTxdInfo(IN struct ADAPTER *prAdapter, uint32_t *tmac_info)
-{
-	struct TMAC_TXD_S *txd_s;
-	struct TMAC_TXD_0 *txd_0;
-	struct TMAC_TXD_1 *txd_1;
-	uint8_t q_idx = 0;
-
-	txd_s = (struct TMAC_TXD_S *)tmac_info;
-	txd_0 = &txd_s->TxD0;
-	txd_1 = &txd_s->TxD1;
-
-	DBGLOG(HAL, INFO, "TMAC_TXD Fields:\n");
-	DBGLOG(HAL, INFO, "\tTMAC_TXD_0:\n");
-	DBGLOG(HAL, INFO, "\t\tPortID=%d(%s)\n",
-			txd_0->p_idx, p_idx_str[txd_0->p_idx]);
-
-	if (txd_0->p_idx == P_IDX_LMAC)
-		q_idx = txd_0->q_idx % 0x18;
-	else
-		q_idx = ((txd_0->q_idx == TxQ_IDX_MCU_PDA) ?
-			txd_0->q_idx : (txd_0->q_idx % 0x4));
-
-	DBGLOG(HAL, INFO, "\t\tQueID=0x%x(%s %s)\n", txd_0->q_idx,
-			 (txd_0->p_idx == P_IDX_LMAC ? "LMAC" : "MCU"),
-			 txd_0->p_idx == P_IDX_LMAC ?
-				q_idx_lmac_str[q_idx] : q_idx_mcu_str[q_idx]);
-	DBGLOG(HAL, INFO, "\t\tTxByteCnt=%d\n", txd_0->TxByteCount);
-	DBGLOG(HAL, INFO, "\t\tIpChkSumOffload=%d\n", txd_0->IpChkSumOffload);
-	DBGLOG(HAL, INFO, "\t\tUdpTcpChkSumOffload=%d\n",
-						txd_0->UdpTcpChkSumOffload);
-	DBGLOG(HAL, INFO, "\t\tEthTypeOffset=%d\n", txd_0->EthTypeOffset);
-
-	DBGLOG(HAL, INFO, "\tTMAC_TXD_1:\n");
-	DBGLOG(HAL, INFO, "\t\twlan_idx=%d\n", txd_1->wlan_idx);
-	DBGLOG(HAL, INFO, "\t\tHdrFmt=%d(%s)\n",
-			 txd_1->hdr_format, hdr_fmt_str[txd_1->hdr_format]);
-	DBGLOG(HAL, INFO, "\t\tHdrInfo=0x%x\n", txd_1->hdr_info);
-
-	switch (txd_1->hdr_format) {
-	case TMI_HDR_FT_NON_80211:
-		DBGLOG(HAL, INFO,
-			"\t\t\tMRD=%d, EOSP=%d, RMVL=%d, VLAN=%d, ETYP=%d\n",
-			txd_1->hdr_info & (1 << TMI_HDR_INFO_0_BIT_MRD),
-			txd_1->hdr_info & (1 << TMI_HDR_INFO_0_BIT_EOSP),
-			txd_1->hdr_info & (1 << TMI_HDR_INFO_0_BIT_RMVL),
-			txd_1->hdr_info & (1 << TMI_HDR_INFO_0_BIT_VLAN),
-			txd_1->hdr_info & (1 << TMI_HDR_INFO_0_BIT_ETYP));
-		break;
-
-	case TMI_HDR_FT_CMD:
-		DBGLOG(HAL, INFO, "\t\t\tRsvd=0x%x\n", txd_1->hdr_info);
-		break;
-
-	case TMI_HDR_FT_NOR_80211:
-		DBGLOG(HAL, INFO, "\t\t\tHeader Len=%d(WORD)\n",
-				 txd_1->hdr_info & TMI_HDR_INFO_2_MASK_LEN);
-		break;
-
-	case TMI_HDR_FT_ENH_80211:
-		DBGLOG(HAL, INFO, "\t\t\tEOSP=%d, AMS=%d\n",
-			txd_1->hdr_info & (1 << TMI_HDR_INFO_3_BIT_EOSP),
-			txd_1->hdr_info & (1 << TMI_HDR_INFO_3_BIT_AMS));
-		break;
-	}
-
-	DBGLOG(HAL, INFO, "\t\tTxDFormatType=%d(%s format)\n", txd_1->ft,
-		(txd_1->ft == TMI_FT_LONG ?
-		"Long - 8 DWORD" : "Short - 3 DWORD"));
-	DBGLOG(HAL, INFO, "\t\ttxd_len=%d page(%d DW)\n",
-		txd_1->txd_len == 0 ? 1 : 2, (txd_1->txd_len + 1) * 16);
-	DBGLOG(HAL, INFO,
-		"\t\tHdrPad=%d(Padding Mode: %s, padding bytes: %d)\n",
-		txd_1->hdr_pad,
-		((txd_1->hdr_pad & (TMI_HDR_PAD_MODE_TAIL << 1)) ?
-		"tail" : "head"), (txd_1->hdr_pad & 0x1 ? 2 : 0));
-	DBGLOG(HAL, INFO, "\t\tUNxV=%d\n", txd_1->UNxV);
-	DBGLOG(HAL, INFO, "\t\tamsdu=%d\n", txd_1->amsdu);
-	DBGLOG(HAL, INFO, "\t\tTID=%d\n", txd_1->tid);
-	DBGLOG(HAL, INFO, "\t\tpkt_ft=%d(%s)\n",
-			 txd_1->pkt_ft, pkt_ft_str[txd_1->pkt_ft]);
-	DBGLOG(HAL, INFO, "\t\town_mac=%d\n", txd_1->OwnMacAddr);
-
-	if (txd_s->TxD1.ft == TMI_FT_LONG) {
-		struct TMAC_TXD_L *txd_l = (struct TMAC_TXD_L *)tmac_info;
-		struct TMAC_TXD_2 *txd_2 = &txd_l->TxD2;
-		struct TMAC_TXD_3 *txd_3 = &txd_l->TxD3;
-		struct TMAC_TXD_4 *txd_4 = &txd_l->TxD4;
-		struct TMAC_TXD_5 *txd_5 = &txd_l->TxD5;
-		struct TMAC_TXD_6 *txd_6 = &txd_l->TxD6;
-
-		DBGLOG(HAL, INFO, "\tTMAC_TXD_2:\n");
-		DBGLOG(HAL, INFO, "\t\tsub_type=%d\n", txd_2->sub_type);
-		DBGLOG(HAL, INFO, "\t\tfrm_type=%d\n", txd_2->frm_type);
-		DBGLOG(HAL, INFO, "\t\tNDP=%d\n", txd_2->ndp);
-		DBGLOG(HAL, INFO, "\t\tNDPA=%d\n", txd_2->ndpa);
-		DBGLOG(HAL, INFO, "\t\tSounding=%d\n", txd_2->sounding);
-		DBGLOG(HAL, INFO, "\t\tRTS=%d\n", txd_2->rts);
-		DBGLOG(HAL, INFO, "\t\tbc_mc_pkt=%d\n", txd_2->bc_mc_pkt);
-		DBGLOG(HAL, INFO, "\t\tBIP=%d\n", txd_2->bip);
-		DBGLOG(HAL, INFO, "\t\tDuration=%d\n", txd_2->duration);
-		DBGLOG(HAL, INFO, "\t\tHE(HTC Exist)=%d\n", txd_2->htc_vld);
-		DBGLOG(HAL, INFO, "\t\tFRAG=%d\n", txd_2->frag);
-		DBGLOG(HAL, INFO, "\t\tReamingLife/MaxTx time=%d\n",
-			txd_2->max_tx_time);
-		DBGLOG(HAL, INFO, "\t\tpwr_offset=%d\n", txd_2->pwr_offset);
-		DBGLOG(HAL, INFO, "\t\tba_disable=%d\n", txd_2->ba_disable);
-		DBGLOG(HAL, INFO, "\t\ttiming_measure=%d\n",
-			txd_2->timing_measure);
-		DBGLOG(HAL, INFO, "\t\tfix_rate=%d\n", txd_2->fix_rate);
-		DBGLOG(HAL, INFO, "\tTMAC_TXD_3:\n");
-		DBGLOG(HAL, INFO, "\t\tNoAck=%d\n", txd_3->no_ack);
-		DBGLOG(HAL, INFO, "\t\tPF=%d\n", txd_3->protect_frm);
-		DBGLOG(HAL, INFO, "\t\ttx_cnt=%d\n", txd_3->tx_cnt);
-		DBGLOG(HAL, INFO, "\t\tremain_tx_cnt=%d\n",
-			txd_3->remain_tx_cnt);
-		DBGLOG(HAL, INFO, "\t\tsn=%d\n", txd_3->sn);
-		DBGLOG(HAL, INFO, "\t\tpn_vld=%d\n", txd_3->pn_vld);
-		DBGLOG(HAL, INFO, "\t\tsn_vld=%d\n", txd_3->sn_vld);
-		DBGLOG(HAL, INFO, "\tTMAC_TXD_4:\n");
-		DBGLOG(HAL, INFO, "\t\tpn_low=0x%x\n", txd_4->pn_low);
-		DBGLOG(HAL, INFO, "\tTMAC_TXD_5:\n");
-		DBGLOG(HAL, INFO, "\t\ttx_status_2_host=%d\n",
-			txd_5->tx_status_2_host);
-		DBGLOG(HAL, INFO, "\t\ttx_status_2_mcu=%d\n",
-			txd_5->tx_status_2_mcu);
-		DBGLOG(HAL, INFO, "\t\ttx_status_fmt=%d\n",
-			txd_5->tx_status_fmt);
-
-		if (txd_5->tx_status_2_host || txd_5->tx_status_2_mcu)
-			DBGLOG(HAL, INFO, "\t\tpid=%d\n", txd_5->pid);
-
-		if (txd_2->fix_rate)
-			DBGLOG(HAL, INFO,
-				"\t\tda_select=%d\n", txd_5->da_select);
-
-		DBGLOG(HAL, INFO, "\t\tpwr_mgmt=0x%x\n", txd_5->pwr_mgmt);
-		DBGLOG(HAL, INFO, "\t\tpn_high=0x%x\n", txd_5->pn_high);
-
-		if (txd_2->fix_rate) {
-			DBGLOG(HAL, INFO, "\tTMAC_TXD_6:\n");
-			DBGLOG(HAL, INFO, "\t\tfix_rate_mode=%d\n",
-				txd_6->fix_rate_mode);
-			DBGLOG(HAL, INFO, "\t\tGI=%d(%s)\n", txd_6->gi,
-				(txd_6->gi == 0 ? "LONG" : "SHORT"));
-			DBGLOG(HAL, INFO, "\t\tldpc=%d(%s)\n", txd_6->ldpc,
-				(txd_6->ldpc == 0 ? "BCC" : "LDPC"));
-			DBGLOG(HAL, INFO, "\t\tTxBF=%d\n", txd_6->TxBF);
-			DBGLOG(HAL, INFO, "\t\ttx_rate=0x%x\n", txd_6->tx_rate);
-			DBGLOG(HAL, INFO, "\t\tant_id=%d\n", txd_6->ant_id);
-			DBGLOG(HAL, INFO, "\t\tdyn_bw=%d\n", txd_6->dyn_bw);
-			DBGLOG(HAL, INFO, "\t\tbw=%d\n", txd_6->bw);
-		}
+	for (i = 0x820F4130; i <= 0x820F4148; i += 4) {
+		HAL_MCR_RD(prAdapter, i, &value);
+		DBGLOG(HAL, INFO, "0x%08x: 0x%08x\n", i, value);
 	}
 }
-
-void halShowLitePleInfo(IN struct ADAPTER *prAdapter)
-{
-	uint32_t pg_flow_ctrl[6] = {0};
-	uint32_t rpg_hif, upg_hif, i, j;
-	uint32_t ple_stat[17] = {0};
-	uint32_t sta_pause[4] = {0};
-	uint32_t dis_sta_map[4] = {0};
-
-	HAL_MCR_RD(prAdapter, PLE_HIF_PG_INFO, &pg_flow_ctrl[3]);
-	rpg_hif = pg_flow_ctrl[3] & 0xfff;
-	upg_hif = (pg_flow_ctrl[3] & (0xfff << 16)) >> 16;
-	DBGLOG(HAL, INFO,
-	  "\t\tThe used/reserved pages of HIF group=0x%03x/0x%03x\n",
-	  upg_hif, rpg_hif);
-
-	HAL_MCR_RD(prAdapter, PLE_QUEUE_EMPTY, &ple_stat[0]);
-	HAL_MCR_RD(prAdapter, PLE_AC0_QUEUE_EMPTY_0, &ple_stat[1]);
-	HAL_MCR_RD(prAdapter, PLE_AC0_QUEUE_EMPTY_1, &ple_stat[2]);
-	HAL_MCR_RD(prAdapter, PLE_AC0_QUEUE_EMPTY_2, &ple_stat[3]);
-	HAL_MCR_RD(prAdapter, PLE_AC0_QUEUE_EMPTY_3, &ple_stat[4]);
-	HAL_MCR_RD(prAdapter, PLE_AC1_QUEUE_EMPTY_0, &ple_stat[5]);
-	HAL_MCR_RD(prAdapter, PLE_AC1_QUEUE_EMPTY_1, &ple_stat[6]);
-	HAL_MCR_RD(prAdapter, PLE_AC1_QUEUE_EMPTY_2, &ple_stat[7]);
-	HAL_MCR_RD(prAdapter, PLE_AC1_QUEUE_EMPTY_3, &ple_stat[8]);
-	HAL_MCR_RD(prAdapter, PLE_AC2_QUEUE_EMPTY_0, &ple_stat[9]);
-	HAL_MCR_RD(prAdapter, PLE_AC2_QUEUE_EMPTY_1, &ple_stat[10]);
-	HAL_MCR_RD(prAdapter, PLE_AC2_QUEUE_EMPTY_2, &ple_stat[11]);
-	HAL_MCR_RD(prAdapter, PLE_AC2_QUEUE_EMPTY_3, &ple_stat[12]);
-	HAL_MCR_RD(prAdapter, PLE_AC3_QUEUE_EMPTY_0, &ple_stat[13]);
-	HAL_MCR_RD(prAdapter, PLE_AC3_QUEUE_EMPTY_1, &ple_stat[14]);
-	HAL_MCR_RD(prAdapter, PLE_AC3_QUEUE_EMPTY_2, &ple_stat[15]);
-	HAL_MCR_RD(prAdapter, PLE_AC3_QUEUE_EMPTY_3, &ple_stat[16]);
-
-	HAL_MCR_RD(prAdapter, STATION_PAUSE0, &sta_pause[0]);
-	HAL_MCR_RD(prAdapter, STATION_PAUSE1, &sta_pause[1]);
-	HAL_MCR_RD(prAdapter, STATION_PAUSE2, &sta_pause[2]);
-	HAL_MCR_RD(prAdapter, STATION_PAUSE3, &sta_pause[3]);
-
-	HAL_MCR_RD(prAdapter, DIS_STA_MAP0, &dis_sta_map[0]);
-	HAL_MCR_RD(prAdapter, DIS_STA_MAP1, &dis_sta_map[1]);
-	HAL_MCR_RD(prAdapter, DIS_STA_MAP2, &dis_sta_map[2]);
-	HAL_MCR_RD(prAdapter, DIS_STA_MAP3, &dis_sta_map[3]);
-
-	for (j = 0; j < 16; j = j + 4) { /* show AC Q info */
-		for (i = 0; i < 32; i++) {
-			if (((ple_stat[j + 1] & (0x1 << i)) >> i) == 0) {
-				uint32_t hfid, tfid, pktcnt,
-					ac_num = j / 4, ctrl = 0;
-				uint32_t sta_num = i + (j % 4) * 32,
-					fl_que_ctrl[3] = {0};
-				fl_que_ctrl[0] |= (0x1 << 31);
-				fl_que_ctrl[0] |= (0x2 << 14);
-				fl_que_ctrl[0] |= (ac_num << 8);
-				fl_que_ctrl[0] |= sta_num;
-				HAL_MCR_WR(prAdapter,
-					PLE_FL_QUE_CTRL_0, fl_que_ctrl[0]);
-				HAL_MCR_RD(prAdapter,
-					PLE_FL_QUE_CTRL_2, &fl_que_ctrl[1]);
-				HAL_MCR_RD(prAdapter,
-					PLE_FL_QUE_CTRL_3, &fl_que_ctrl[2]);
-				hfid = fl_que_ctrl[1] & 0xfff;
-				tfid = (fl_que_ctrl[1] & 0xfff << 16) >> 16;
-				pktcnt = fl_que_ctrl[2] & 0xfff;
-
-				if (((sta_pause[j % 4] & 0x1 << i) >> i) == 1)
-					ctrl = 2;
-				if (((dis_sta_map[j % 4] & 0x1 << i) >> i) == 1)
-					ctrl = 1;
-				DBGLOG(HAL, INFO,
-					"STA%d AC%d: tail/head fid = 0x%03x/0x%03x, pkt cnt = %x  ctrl = %s\n",
-					 sta_num, ac_num, tfid, hfid, pktcnt,
-					 sta_ctrl_reg[ctrl]);
-			}
-		}
-	}
-}
-

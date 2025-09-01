@@ -52,7 +52,7 @@
 #define STP_LOG_WARN                 1
 #define STP_LOG_ERR                  0
 
-extern INT32 gStpDbgLvl;
+extern UINT32 gStpDbgLvl;
 
 #define STP_DBG_FUNC(fmt, arg...)    do {\
 	if (gStpDbgLvl >= STP_LOG_DBG)\
@@ -275,8 +275,6 @@ typedef struct {
 	UINT32 f_wmt_last_close;
 	/* Flag to indicate evt err has triggered assert or not */
 	UINT32 f_evt_err_assert;
-	/* Flag to indicate assert process is ongoing or not */
-	UINT32 f_assert_in_progress;
 } mtkstp_context_struct;
 
 /*******************************************************************************
@@ -627,7 +625,7 @@ extern VOID mtk_wcn_stp_set_if_tx_type(ENUM_STP_TX_IF_TYPE stp_if_type);
 
 extern INT32 mtk_wcn_sys_if_rx(PUINT8 data, INT32 size);
 
-extern MTK_WCN_BOOL mtk_wcn_stp_dbg_level(INT32 dbglevel);
+extern MTK_WCN_BOOL mtk_wcn_stp_dbg_level(UINT32 dbglevel);
 
 extern INT32 mtk_wcn_stp_dbg_dump_package(VOID);
 
@@ -667,13 +665,6 @@ extern INT32 mtk_wcn_stp_coredump_timeout_handle(VOID);
 extern VOID mtk_wcn_stp_dbg_pkt_log(INT32 type, INT32 dir);
 
 extern INT32 mtk_wcn_sys_if_rx(UINT8 *data, INT32 size);
-
-/*
- * API to get/set assert process is ongoing.
- * It includes assert, coredump and chip reset process.
- */
-extern VOID mtk_wcn_stp_assert_flow_ctrl(UINT32 on);
-extern UINT32 mtk_wcn_stp_assert_flow_get(VOID);
 
 VOID mtk_stp_sdio_retry_flag_ctrl(INT32 flag);
 VOID mtk_stp_dbg_sdio_retry_flag_ctrl(INT32 flag);

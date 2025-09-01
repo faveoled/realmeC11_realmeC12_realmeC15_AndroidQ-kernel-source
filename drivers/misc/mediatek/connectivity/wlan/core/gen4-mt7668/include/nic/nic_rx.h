@@ -95,7 +95,7 @@
 #define RX_RFB_LEN_FIELD_LEN        4
 #define RX_HEADER_OFFSET            2
 
-#define RX_RETURN_INDICATED_RFB_TIMEOUT_SEC     1
+#define RX_RETURN_INDICATED_RFB_TIMEOUT_SEC     3
 
 #if defined(_HIF_SDIO) && defined(WINDOWS_DDK)
 /*! On XP, maximum Tx+Rx Statue <= 64-4(HISR)*/

@@ -514,7 +514,7 @@ VOID halSetFWOwn(IN P_ADAPTER_T prAdapter, IN BOOLEAN fgEnableGlobalInt)
 		return;
 
 	if ((nicProcessIST(prAdapter) != WLAN_STATUS_NOT_INDICATING) && !nicSerIsWaitingReset(prAdapter)) {
-		DBGLOG(INIT, INFO, "FW OWN Skipped due to pending INT\n");
+		DBGLOG(INIT, STATE, "FW OWN Skipped due to pending INT\n");
 		/* pending interrupts */
 		return;
 	}
@@ -1169,15 +1169,14 @@ halRxEnhanceReadBuffer(IN P_ADAPTER_T prAdapter,
 
 		/* 4 <2> if the RFB dw size or packet size is zero */
 		if (u4PktLen == 0) {
-			DBGLOG(RX, ERROR, "Packet Length = %u\n", u4PktLen);
+			DBGLOG(RX, ERROR, "Packet Length = %lu\n", u4PktLen);
 			ASSERT(0);
 			break;
 		}
 		/* 4 <3> if the packet is too large or too small */
 		/* ToDo[6630]: adjust CFG_RX_MAX_PKT_SIZE */
 		if (u4PktLen > CFG_RX_MAX_PKT_SIZE) {
-			DBGLOG(RX, TRACE, "Read RX Packet Lentgh Error (%u)\n",
-			      u4PktLen);
+			DBGLOG(RX, TRACE, "Read RX Packet Lentgh Error (%lu)\n", u4PktLen);
 			ASSERT(0);
 			break;
 		}
@@ -1709,7 +1708,6 @@ UINT_32 halGetValidCoalescingBufSize(IN P_ADAPTER_T prAdapter)
 	UINT_32 u4BufSize;
 #if (MTK_WCN_HIF_SDIO == 0)
 	struct sdio_func *prSdioFunc;
-	UINT_32 u4RuntimeMaxBuf;
 #endif
 
 	prHifInfo = &prAdapter->prGlueInfo->rHifInfo;
@@ -1723,37 +1721,8 @@ UINT_32 halGetValidCoalescingBufSize(IN P_ADAPTER_T prAdapter)
 	prSdioFunc = prHifInfo->func;
 
 	/* Check host capability */
-	/* 1. Should less than host-max_req_size */
 	if (u4BufSize > prSdioFunc->card->host->max_req_size)
 		u4BufSize = prSdioFunc->card->host->max_req_size;
-
-	/* 2. Should less than runtime-blksize * host-blk_count  */
-	u4RuntimeMaxBuf = prSdioFunc->cur_blksize *
-					prSdioFunc->card->host->max_blk_count;
-	if (u4BufSize > u4RuntimeMaxBuf)
-		u4BufSize = u4RuntimeMaxBuf;
-
-	DBGLOG(INIT, TRACE, "\n"
-				"Final buf : 0x%X\n"
-				"Default TX buf : 0x%X\n"
-				"Default RX buf : 0x%X\n"
-				"Host caps -\n"
-				"max_req_size : 0x%X\n"
-				"max_seg_size : 0x%X\n"
-				"max_segs : 0x%X\n"
-				"max_blk_size : 0x%X\n"
-				"max_blk_count : 0x%X\n"
-				"Runtime -\n"
-				"cur_blksize : 0x%X\n",
-				u4BufSize,
-				HIF_TX_COALESCING_BUFFER_SIZE,
-				HIF_RX_COALESCING_BUFFER_SIZE,
-				prSdioFunc->card->host->max_req_size,
-				prSdioFunc->card->host->max_seg_size,
-				prSdioFunc->card->host->max_segs,
-				prSdioFunc->card->host->max_blk_size,
-				prSdioFunc->card->host->max_blk_count,
-				prSdioFunc->cur_blksize);
 #endif
 
 	return u4BufSize;
@@ -1768,15 +1737,11 @@ WLAN_STATUS halAllocateIOBuffer(IN P_ADAPTER_T prAdapter)
 	prHifInfo = &prAdapter->prGlueInfo->rHifInfo;
 
 	/* 4 <5> Memory for enhanced interrupt response */
-#ifdef CFG_PREALLOC_MEMORY
-	prHifInfo->prSDIOCtrl = (P_SDIO_CTRL_T)preallocGetMem(MEM_ID_IO_CTRL);
-#else
 	prHifInfo->prSDIOCtrl = (P_SDIO_CTRL_T)
 		kalAllocateIOBuffer(sizeof(ENHANCE_MODE_DATA_STRUCT_T));
-#endif
+
 	if (prHifInfo->prSDIOCtrl == NULL) {
-		DBGLOG(HAL, ERROR,
-			"Could not allocate %zu bytes for interrupt response.\n",
+		DBGLOG(HAL, ERROR, "Could not allocate %d bytes for interrupt response.\n",
 			sizeof(ENHANCE_MODE_DATA_STRUCT_T));
 
 		return WLAN_STATUS_RESOURCES;
@@ -1789,11 +1754,7 @@ WLAN_STATUS halAllocateIOBuffer(IN P_ADAPTER_T prAdapter)
 		prRxBuf->u4PktCount = 0;
 
 		prRxBuf->u4BufSize = HIF_RX_COALESCING_BUFFER_SIZE;
-#ifdef CFG_PREALLOC_MEMORY
-		prRxBuf->pvRxCoalescingBuf = preallocGetMem(MEM_ID_RX_DATA);
-#else
 		prRxBuf->pvRxCoalescingBuf = kalAllocateIOBuffer(prRxBuf->u4BufSize);
-#endif
 		if (!prRxBuf->pvRxCoalescingBuf) {
 			DBGLOG(HAL, ERROR, "Rx coalescing alloc failed!\n");
 			continue;
@@ -1816,17 +1777,13 @@ WLAN_STATUS halReleaseIOBuffer(IN P_ADAPTER_T prAdapter)
 	/* Release coalescing buffer */
 	for (ucIdx = 0; ucIdx < HIF_RX_COALESCING_BUF_COUNT; ucIdx++) {
 		prRxBuf = &prHifInfo->rRxCoalesingBuf[ucIdx];
-#ifndef CFG_PREALLOC_MEMORY
 		kalReleaseIOBuffer(prRxBuf->pvRxCoalescingBuf, prRxBuf->u4BufSize);
-#endif
 		prRxBuf->pvRxCoalescingBuf = NULL;
 	}
 
 	/* 4 <5> Memory for enhanced interrupt response */
 	if (prHifInfo->prSDIOCtrl) {
-#ifndef CFG_PREALLOC_MEMORY
 		kalReleaseIOBuffer((PVOID) prHifInfo->prSDIOCtrl, sizeof(ENHANCE_MODE_DATA_STRUCT_T));
-#endif
 		prHifInfo->prSDIOCtrl = (P_SDIO_CTRL_T) NULL;
 	}
 
@@ -1869,8 +1826,7 @@ VOID halPrintFirmwareAssertInfo(IN P_ADAPTER_T prAdapter)
 
 	aucAssertFile[6] = '\0';
 
-	LOG_FUNC("[%s][wifi][Firmware] Assert at \"%s\" #%d\n\n",
-		 NIC_NAME, aucAssertFile, line);
+	LOG_FUNC("[%s][wifi][Firmware] Assert at \"%s\" #%ld\n\n", NIC_NAME, aucAssertFile, line);
 
 }
 
@@ -1894,7 +1850,7 @@ VOID halProcessSoftwareInterrupt(IN P_ADAPTER_T prAdapter)
 	if ((u4IntrBits & WHISR_D2H_SW_ASSERT_INFO_INT) != 0) {
 		halPrintFirmwareAssertInfo(prAdapter);
 #if CFG_CHIP_RESET_SUPPORT
-		glResetTrigger(prAdapter);
+		glSendResetRequest();
 #endif
 	}
 
@@ -1917,7 +1873,7 @@ VOID halProcessSoftwareInterrupt(IN P_ADAPTER_T prAdapter)
 	}
 
 	if ((u4IntrBits & ~WHISR_D2H_WKUP_BY_RX_PACKET) != 0)
-		DBGLOG(SW4, WARN, "u4IntrBits: 0x%x\n", u4IntrBits);
+		DBGLOG(SW4, WARN, "u4IntrBits: 0x%lx\n", u4IntrBits);
 
 } /* end of halProcessSoftwareInterrupt() */
 
@@ -2208,20 +2164,11 @@ BOOLEAN halIsTxResourceControlEn(IN P_ADAPTER_T prAdapter)
 
 VOID halTxResourceResetHwTQCounter(IN P_ADAPTER_T prAdapter)
 {
-	PUINT_32 pu4WHISR = NULL;
+	UINT_32 u4WHISR = 0;
 	UINT_16 au2TxCount[16];
 
-	pu4WHISR = (PUINT_32)kalMemAlloc(sizeof(UINT_32), PHY_MEM_TYPE);
-	if (!pu4WHISR) {
-		DBGLOG(INIT, ERROR, "Allocate pu4WHISR fail\n");
-		return;
-	}
-
-	HAL_READ_INTR_STATUS(prAdapter, sizeof(UINT_32), (PUINT_8)pu4WHISR);
-	if (HAL_IS_TX_DONE_INTR(*pu4WHISR))
+	HAL_READ_INTR_STATUS(prAdapter, 4, (PUINT_8)&u4WHISR);
+	if (HAL_IS_TX_DONE_INTR(u4WHISR))
 		HAL_READ_TX_RELEASED_COUNT(prAdapter, au2TxCount);
-
-	if (pu4WHISR)
-		kalMemFree(pu4WHISR, PHY_MEM_TYPE, sizeof(UINT_32));
 }
 

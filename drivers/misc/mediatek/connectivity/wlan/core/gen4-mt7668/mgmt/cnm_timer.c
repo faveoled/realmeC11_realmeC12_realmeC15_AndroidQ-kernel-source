@@ -278,7 +278,7 @@ static VOID cnmTimerStopTimer_impl(IN P_ADAPTER_T prAdapter, IN P_TIMER_T prTime
 		 * this dummy timeout will still happen, but it is OK.
 		 */
 		if (LINK_IS_EMPTY(&prRootTimer->rLinkHead)) {
-			/*kalCancelTimer(prAdapter->prGlueInfo); */
+			kalCancelTimer(prAdapter->prGlueInfo);
 
 			if (fgAcquireSpinlock && prRootTimer->fgWakeLocked) {
 				KAL_WAKE_UNLOCK(prAdapter, &prRootTimer->rWakeLock);

@@ -1020,8 +1020,7 @@ void testPsCmdCategory0(struct ADAPTER *prAdapter,
 			/* txmForwardQueuedBmcPkts (ucOpt0); */
 			break;
 		case TEST_PS_SEND_NULL: {
-			if (prStaRec == NULL)
-				break;
+
 			testPsSendQoSNullFrame(prAdapter, prStaRec,
 				/* UP */
 				(uint8_t) (g_au4SwCr[1] & 0xFF),
@@ -1193,7 +1192,7 @@ void swCrReadWriteCmd(struct ADAPTER *prAdapter,
 	/* Address [7:0] OFFSET */
 
 	DEBUGFUNC("swCrReadWriteCmd");
-	DBGLOG(SW4, TRACE, "%u addr 0x%x data 0x%x\n", ucRead,
+	DBGLOG_LIMITED(SW4, INFO, "%u addr 0x%x data 0x%x\n", ucRead,
 	       u2Addr, *pu4Data);
 
 	if (ucMod < (ARRAY_SIZE(g_arSwCrModHandle))) {

@@ -160,8 +160,6 @@ typedef enum _ENUM_PARAM_AUTH_MODE_T {
 	AUTH_MODE_WPA2_PSK,
 	AUTH_MODE_WPA2_FT, /* Fast Bss Transition for 802.1x */
 	AUTH_MODE_WPA2_FT_PSK, /* Fast Bss Transition for WPA2 PSK */
-	AUTH_MODE_WPA3_SAE,
-	AUTH_MODE_WPA3_OWE,
 	AUTH_MODE_NUM		/*!< Upper bound, not real case */
 } ENUM_PARAM_AUTH_MODE_T, *P_ENUM_PARAM_AUTH_MODE_T;
 
@@ -217,7 +215,6 @@ typedef enum _ENUM_PARAM_PHY_TYPE_T {
 	PHY_TYPE_NUM		/* 5 */
 } ENUM_PARAM_PHY_TYPE_T, *P_ENUM_PARAM_PHY_TYPE_T;
 
-
 typedef enum _ENUM_PARAM_OP_MODE_T {
 	NET_TYPE_IBSS = 0,	/*!< Try to merge/establish an AdHoc, do periodic SCAN for merging. */
 	NET_TYPE_INFRA,		/*!< Try to join an Infrastructure, do periodic SCAN for joining. */
@@ -243,12 +240,6 @@ typedef struct _PARAM_CONNECT_T {
 	UINT_8 *pucBssid;
 	UINT_32 u4CenterFreq;
 } PARAM_CONNECT_T, *P_PARAM_CONNECT_T;
-
-struct PARAM_EXTERNAL_AUTH {
-	UINT_8 bssid[PARAM_MAC_ADDR_LEN];
-	UINT_16 status;
-	UINT_8 ucBssIdx;
-};
 
 /* This is enum defined for user to select an AdHoc Mode */
 typedef enum _ENUM_PARAM_AD_HOC_MODE_T {
@@ -1297,8 +1288,6 @@ typedef struct _PARAM_802_11_STATISTICS_STRUCT_T {
 	LARGE_INTEGER rWEPICVErrorCount;
 	LARGE_INTEGER rDecryptSuccessCount;
 	LARGE_INTEGER rDecryptFailureCount;
-	LARGE_INTEGER rMdrdyCnt;
-	LARGE_INTEGER rChnlIdleCnt;
 } PARAM_802_11_STATISTICS_STRUCT_T, *P_PARAM_802_11_STATISTICS_STRUCT_T;
 
 /* Linux Network Device Statistics Struct */
@@ -1603,7 +1592,7 @@ typedef struct _CMD_SET_PSCAN_ENABLE {
 	UINT_8 aucReserved[3];
 } CMD_SET_PSCAN_ENABLE, *P_CMD_SET_PSCAN_ENABLE;
 
-
+#if CFG_AUTO_CHANNEL_SEL_SUPPORT
 /*--------------------------------------------------------------*/
 /*! \brief MTK Auto Channel Selection related Container         */
 /*--------------------------------------------------------------*/
@@ -1615,14 +1604,13 @@ typedef struct _PARAM_CHN_LOAD_INFO {
 	/* Per-CHN Load */
 	UINT_8 ucChannel;
 	UINT_16 u2APNum;
-	UINT_16 u2APNumScore;
-	UINT_8 aucReserved[3];
+	UINT_8 ucReserved;
 } PARAM_CHN_LOAD_INFO, *P_PARAM_CHN_LOAD_INFO;
 
 typedef struct _PARAM_GET_CHN_INFO {
-	UINT_8 ucRoleIndex;
 	LTE_SAFE_CHN_INFO_T rLteSafeChnList;
 	PARAM_CHN_LOAD_INFO rEachChnLoad[MAX_CHN_NUM];
+	BOOLEAN fgDataReadyBit;
 	UINT_8 aucReserved[3];
 } PARAM_GET_CHN_INFO, *P_PARAM_GET_CHN_INFO;
 
@@ -1632,7 +1620,7 @@ typedef struct _PARAM_PREFER_CHN_INFO {
 	UINT_8 ucReserved;
 } PARAM_PREFER_CHN_INFO, *P_PARAM_PREFER_CHN_INFO;
 
-
+#endif
 
 /* use to save partial scan channel information */
 typedef struct _PARTIAL_SCAN_INFO_T {
@@ -1700,11 +1688,6 @@ enum ENUM_WIFI_LOG_LEVEL_SUPPORT_T {
 	ENUM_WIFI_LOG_LEVEL_SUPPORT_ENABLE,
 	ENUM_WIFI_LOG_LEVEL_SUPPORT_NUM
 };
-/* link quality monitor */
-struct PARAM_GET_LINK_QUALITY_INFO {
-	UINT_8 ucBssIdx;
-	struct WIFI_LINK_QUALITY_INFO *prLinkQualityInfo;
-};
 
 /*******************************************************************************
 *                            P U B L I C   D A T A
@@ -1720,10 +1703,6 @@ struct PARAM_GET_LINK_QUALITY_INFO {
 *                                 M A C R O S
 ********************************************************************************
 */
-
-WLAN_STATUS
-wlanoidQueryAntSwapCapability(IN P_ADAPTER_T prAdapter,
-		IN PVOID pvQueryBuffer, IN UINT_32 u4QueryBufferLen, OUT PUINT_32 pu4QueryInfoLen);
 
 /*******************************************************************************
 *                   F U N C T I O N   D E C L A R A T I O N S
@@ -2194,6 +2173,12 @@ wlanoidSetWapiKey(IN P_ADAPTER_T prAdapter,
 		  IN PVOID pvSetBuffer, IN UINT_32 u4SetBufferLen, OUT PUINT_32 pu4SetInfoLen);
 #endif
 
+#if CFG_SUPPORT_WPS2
+WLAN_STATUS
+wlanoidSetWSCAssocInfo(IN P_ADAPTER_T prAdapter,
+		       IN PVOID pvSetBuffer, IN UINT_32 u4SetBufferLen, OUT PUINT_32 pu4SetInfoLen);
+#endif
+
 #if CFG_ENABLE_WAKEUP_ON_LAN
 WLAN_STATUS
 wlanoidSetAddWakeupPattern(IN P_ADAPTER_T prAdapter,
@@ -2335,12 +2320,6 @@ WLAN_STATUS wlanoidSetMonitor(IN P_ADAPTER_T prAdapter,
 			      IN PVOID pvSetBuffer, IN UINT_32 u4SetBufferLen, OUT PUINT_32 pu4SetInfoLen);
 #endif
 
-#if CFG_SUPPORT_RSSI_DISCONNECT
-WLAN_STATUS
-wlanoidQueryRssiDisconnect(IN P_ADAPTER_T prAdapter,
-		      IN PVOID pvQueryBuffer, IN UINT_32 u4QueryBufferLen, OUT PUINT_32 pu4QueryInfoLen);
-#endif
-
 #if CFG_SUPPORT_GSCN
 WLAN_STATUS
 wlanoidSetGSCNAction(IN P_ADAPTER_T prAdapter,
@@ -2371,6 +2350,11 @@ WLAN_STATUS
 wlanoidPacketKeepAlive(IN P_ADAPTER_T prAdapter,
 		       IN PVOID pvSetBuffer, IN UINT_32 u4SetBufferLen, OUT PUINT_32 pu4SetInfoLen);
 
+#if CFG_AUTO_CHANNEL_SEL_SUPPORT
+WLAN_STATUS
+wlanoidQueryLteSafeChannel(IN P_ADAPTER_T prAdapter,
+			   IN PVOID pvQueryBuffer, IN UINT_32 u4QueryBufferLen, OUT PUINT_32 pu4QueryInfoLen);
+#endif
 
 #if FW_CFG_SUPPORT
 WLAN_STATUS wlanoidQueryCfgRead(IN P_ADAPTER_T prAdapter,
@@ -2448,32 +2432,15 @@ wlanoidConfigRoaming(IN P_ADAPTER_T prAdapter,
 WLAN_STATUS
 wlanoidSetScanMacOui(IN P_ADAPTER_T prAdapter,
 		     IN PVOID pvSetBuffer, IN UINT_32 u4SetBufferLen, OUT PUINT_32 pu4SetInfoLen);
+uint32_t wlanoidGetWifiType(IN P_ADAPTER_T prAdapter,
+			    IN void *pvSetBuffer,
+			    IN uint32_t u4SetBufferLen,
+			    OUT uint32_t *pu4SetInfoLen);
 
 WLAN_STATUS
-wlanoidStopApRole(IN P_ADAPTER_T prAdapter,
-		     IN void *pvSetBuffer, IN UINT_32 u4SetBufferLen, OUT UINT_32 *pu4SetInfoLen);
+wlanoidStopApRole(P_ADAPTER_T prAdapter, void *pvSetBuffer,
+		UINT_32 u4SetBufferLen, UINT_32 *pu4SetInfoLen);
 
-WLAN_STATUS
-wlanoidSendSarEnable(IN P_ADAPTER_T prAdapter,
-		     IN PVOID pvSetBuffer, IN UINT_32 u4SetBufferLen, OUT PUINT_32 pu4SetInfoLen);
-
-uint32_t
-wlanoidGetWifiType(IN P_ADAPTER_T prAdapter,
-		     IN void *pvSetBuffer, IN UINT_32 u4SetBufferLen, OUT UINT_32 *pu4SetInfoLen);
-
-uint32_t
-wlanoidExternalAuthDone(IN struct _ADAPTER_T *prAdapter,
-		     IN void *pvSetBuffer, IN UINT_32 u4SetBufferLen, OUT UINT_32 *pu4SetInfoLen);
-WLAN_STATUS
-wlanoidSetP2pRandomMac(P_ADAPTER_T prAdapter, void *pvSetBuffer,
-	UINT_32 u4SetBufferLen, UINT_32 *pu4SetInfoLen);
-
-#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
-UINT_32 wlanoidGetLinkQualityInfo(IN P_ADAPTER_T prAdapter,
-				   IN void *pvSetBuffer,
-				   IN UINT_32 u4SetBufferLen,
-				   OUT UINT_32 *pu4SetInfoLen);
-#endif
 /*******************************************************************************
 *                              F U N C T I O N S
 ********************************************************************************

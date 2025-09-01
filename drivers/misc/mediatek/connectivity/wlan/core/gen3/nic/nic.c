@@ -1619,14 +1619,6 @@ WLAN_STATUS nicUpdateBss(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBssIndex)
 		rCmdSetBssInfo.ucEncStatus = (UINT_8) prConnSettings->eEncStatus;
 		rCmdSetBssInfo.ucWapiMode = (UINT_8) prConnSettings->fgWapiMode;
 		rCmdSetBssInfo.ucDisconnectDetectTh = prWifiVar->ucStaDisconnectDetectTh;
-		/* If connect to a AP in bandwidth VHT80, change vcore to 0.8v
-		** otherwise, if disconnect from VHT80 AP or leave VHT80, change vcore to 0.725v
-		*/
-		if (prBssInfo->ucVhtChannelWidth == VHT_OP_CHANNEL_WIDTH_80 &&
-		    prBssInfo->eConnectionState == PARAM_MEDIA_STATE_CONNECTED)
-			kalTakeVcoreAction(VCORE_ADD_HIGHER_REQ);
-		else if (prBssInfo->eConnectionState != PARAM_MEDIA_STATE_TO_BE_INDICATED)
-			kalTakeVcoreAction(VCORE_DEC_HIGHER_REQ);
 	}
 #if CFG_ENABLE_BT_OVER_WIFI
 	else if (IS_BSS_BOW(prBssInfo)) {
@@ -3891,11 +3883,8 @@ WLAN_STATUS nicApplyNetworkAddress(IN P_ADAPTER_T prAdapter)
 	COPY_MAC_ADDR(prAdapter->rWifiVar.aucDeviceAddress, prAdapter->rMyMacAddr);
 	prAdapter->rWifiVar.aucDeviceAddress[0] ^= MAC_ADDR_LOCAL_ADMIN;
 
-	for (i = 0; i < MAC_ADDR_NUM_STORE; i++) {
-		COPY_MAC_ADDR(prAdapter->rWifiVar.aucInterfaceAddress[i], prAdapter->rMyMacAddr);
-		prAdapter->rWifiVar.aucInterfaceAddress[i][0] |= 0x2;
-		prAdapter->rWifiVar.aucInterfaceAddress[i][0] ^= i << MAC_ADDR_LOCAL_ADMIN;
-	}
+	COPY_MAC_ADDR(prAdapter->rWifiVar.aucInterfaceAddress, prAdapter->rMyMacAddr);
+	prAdapter->rWifiVar.aucInterfaceAddress[0] ^= MAC_ADDR_LOCAL_ADMIN;
 
 #if CFG_ENABLE_WIFI_DIRECT
 	if (prAdapter->fgIsP2PRegistered) {

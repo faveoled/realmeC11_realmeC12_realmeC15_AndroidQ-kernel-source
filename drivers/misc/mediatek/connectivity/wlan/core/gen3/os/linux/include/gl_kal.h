@@ -61,9 +61,7 @@ extern int allocatedMemSize;
 #endif
 
 extern struct delayed_work sched_workq;
-#if CFG_MODIFY_TX_POWER_BY_BAT_VOLT
-extern unsigned int wlan_bat_volt;
-#endif
+
 /*******************************************************************************
 *                              C O N S T A N T S
 ********************************************************************************
@@ -139,18 +137,7 @@ extern unsigned int wlan_bat_volt;
 				    RADIOTAP_FIELD_ANT | \
 				    RADIOTAP_FIELD_VENDOR)
 #endif
-#ifdef CFG_SUPPORT_DATA_STALL
-#define REPORT_EVENT_INTERVAL		30
-#define EVENT_PER_HIGH_THRESHOLD	80
-#define EVENT_TX_LOW_RATE_THRESHOLD	20
-#define EVENT_RX_LOW_RATE_THRESHOLD	20
-#define TRAFFIC_RHRESHOLD      150
-#endif
 
-#if CFG_SUPPORT_REPORT_MISC
-#define EXT_SRC_DHCP_BIT 1
-#define EXT_SRC_DISCONNCT_BIT 2
-#endif
 /*******************************************************************************
 *                             D A T A   T Y P E S
 ********************************************************************************
@@ -262,16 +249,6 @@ typedef enum _ENUM_AGPS_EVENT {
 	AGPS_EVENT_WLAN_OFF,
 	AGPS_EVENT_WLAN_AP_LIST,
 } ENUM_CCX_EVENT;
-#ifdef CFG_SUPPORT_DATA_STALL
-enum ENUM_VENDOR_DRIVER_EVENT {
-	EVENT_TEST_MODE,
-	EVENT_ARP_NO_RESPONSE,
-	EVENT_PER_HIGH,
-	EVENT_TX_LOW_RATE,
-	EVENT_RX_LOW_RATE
-};
-#endif
-
 BOOLEAN kalIndicateAgpsNotify(P_ADAPTER_T prAdapter, UINT_8 cmd, PUINT_8 data, UINT_16 dataLen);
 #endif /* CFG_SUPPORT_AGPS_ASSIST */
 
@@ -377,15 +354,6 @@ struct KAL_HALT_CTRL_T {
 	BOOLEAN fgHalt;
 	BOOLEAN fgHeldByKalIoctl;
 	OS_SYSTIME u4HoldStart;
-};
-
-enum VCORE_ACTION_T {
-	VCORE_ADD_HIGHER_REQ,
-	VCORE_DEC_HIGHER_REQ,
-	VCORE_RESTORE_DEF,
-	VCORE_SET_HIGHER,
-	VCORE_CLEAR_ALL_REQ,
-	VCORE_ACTION_MAX_NUM
 };
 /*******************************************************************************
 *                            P U B L I C   D A T A
@@ -497,7 +465,7 @@ enum VCORE_ACTION_T {
 		__pm_stay_awake(_prWakeLock)
 
 #define KAL_WAKE_LOCK_TIMEOUT(_prAdapter, _prWakeLock, _u4Timeout) \
-	__pm_wakeup_event(_prWakeLock, JIFFIES_TO_MSEC(_u4Timeout))
+	__pm_wakeup_event(_prWakeLock, _u4Timeout)
 
 #define KAL_WAKE_UNLOCK(_prAdapter, _prWakeLock) \
 	__pm_relax(_prWakeLock)
@@ -521,10 +489,6 @@ enum VCORE_ACTION_T {
 *
 * \param[in] u4Size Required memory size.
 * \param[in] eMemType  Memory allocation type
-*Ps. when mem type is set to virtual
-*and size is smaller than one PAGE_SIZE,
-*it will be forced to malloc a physical
-*address.
 *
 * \return Pointer to allocated memory
 *         or NULL
@@ -537,10 +501,7 @@ enum VCORE_ACTION_T {
 		pvAddr = kmalloc(u4Size, GFP_KERNEL);   \
 	} \
 	else { \
-		if (u4Size > PAGE_SIZE) \
-			pvAddr = vmalloc(u4Size);   \
-		else \
-			pvAddr = kmalloc(u4Size, GFP_KERNEL);   \
+		pvAddr = vmalloc(u4Size);   \
 	} \
 	if (pvAddr) {   \
 		allocatedMemSize += u4Size;   \
@@ -556,10 +517,7 @@ enum VCORE_ACTION_T {
 		pvAddr = kmalloc(u4Size, GFP_KERNEL);   \
 	} \
 	else { \
-		if (u4Size > PAGE_SIZE) \
-			pvAddr = vmalloc(u4Size);   \
-		else \
-			pvAddr = kmalloc(u4Size, GFP_KERNEL);   \
+		pvAddr = vmalloc(u4Size);   \
 	} \
 	if (!pvAddr) \
 		ASSERT_NOMEM(); \
@@ -586,13 +544,22 @@ enum VCORE_ACTION_T {
 		DBGLOG(INIT, INFO, "0x%p(%ld) freed (%s:%s)\n", \
 			pvAddr, (UINT_32)u4Size, __FILE__, __func__;  \
 	}   \
-	kvfree(pvAddr); \
-
+	if (eMemType == PHY_MEM_TYPE) { \
+		kfree(pvAddr; \
+	} \
+	else { \
+		vfree(pvAddr); \
+	} \
 }
 #else
 #define kalMemFree(pvAddr, eMemType, u4Size)  \
 {   \
-	kvfree(pvAddr); \
+	if (eMemType == PHY_MEM_TYPE) { \
+		kfree(pvAddr); \
+	} \
+	else { \
+		vfree(pvAddr); \
+	} \
 }
 #endif
 
@@ -753,11 +720,11 @@ do {\
 	left_size -= ret_val;\
 	buf += ret_val;\
 } while (0)
+
 #define USEC_TO_SYSTIME(_usec)      ((_usec) / USEC_PER_MSEC)
 #define MSEC_TO_SYSTIME(_msec)      (_msec)
 
 #define MSEC_TO_JIFFIES(_msec)      msecs_to_jiffies(_msec)
-#define JIFFIES_TO_MSEC(_jiffie)    jiffies_to_msecs(_jiffie)
 
 #define KAL_HALT_LOCK_TIMEOUT_NORMAL_CASE		3000 /* 3s */
 /*******************************************************************************
@@ -988,12 +955,6 @@ VOID kalTimeoutHandler(unsigned long arg);
 
 VOID kalSetEvent(P_GLUE_INFO_T pr);
 
-VOID kalSetResetConnEvent(P_GLUE_INFO_T pr);
-
-#if CFG_SUPPORT_REPORT_MISC
-VOID kalSetReportMiscEvent(P_GLUE_INFO_T pr);
-#endif
-
 #if CFG_SUPPORT_MULTITHREAD
 VOID kalSetTxEvent2Hif(P_GLUE_INFO_T pr);
 
@@ -1149,17 +1110,10 @@ INT_32 kalPerMonStop(IN P_GLUE_INFO_T prGlueInfo);
 INT_32 kalPerMonDestroy(IN P_GLUE_INFO_T prGlueInfo);
 VOID kalPerMonHandler(IN P_ADAPTER_T prAdapter, ULONG ulParam);
 INT_32 kalBoostCpu(UINT_32 core_num);
-
 INT_32 kalSetCpuNumFreq(UINT_32 core_num, UINT_32 u4Freq);
 INT_32 kalPerMonSetForceEnableFlag(UINT_8 uFlag);
 INT_32 kalFbNotifierReg(IN P_GLUE_INFO_T prGlueInfo);
 VOID kalFbNotifierUnReg(VOID);
-
-#if CFG_MODIFY_TX_POWER_BY_BAT_VOLT
-INT_32 kalBatNotifierReg(IN P_GLUE_INFO_T prGlueInfo);
-VOID kalSetTxPwrBackoffByBattVolt(P_ADAPTER_T prAdapter, BOOLEAN ucEnable);
-VOID kalBatNotifierUnReg(VOID);
-#endif
 
 UINT_8 kalGetEapolKeyType(P_NATIVE_PACKET prPacket);
 
@@ -1175,12 +1129,5 @@ BOOLEAN kalScanParseRandomMac(
 BOOLEAN kalSchedScanParseRandomMac(
 	const struct net_device *ndev,
 	IN struct cfg80211_sched_scan_request *request);
-VOID kalTakeVcoreAction(UINT_8 ucAction);
-
-VOID kalVcoreInitUninit(BOOLEAN fgInit);
-
-VOID kalMayChangeVcore(VOID);
-
-int kalExternalAuthRequest(IN struct _ADAPTER_T *prAdapter, IN uint8_t uBssIndex);
 
 #endif /* _GL_KAL_H */

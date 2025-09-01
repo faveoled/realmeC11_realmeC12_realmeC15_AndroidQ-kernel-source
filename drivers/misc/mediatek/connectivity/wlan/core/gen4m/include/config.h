@@ -158,15 +158,6 @@
 #define CFG_MET_TAG_SUPPORT             0
 #endif
 
-#ifndef CFG_SUPPORT_PERF_IND
-#ifdef VENDOR_EDIT
-//Xiao.Liang@PSW.CN.WiFi.Basic.Custom.2625617, 2019/11/26, add for LTE&WIFI Co-ex RSSI feature
-#define CFG_SUPPORT_PERF_IND            1
-#else
-#define CFG_SUPPORT_PERF_IND            0
-#endif /* VENDOR_EDIT */
-#endif
-
 /* Support AP Selection */
 #define CFG_SUPPORT_RSN_SCORE		0
 #define CFG_SELECT_BSS_BASE_ON_MULTI_PARAM	1
@@ -249,24 +240,17 @@
 /* Enable A-MSDU RX Reordering Support */
 #define CFG_SUPPORT_RX_AMSDU	1
 
-/* Enable Detection for 2021 Frag/AGG Attack from WFA */
-#define CFG_SUPPORT_FRAG_AGG_ATTACK_DETECTION 1
-
 /* Enable Android wake_lock operations */
 #ifndef CFG_ENABLE_WAKE_LOCK
-#define CFG_ENABLE_WAKE_LOCK	1
+#define CFG_ENABLE_WAKE_LOCK	0
 #endif
 
 #define CFG_SUPPORT_OSHARE	1
 
 #define CFG_SUPPORT_LOWLATENCY_MODE	1
 
-#define CFG_SUPPORT_ANT_SWAP		1
-
 /* If skb_buff mark field is 0x5a, change priority to VO (Customer Feature)*/
 #define CFG_CHANGE_PRIORITY_BY_SKB_MARK_FIELD	1
-
-#define CFG_SUPPORT_DATA_STALL			1
 
 /*------------------------------------------------------------------------------
  * Flags of Buffer mode SUPPORT
@@ -376,8 +360,6 @@
 #define CFG_RX_DIRECT_USB                           1
 #endif
 
-#define CFG_HW_WMM_BY_BSS                           1
-
 /*------------------------------------------------------------------------------
  * Flags and Parameters for Integration
  *------------------------------------------------------------------------------
@@ -470,7 +452,7 @@
 #define CFG_RX_MIN_PKT_SIZE	10 /*!< 802.11 Control Frame is 10 bytes */
 
 /*! RX BA capability */
-#define CFG_NUM_OF_RX_BA_AGREEMENTS             80
+#define CFG_NUM_OF_RX_BA_AGREEMENTS             8
 #if CFG_M0VE_BA_TO_DRIVER
 #define CFG_RX_BA_MAX_WINSIZE                   64
 #endif
@@ -517,8 +499,6 @@
 
 /* debug which packet wake up host */
 #define CFG_SUPPORT_WAKEUP_REASON_DEBUG         1
-#define CFG_MODIFY_TX_POWER_BY_BAT_VOLT         0
-#define CFG_SUPPORT_WAKEUP_COUNT                0
 
 #define CFG_INIT_POWER_SAVE_PROF		ENUM_PSP_FAST_SWITCH
 
@@ -539,19 +519,20 @@
 #define CFG_SUPPORT_DROP_ALL_MC_PACKET		0
 
 /*------------------------------------------------------------------------------
+ * 802.11i RSN Pre-authentication PMKID cahce maximun number
+ *------------------------------------------------------------------------------
+ */
+/*!< max number of PMKID cache 16(default) : The Max PMKID cache */
+#define CFG_MAX_PMKID_CACHE                     16
+
+/*------------------------------------------------------------------------------
  * Auto Channel Selection maximun channel number
  *------------------------------------------------------------------------------
  */
 /* ARRAY_SIZE(mtk_5ghz_channels) + ARRAY_SIZE(mtk_2ghz_channels) */
-#ifndef VENDOR_EDIT
-//Pan.Zhang@PSW.CN.WiFi.Basic.SoftAP.1153775, 2018/01/17,
-//Modify for set softap max 2.4G band 11 channel.
 #define MAX_CHN_NUM			39
-#define MAX_2G_BAND_CHN_NUM                     14
-#else /* VENDOR_EDIT */
-#define MAX_CHN_NUM			36
-#define MAX_2G_BAND_CHN_NUM                     11
-#endif /* VENDOR_EDIT */
+
+#define MAX_2G_BAND_CHN_NUM		14
 #define MAX_5G_BAND_CHN_NUM		(MAX_CHN_NUM - MAX_2G_BAND_CHN_NUM)
 #define ACS_PRINT_BUFFER_LEN		200
 
@@ -659,14 +640,10 @@
 #endif
 
 /* Allow connection with no P2P IE device */
-#ifndef CFG_P2P_CONNECT_ALL_BSS
 #define CFG_P2P_CONNECT_ALL_BSS            0
-#endif
 
 /* Allow setting max P2P GO client count */
-#ifndef CFG_P2P_DEFAULT_CLIENT_COUNT
 #define CFG_P2P_DEFAULT_CLIENT_COUNT 0
-#endif
 
 /*------------------------------------------------------------------------------
  * Flags for GTK rekey offload
@@ -713,8 +690,6 @@
 #ifndef CFG_ENABLE_UNIFY_WIPHY
 #define CFG_ENABLE_UNIFY_WIPHY 1
 #endif
-
-#define CFG_ENABLE_OFFCHANNEL_TX 1
 
 /*------------------------------------------------------------------------------
  * Configuration Flags (Linux Only)
@@ -812,10 +787,7 @@
 #define CFG_SUPPORT_UL_PSMP		0
 
 /* Roaming System */
-#ifndef CFG_SUPPORT_ROAMING
-#define CFG_SUPPORT_ROAMING		1
-#endif
-
+#define CFG_SUPPORT_ROAMING         1
 #if (CFG_SUPPORT_ROAMING == 1)
 
 /* Roaming feature: skip roaming when only one ESSID AP
@@ -824,11 +796,12 @@
  * to trigger roaming scan
  * after skip roaming in one ESSID AP case
  */
-#define CFG_SUPPORT_ROAMING_SKIP_ONE_AP		0
-#define CFG_SUPPORT_DRIVER_ROAMING		1
+#define CFG_SUPPORT_ROAMING_SKIP_ONE_AP		1
+#if CFG_SUPPORT_ROAMING_SKIP_ONE_AP
+#define CFG_MAX_NUM_ROAM_BSS_LIST		64
+#endif
 #else
 #define CFG_SUPPORT_ROAMING_SKIP_ONE_AP		0
-#define CFG_SUPPORT_DRIVER_ROAMING		0
 
 #endif /* CFG_SUPPORT_ROAMING */
 
@@ -846,9 +819,7 @@
 
 #define CFG_SHOW_FULL_MACADDR     1
 
-#ifndef CFG_SUPPORT_VO_ENTERPRISE
 #define CFG_SUPPORT_VO_ENTERPRISE               1
-#endif
 #define CFG_SUPPORT_WMM_AC                      1
 #if CFG_SUPPORT_VO_ENTERPRISE
 #define CFG_SUPPORT_802_11R                     1
@@ -859,14 +830,8 @@
 #endif
 
 /* Support 802.11v Wireless Network Management */
-#ifndef CFG_SUPPORT_802_11V
 #define CFG_SUPPORT_802_11V                     1
-#endif
-#if CFG_SUPPORT_802_11V
 #define CFG_SUPPORT_802_11V_BSS_TRANSITION_MGT  1
-#else
-#define CFG_SUPPORT_802_11V_BSS_TRANSITION_MGT  0
-#endif
 #define CFG_SUPPORT_802_11V_TIMING_MEASUREMENT	0
 
 #if (CFG_SUPPORT_802_11V_TIMING_MEASUREMENT == 1) && \
@@ -884,9 +849,6 @@
 
 #define CFG_SUPPORT_WFD				1
 #define CFG_SUPPORT_WFD_COMPOSE_IE		1
-
-/* Support Customer vendor IE */
-#define CFG_SUPPORT_CUSTOM_VENDOR_IE		1
 
 #define CFG_SUPPORT_HOTSPOT_WPS_MANAGER		1
 #define CFG_SUPPORT_NFC_BEAM_PLUS		1
@@ -934,6 +896,13 @@
 /* Handle IOT issue for 11ac certification */
 #define CFG_OPMODE_CONFLICT_OPINFO	1
 
+
+/*------------------------------------------------------------------------------
+ * Flags of 5G NVRAM SUPPORT
+ *------------------------------------------------------------------------------
+ */
+#define CFG_SUPPORT_NVRAM_5G                0
+
 /*------------------------------------------------------------------------------
  * Flags of Packet Lifetime Profiling Mechanism
  *------------------------------------------------------------------------------
@@ -963,6 +932,7 @@
  * Flags of SCHEDULE SCAN SUPPORT
  *------------------------------------------------------------------------------
  */
+#define CFG_SUPPORT_PNO                    (1)
 #define CFG_SUPPORT_SCHED_SCAN             (1)
 #define SCHED_SCAN_CMD_VERSION             (1)
 
@@ -970,6 +940,10 @@
 #define CFG_SCAN_HIDDEN_SSID_MAX_NUM       (10)
 /* this value should be aligned to auMatchSsid in struct CMD_SCHED_SCAN_REQ */
 #define CFG_SCAN_SSID_MATCH_MAX_NUM        (16)
+
+#if CFG_SUPPORT_PNO != CFG_SUPPORT_SCHED_SCAN
+#error Value of CFG_SUPPORT_SCHED_SCAN and CFG_SUPPORT_PNO should be the same
+#endif
 
 /*------------------------------------------------------------------------------
  * Full2Partial Scan SUPPORT
@@ -1088,7 +1062,6 @@
  */
 
 #define CFG_SUPPORT_DBDC	1
-#define CFG_SUPPORT_DBDC_NO_BLOCKING_OPMODE 1
 #define CFG_SUPPORT_SAP_DFS_CHANNEL 1
 
 /*------------------------------------------------------------------------------
@@ -1121,13 +1094,7 @@
  * Support CFG_SISO_SW_DEVELOP
  *------------------------------------------------------------------------------
  */
-#define CFG_SISO_SW_DEVELOP			1
-
-/*------------------------------------------------------------------------------
- * Support spatial extension control
- *------------------------------------------------------------------------------
- */
-#define CFG_SUPPORT_SPE_IDX_CONTROL		1
+#define CFG_SISO_SW_DEVELOP			0
 
 /*------------------------------------------------------------------------------
  * Flags for a Goal for MT6632 : Cal Result Backup in Host or NVRam when Android
@@ -1209,68 +1176,10 @@
 #define CFG_ENABLE_KEYWORD_EXCEPTION_MECHANISM  1
 
 /*------------------------------------------------------------------------------
- * Flags of auto onnection logs reporting mechanism
- *------------------------------------------------------------------------------
- */
-#define CFG_SUPPORT_REPORT_MISC		1
-
-/*------------------------------------------------------------------------------
  * Driver supports preferred frequency list for p2p operating channel
  *------------------------------------------------------------------------------
  */
-#define CFG_SUPPORT_P2P_PREFERRED_FREQ_LIST  1
-
-/*------------------------------------------------------------------------------
- * Flag used for P2P GO to find the best channel list
- * Value 0: Disable
- * Value 1: Enable
- * Note: Must Enable CFG_SUPPORT_P2P_PREFERRED_FREQ_LIST in advance
- *------------------------------------------------------------------------------
- */
-#define CFG_SUPPORT_P2PGO_ACS 1
-
-/*------------------------------------------------------------------------------
- * Driver supports reporting max tx rate instead of current tx rate
- * in mtk_cfg80211_get_station
- *------------------------------------------------------------------------------
- */
-/* #define CFG_REPORT_MAX_TX_RATE */
-#ifndef VENDOR_EDIT
-//Chuanye.Xu@PSW.CN.WiFi.Connect.config.2432753, 2019/10/16,
-//Modify for show max tx rate
-#define CFG_REPORT_MAX_TX_RATE	0
-#else /* VENDOR_EDIT */
-#define CFG_REPORT_MAX_TX_RATE	1
-#endif /* VENDOR_EDIT */
-
-/*------------------------------------------------------------------------------
- * Link Quality Monitor
- * Link quality monitor execution period base on performance monitor timer
- * CFG_LINK_QUALITY_MONITOR_UPDATE_FREQUENCY base on PERF_MON_UPDATE_INTERVAL
- *------------------------------------------------------------------------------
- */
-#define CFG_SUPPORT_LINK_QUALITY_MONITOR
-#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
-#define CFG_LINK_QUALITY_MONITOR_UPDATE_FREQUENCY	1
-#define CFG_LINK_QUALITY_MONITOR_UPDATE_TOLERANT	1000
-#endif /* CFG_SUPPORT_LINK_QUALITY_MONITOR */
-
- /*-----------------------------------------------------------------------------
- * Flags to support IOT AP blacklist
- *------------------------------------------------------------------------------
- */
- #if CFG_SUPPORT_DBDC
- #define CFG_SUPPORT_IOT_AP_BLACKLIST  1
- #define CFG_IOT_AP_RULE_MAX_CNT 32
- #define CFG_IOT_AP_DATA_MAX_LEN 16
- #endif
-
-/*------------------------------------------------------------------------------
- * Notify clients to reconnect when channel switch in hotspot mode to avoid IOT
- * issues, eg. cross band switch.
- *------------------------------------------------------------------------------
- */
-#define CFG_SEND_DEAUTH_DURING_CHNL_SWITCH    1
+#define CFG_SUPPORT_P2P_PREFERRED_FREQ_LIST  0
 
 /*******************************************************************************
  *                             D A T A   T Y P E S

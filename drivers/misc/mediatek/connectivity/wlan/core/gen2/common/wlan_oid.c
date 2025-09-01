@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -1452,10 +1450,19 @@ wlanoidSetInfrastructureMode(IN P_ADAPTER_T prAdapter,
 	prAdapter->rWifiVar.rAisSpecificBssInfo.fgTransmitKeyExist = FALSE;
 
 	prAdapter->rWifiVar.rConnSettings.fgWapiMode = FALSE;
+#if CFG_SUPPORT_WAPI
+	prAdapter->prGlueInfo->u2WapiAssocInfoIESz = 0;
+	kalMemZero(&prAdapter->prGlueInfo->aucWapiAssocInfoIEs, 42);
+#endif
 
 #if CFG_SUPPORT_802_11W
 	prAdapter->rWifiVar.rAisSpecificBssInfo.fgMgmtProtection = FALSE;
 	prAdapter->rWifiVar.rAisSpecificBssInfo.fgBipKeyInstalled = FALSE;
+#endif
+
+#if CFG_SUPPORT_WPS2
+	kalMemZero(&prAdapter->prGlueInfo->aucWSCAssocInfoIE, 200);
+	prAdapter->prGlueInfo->u2WSCAssocInfoIELen = 0;
 #endif
 
 	return wlanSendSetQueryCmd(prAdapter,
@@ -1463,8 +1470,7 @@ wlanoidSetInfrastructureMode(IN P_ADAPTER_T prAdapter,
 				   TRUE,
 				   FALSE,
 				   TRUE,
-				   nicCmdEventSetCommon, nicOidCmdTimeoutCommon,
-				   0, NULL, pvSetBuffer, u4SetBufferLen);
+				   nicCmdEventSetCommon, nicOidCmdTimeoutCommon, 0, NULL, pvSetBuffer, u4SetBufferLen);
 
 }				/* wlanoidSetInfrastructureMode */
 
@@ -1614,8 +1620,6 @@ wlanoidSetAuthMode(IN P_ADAPTER_T prAdapter,
 	case AUTH_MODE_WPA2_PSK:
 	case AUTH_MODE_WPA2_FT:
 	case AUTH_MODE_WPA2_FT_PSK:
-	case AUTH_MODE_WPA3_SAE:
-	case AUTH_MODE_WPA3_OWE:
 		/* infrastructure mode only */
 		if (prAdapter->rWifiVar.rConnSettings.eOPMode != NET_TYPE_INFRA)
 			return WLAN_STATUS_NOT_ACCEPTED;
@@ -1668,16 +1672,11 @@ wlanoidSetAuthMode(IN P_ADAPTER_T prAdapter,
 		DBGLOG(RSN, TRACE, "New auth mode: WPA2 PSK\n");
 		break;
 
-	case AUTH_MODE_WPA3_SAE:
-		DBGLOG(RSN, INFO, "New auth mode: SAE\n");
-		break;
-
 	default:
 		DBGLOG(RSN, TRACE, "New auth mode: unknown (%d)\n", prAdapter->rWifiVar.rConnSettings.eAuthMode);
 	}
 #endif
 
-#if 0
 	if (prAdapter->rWifiVar.rConnSettings.eAuthMode >= AUTH_MODE_WPA) {
 		switch (prAdapter->rWifiVar.rConnSettings.eAuthMode) {
 		case AUTH_MODE_WPA:
@@ -1743,7 +1742,7 @@ wlanoidSetAuthMode(IN P_ADAPTER_T prAdapter,
 		}
 #endif
 	}
-#endif
+
 	return WLAN_STATUS_SUCCESS;
 
 }				/* wlanoidSetAuthMode */
@@ -2356,7 +2355,6 @@ _wlanoidSetAddKey(IN P_ADAPTER_T prAdapter,
 
 	kalMemCopy(prCmdKey->aucKeyMaterial, (PUINT_8) prNewKey->aucKeyMaterial, prCmdKey->ucKeyLen);
 
-	prCmdKey->ucAlgorithmId = ucAlgorithmId;
 	if (prNewKey->u4KeyLength == 5) {
 		prCmdKey->ucAlgorithmId = CIPHER_SUITE_WEP40;
 	} else if (prNewKey->u4KeyLength == 13) {
@@ -2398,6 +2396,7 @@ _wlanoidSetAddKey(IN P_ADAPTER_T prAdapter,
 		} else
 			prCmdKey->ucAlgorithmId = CIPHER_SUITE_TKIP;
 	}
+
 	prAdapter->rWifiVar.rAisSpecificBssInfo.ucKeyAlgorithmId = prCmdKey->ucAlgorithmId;
 
 	DBGLOG(RSN, TRACE, "prCmdKey->ucAlgorithmId=%d, key len=%d\n",
@@ -2489,7 +2488,7 @@ wlanoidSetAddKey(IN P_ADAPTER_T prAdapter, IN PVOID pvSetBuffer, IN UINT_32 u4Se
 		return WLAN_STATUS_SUCCESS;
 #endif /* CFG_SUPPORT_TDLS */
 
-	return _wlanoidSetAddKey(prAdapter, pvSetBuffer, u4SetBufferLen, TRUE, prNewKey->ucCipher, pu4SetInfoLen);
+	return _wlanoidSetAddKey(prAdapter, pvSetBuffer, u4SetBufferLen, TRUE, CIPHER_SUITE_NONE, pu4SetInfoLen);
 }				/* wlanoidSetAddKey */
 
 /*----------------------------------------------------------------------------*/
@@ -3032,7 +3031,7 @@ wlanoidQueryPmkid(IN P_ADAPTER_T prAdapter,
 WLAN_STATUS
 wlanoidSetPmkid(IN P_ADAPTER_T prAdapter, IN PVOID pvSetBuffer, IN UINT_32 u4SetBufferLen, OUT PUINT_32 pu4SetInfoLen)
 {
-	UINT_32 i, j = 0;
+	UINT_32 i, j;
 	P_PARAM_PMKID_T prPmkid;
 	P_AIS_SPECIFIC_BSS_INFO_T prAisSpecBssInfo;
 
@@ -3103,8 +3102,7 @@ wlanoidSetPmkid(IN P_ADAPTER_T prAdapter, IN PVOID pvSetBuffer, IN UINT_32 u4Set
 		}
 	}
 #endif
-	if (prAdapter->rWifiVar.rConnSettings.fgOkcEnabled &&
-	    prPmkid->u4BSSIDInfoCount > 0) {
+	if (prAdapter->rWifiVar.rConnSettings.fgOkcEnabled) {
 		P_BSS_DESC_T prBssDesc = prAdapter->rWifiVar.rAisFsmInfo.prTargetBssDesc;
 		P_UINT_8 pucPmkID = NULL;
 
@@ -4839,7 +4837,6 @@ wlanoidSetSwCtrlWrite(IN P_ADAPTER_T prAdapter,
 			if ((BOOLEAN)u4Data) {
 				PARAM_CUSTOM_UAPSD_PARAM_STRUCT_T rUapsdParams;
 
-				kalMemZero(&rUapsdParams, sizeof(PARAM_CUSTOM_UAPSD_PARAM_STRUCT_T));
 				prAdapter->rWifiVar.fgSupportUAPSD = TRUE;
 				rUapsdParams.fgEnAPSD = 1;
 				rUapsdParams.fgEnAPSD_AcBe = 1;
@@ -5797,7 +5794,7 @@ WLAN_STATUS wlanoidSetPacketFilter(P_ADAPTER_T prAdapter, UINT_32 u4PacketFilter
 		u4PacketFilter &= ~(PARAM_PACKET_FILTER_MULTICAST | PARAM_PACKET_FILTER_ALL_MULTICAST);
 #endif
 
-	DBGLOGLIMITED(REQ, INFO, "[MC debug] u4PacketFilter=%x, IsSuspend=%d\n", u4PacketFilter, fgIsUnderSuspend);
+	DBGLOG(REQ, INFO, "[MC debug] u4PacketFilter=%x, IsSuspend=%d\n", u4PacketFilter, fgIsUnderSuspend);
 	return wlanSendSetQueryCmd(prAdapter,
 						   CMD_ID_SET_RX_FILTER,
 						   TRUE,
@@ -7542,6 +7539,10 @@ wlanoidSetWapiAssocInfo(IN P_ADAPTER_T prAdapter,
 	prAdapter->rWifiVar.rConnSettings.u4WapiSelectedPairwiseCipher = u4PairSuite;
 	prAdapter->rWifiVar.rConnSettings.u4WapiSelectedGroupCipher = u4GroupSuite;
 
+	kalMemCopy(prAdapter->prGlueInfo->aucWapiAssocInfoIEs, pvSetBuffer, u4SetBufferLen);
+	prAdapter->prGlueInfo->u2WapiAssocInfoIESz = (UINT_16) u4SetBufferLen;
+	DBGLOG(SEC, TRACE, "Assoc Info IE sz %u\n", u4SetBufferLen);
+
 	return WLAN_STATUS_SUCCESS;
 
 }
@@ -7708,6 +7709,53 @@ wlanoidSetWapiKey(IN P_ADAPTER_T prAdapter, IN PVOID pvSetBuffer, IN UINT_32 u4S
 
 	return WLAN_STATUS_PENDING;
 }				/* wlanoidSetAddKey */
+#endif
+
+#if CFG_SUPPORT_WPS2
+/*----------------------------------------------------------------------------*/
+/*!
+* \brief This routine is called by WSC to set the assoc info, which is needed to add to
+*          Association request frame while join WPS AP.
+*
+* \param[in] prAdapter Pointer to the Adapter structure
+* \param[in] pvSetBuffer A pointer to the buffer that holds the data to be set
+* \param[in] u4SetBufferLen The length of the set buffer
+* \param[out] pu4SetInfoLen If the call is successful, returns the number of
+*   bytes read from the set buffer. If the call failed due to invalid length of
+*   the set buffer, returns the amount of storage needed.
+*
+* \retval WLAN_STATUS_SUCCESS
+* \retval WLAN_STATUS_INVALID_DATA If new setting value is wrong.
+* \retval WLAN_STATUS_INVALID_LENGTH
+*
+*/
+/*----------------------------------------------------------------------------*/
+WLAN_STATUS
+wlanoidSetWSCAssocInfo(IN P_ADAPTER_T prAdapter,
+		       IN PVOID pvSetBuffer, IN UINT_32 u4SetBufferLen, OUT PUINT_32 pu4SetInfoLen)
+{
+	ASSERT(prAdapter);
+	ASSERT(pvSetBuffer);
+	ASSERT(pu4SetInfoLen);
+
+	DEBUGFUNC("wlanoidSetWSCAssocInfo");
+	DBGLOG(OID, LOUD, "\r\n");
+
+	if (u4SetBufferLen == 0)
+		return WLAN_STATUS_INVALID_LENGTH;
+
+	if (u4SetBufferLen > sizeof(prAdapter->prGlueInfo->aucWapiAssocInfoIEs))
+		return WLAN_STATUS_INVALID_LENGTH;
+
+	*pu4SetInfoLen = u4SetBufferLen;
+
+	kalMemCopy(prAdapter->prGlueInfo->aucWSCAssocInfoIE, pvSetBuffer, u4SetBufferLen);
+	prAdapter->prGlueInfo->u2WSCAssocInfoIELen = (UINT_16) u4SetBufferLen;
+	DBGLOG(SEC, TRACE, "Assoc Info IE sz %u\n", u4SetBufferLen);
+
+	return WLAN_STATUS_SUCCESS;
+
+}
 #endif
 
 #if CFG_ENABLE_WAKEUP_ON_LAN
@@ -9046,10 +9094,30 @@ wlanoidSetTxPower(IN P_ADAPTER_T prAdapter, IN PVOID pvSetBuffer, IN UINT_32 u4S
 {
 	/* P_SET_TXPWR_CTRL_T pTxPwr = (P_SET_TXPWR_CTRL_T)pvSetBuffer; */
 	/* UINT_32 i; */
+	P_SET_TXPWR_CTRL_T pTxPwr = (P_SET_TXPWR_CTRL_T) pvSetBuffer;
+	P_SET_TXPWR_CTRL_T prCmd;
+	UINT_32 i;
 	WLAN_STATUS rStatus;
 
 	DEBUGFUNC("wlanoidSetTxPower");
 	DBGLOG(OID, LOUD, "\r\n");
+
+	prCmd = cnmMemAlloc(prAdapter, RAM_TYPE_BUF, sizeof(SET_TXPWR_CTRL_T));
+	kalMemZero(prCmd, sizeof(SET_TXPWR_CTRL_T));
+	prCmd->c2GLegacyStaPwrOffset = pTxPwr->c2GLegacyStaPwrOffset;
+	prCmd->c2GHotspotPwrOffset = pTxPwr->c2GHotspotPwrOffset;
+	prCmd->c2GP2pPwrOffset = pTxPwr->c2GP2pPwrOffset;
+	prCmd->c2GBowPwrOffset = pTxPwr->c2GBowPwrOffset;
+	prCmd->c5GLegacyStaPwrOffset = pTxPwr->c5GLegacyStaPwrOffset;
+	prCmd->c5GHotspotPwrOffset = pTxPwr->c5GHotspotPwrOffset;
+	prCmd->c5GP2pPwrOffset = pTxPwr->c5GP2pPwrOffset;
+	prCmd->c5GBowPwrOffset = pTxPwr->c5GBowPwrOffset;
+	prCmd->ucConcurrencePolicy = pTxPwr->ucConcurrencePolicy;
+	for (i = 0; i < 14; i++)
+		prCmd->acTxPwrLimit2G[i] = pTxPwr->acTxPwrLimit2G[i];
+
+	for (i = 0; i < 4; i++)
+		prCmd->acTxPwrLimit5G[i] = pTxPwr->acTxPwrLimit5G[i];
 
 	ASSERT(prAdapter);
 	ASSERT(pvSetBuffer);
@@ -9077,10 +9145,8 @@ wlanoidSetTxPower(IN P_ADAPTER_T prAdapter, IN PVOID pvSetBuffer, IN UINT_32 u4S
 				      TRUE,	/* fgSetQuery */
 				      FALSE,	/* fgNeedResp */
 				      TRUE,	/* fgIsOid */
-				      NULL,	/* pfCmdDoneHandler */
-				      NULL,	/* pfCmdTimeoutHandler */
-				      u4SetBufferLen,	/* u4SetQueryInfoLen */
-				      (PUINT_8) pvSetBuffer,	/* pucInfoBuffer */
+				      nicCmdEventSetCommon, nicOidCmdTimeoutCommon, sizeof(SET_TXPWR_CTRL_T),
+				      (PUINT_8) prCmd,	/* pucInfoBuffer */
 				      NULL,	/* pvSetQueryBuffer */
 				      0	/* u4SetQueryBufferLen */
 	    );
@@ -9248,13 +9314,13 @@ wlanoidSetP2pMode(IN P_ADAPTER_T prAdapter, IN PVOID pvSetBuffer, IN UINT_32 u4S
 
 			DBGLOG(OID, INFO, "wlanoidSetP2pMode Default enable ApUapsd\n");
 
-			kalMemZero(&rUapsdParams, sizeof(PARAM_CUSTOM_UAPSD_PARAM_STRUCT_T));
 			rUapsdParams.fgEnAPSD = 1;
 			rUapsdParams.fgEnAPSD_AcBe = 1;
 			rUapsdParams.fgEnAPSD_AcBk = 1;
 			rUapsdParams.fgEnAPSD_AcVi = 1;
 			rUapsdParams.fgEnAPSD_AcVo = 1;
 			rUapsdParams.ucMaxSpLen = 0; /* default:0, Do not limit delivery pkt num */
+			memset(rUapsdParams.aucResv, 0, sizeof(rUapsdParams.aucResv));
 
 			nicSetUApsdParam(prAdapter, rUapsdParams, NETWORK_TYPE_P2P_INDEX);
 		}
@@ -10077,6 +10143,111 @@ wlanoidSetHS20Info(IN P_ADAPTER_T prAdapter,
 
 	DBGLOG(SEC, TRACE, "HS20 IE sz %u\n", u4SetBufferLen);
 
+	kalMemCopy(prAdapter->prGlueInfo->aucHS20AssocInfoIE, pvSetBuffer, u4SetBufferLen);
+	prAdapter->prGlueInfo->u2HS20AssocInfoIELen = (UINT_16) u4SetBufferLen;
+	DBGLOG(SEC, TRACE, "HS20 Assoc Info IE sz %u\n", u4SetBufferLen);
+
+	return WLAN_STATUS_SUCCESS;
+
+}
+
+/*----------------------------------------------------------------------------*/
+/*!
+* \brief This routine is called by WSC to set the assoc info, which is needed to add to
+*          Association request frame while join WPS AP.
+*
+* \param[in] prAdapter Pointer to the Adapter structure
+* \param[in] pvSetBuffer A pointer to the buffer that holds the data to be set
+* \param[in] u4SetBufferLen The length of the set buffer
+* \param[out] pu4SetInfoLen If the call is successful, returns the number of
+*   bytes read from the set buffer. If the call failed due to invalid length of
+*   the set buffer, returns the amount of storage needed.
+*
+* \retval WLAN_STATUS_SUCCESS
+* \retval WLAN_STATUS_INVALID_DATA If new setting value is wrong.
+* \retval WLAN_STATUS_INVALID_LENGTH
+*
+*/
+/*----------------------------------------------------------------------------*/
+WLAN_STATUS
+wlanoidSetInterworkingInfo(IN P_ADAPTER_T prAdapter,
+			   IN PVOID pvSetBuffer, IN UINT_32 u4SetBufferLen, OUT PUINT_32 pu4SetInfoLen)
+{
+#if 0
+	P_HS20_INFO_T prHS20Info = NULL;
+	P_IE_INTERWORKING_T prInterWorkingIe;
+
+	ASSERT(prAdapter);
+	ASSERT(pvSetBuffer);
+	ASSERT(pu4SetInfoLen);
+
+	prHS20Info = &(prAdapter->rWifiVar.rHS20Info);
+
+	DEBUGFUNC("wlanoidSetInterworkingInfo");
+	DBGLOG(OID, TRACE, "\r\n");
+
+	if (u4SetBufferLen == 0)
+		return WLAN_STATUS_INVALID_LENGTH;
+
+	*pu4SetInfoLen = u4SetBufferLen;
+	prInterWorkingIe = (P_IE_INTERWORKING_T) pvSetBuffer;
+
+	prHS20Info->ucAccessNetworkOptions = prInterWorkingIe->ucAccNetOpt;
+	prHS20Info->ucVenueGroup = prInterWorkingIe->ucVenueGroup;
+	prHS20Info->ucVenueType = prInterWorkingIe->ucVenueType;
+	COPY_MAC_ADDR(prHS20Info->aucHESSID, prInterWorkingIe->aucHESSID);
+
+	DBGLOG(SEC, TRACE, "IW IE sz %ld\n", u4SetBufferLen);
+#endif
+	return WLAN_STATUS_SUCCESS;
+
+}
+
+/*----------------------------------------------------------------------------*/
+/*!
+* \brief This routine is called by WSC to set the Roaming Consortium IE info, which is needed to
+*          add to Association request frame while join WPS AP.
+*
+* \param[in] prAdapter Pointer to the Adapter structure
+* \param[in] pvSetBuffer A pointer to the buffer that holds the data to be set
+* \param[in] u4SetBufferLen The length of the set buffer
+* \param[out] pu4SetInfoLen If the call is successful, returns the number of
+*   bytes read from the set buffer. If the call failed due to invalid length of
+*   the set buffer, returns the amount of storage needed.
+*
+* \retval WLAN_STATUS_SUCCESS
+* \retval WLAN_STATUS_INVALID_DATA If new setting value is wrong.
+* \retval WLAN_STATUS_INVALID_LENGTH
+*
+*/
+/*----------------------------------------------------------------------------*/
+WLAN_STATUS
+wlanoidSetRoamingConsortiumIEInfo(IN P_ADAPTER_T prAdapter,
+				  IN PVOID pvSetBuffer, IN UINT_32 u4SetBufferLen, OUT PUINT_32 pu4SetInfoLen)
+{
+#if 0
+	P_HS20_INFO_T prHS20Info = NULL;
+	P_PARAM_HS20_ROAMING_CONSORTIUM_INFO prRCInfo;
+
+	ASSERT(prAdapter);
+	ASSERT(pvSetBuffer);
+	ASSERT(pu4SetInfoLen);
+
+	prHS20Info = &(prAdapter->rWifiVar.rHS20Info);
+
+	/* DEBUGFUNC("wlanoidSetRoamingConsortiumInfo"); */
+	/* DBGLOG(HS2, TRACE, ("\r\n")); */
+
+	if (u4SetBufferLen == 0)
+		return WLAN_STATUS_INVALID_LENGTH;
+
+	*pu4SetInfoLen = u4SetBufferLen;
+	prRCInfo = (P_PARAM_HS20_ROAMING_CONSORTIUM_INFO) pvSetBuffer;
+
+	kalMemCopy(&(prHS20Info->rRCInfo), prRCInfo, sizeof(PARAM_HS20_ROAMING_CONSORTIUM_INFO));
+
+	/* DBGLOG(HS2, TRACE, ("RoamingConsortium IE sz %ld\n", u4SetBufferLen)); */
+#endif
 	return WLAN_STATUS_SUCCESS;
 
 }
@@ -10537,6 +10708,59 @@ wlanoidPacketKeepAlive(IN P_ADAPTER_T prAdapter,
 	return rStatus;
 }
 
+
+#if CFG_AUTO_CHANNEL_SEL_SUPPORT
+/*----------------------------------------------------------------------------*/
+/*!
+* \brief This routine is called to query LTE safe channels.
+*
+* \param[in]  pvAdapter        Pointer to the Adapter structure.
+* \param[out] pvQueryBuffer    A pointer to the buffer that holds the result of
+*                              the query.
+* \param[in]  u4QueryBufferLen The length of the query buffer.
+* \param[out] pu4QueryInfoLen  If the call is successful, returns the number of
+*                              bytes written into the query buffer. If the call
+*                              failed due to invalid length of the query buffer,
+*                              returns the amount of storage needed.
+*
+* \retval WLAN_STATUS_PENDING
+* \retval WLAN_STATUS_FAILURE
+*/
+/*----------------------------------------------------------------------------*/
+WLAN_STATUS
+wlanoidQueryLteSafeChannel(IN P_ADAPTER_T prAdapter,
+			   IN PVOID pvQueryBuffer, IN UINT_32 u4QueryBufferLen, OUT PUINT_32 pu4QueryInfoLen)
+{
+	WLAN_STATUS rResult = WLAN_STATUS_FAILURE;
+
+	DBGLOG(P2P, INFO, "[ACS]Get LTE safe channels\n");
+
+	do {
+		/* Sanity test */
+		if ((prAdapter == NULL) || (pu4QueryInfoLen == NULL))
+			break;
+		if ((pvQueryBuffer == NULL) || (u4QueryBufferLen == 0))
+			break;
+
+		/* Get LTE safe channel list */
+		rResult = wlanSendSetQueryCmd(prAdapter,
+					      CMD_ID_GET_LTE_CHN,
+					      FALSE,
+					      TRUE,
+					      TRUE,
+					      nicCmdEventQueryLteSafeChn,
+					      nicOidCmdTimeoutCommon,
+					      0,
+					      NULL,
+					      pvQueryBuffer,
+					      u4QueryBufferLen);
+
+	} while (FALSE);
+
+	return rResult;
+}				/* wlanoidQueryLteSafeChannel */
+#endif
+
 #ifdef FW_CFG_SUPPORT
 /*----------------------------------------------------------------------------*/
 /*!
@@ -10716,12 +10940,6 @@ wlanoidUpdateFtIes(P_ADAPTER_T prAdapter, PVOID pvSetBuffer, UINT_32 u4SetBuffer
 		prFtIes->pucIEBuf = kalMemAlloc(ftie->ie_len, VIR_MEM_TYPE);
 		prFtIes->u4IeLength = ftie->ie_len;
 	}
-
-	if (!prFtIes->pucIEBuf) {
-		DBGLOG(OID, ERROR, "FT: memory allocation failed\n");
-		return WLAN_STATUS_FAILURE;
-	}
-
 	pucIEStart = prFtIes->pucIEBuf;
 	u4IeLen = prFtIes->u4IeLength;
 	prFtIes->u2MDID = ftie->md;
@@ -12513,106 +12731,6 @@ WLAN_STATUS wlanoidGetWifiType(IN P_ADAPTER_T prAdapter,
 
 	DBGLOG(OID, INFO, "wifi type=[%s](%d), phyType=%u\n",
 	       pNameBuf, *pu4SetInfoLen, ucPhyType);
-
-	return WLAN_STATUS_SUCCESS;
-}
-
-WLAN_STATUS
-wlanoidConfigRoaming(IN P_ADAPTER_T prAdapter, IN PVOID pvSetBuffer,
-		     IN UINT_32 u4SetBufferLen, OUT PUINT_32 pu4SetInfoLen)
-{
-	struct nlattr *attrlist;
-	struct AIS_BLACKLIST_ITEM *prBlackList;
-	P_BSS_DESC_T prBssDesc = NULL;
-	UINT_32 len_shift = 0;
-	UINT_32 numOfList[2] = { 0 };
-	int i;
-
-	attrlist = (struct nlattr *)pvSetBuffer;
-
-	/* get the number of blacklist and copy those mac addresses from HAL */
-	if (attrlist->nla_type == WIFI_ATTRIBUTE_ROAMING_BLACKLIST_NUM)
-		numOfList[0] = nla_get_u32(attrlist);
-
-	DBGLOG(REQ, INFO, "Get the number of blacklist=%d\n", numOfList[0]);
-	/*Refresh all the FWKBlacklist */
-	aisRefreshFWKBlacklist(prAdapter);
-
-	if (numOfList[0] < 0 || numOfList[0] > MAX_FW_ROAMING_BLACKLIST_SIZE)
-		return -EINVAL;
-
-	/* Start to receive blacklist mac addresses and set to FWK blacklist */
-	for (i = 0; i < numOfList[0] && len_shift < u4SetBufferLen; i++) {
-		len_shift += NLA_ALIGN(attrlist->nla_len);
-		attrlist = (struct nlattr *)((UINT_8 *) pvSetBuffer +
-								len_shift);
-		if (attrlist->nla_type ==
-		    WIFI_ATTRIBUTE_ROAMING_BLACKLIST_BSSID) {
-			prBssDesc = scanSearchBssDescByBssid(prAdapter,
-					  nla_data(attrlist));
-
-			if (prBssDesc == NULL) {
-				DBGLOG(REQ, ERROR,
-				       "Cannot find the blacklist BSS=%pM\n",
-				       nla_data(attrlist));
-				continue;
-			}
-
-			prBlackList = aisAddBlacklist(prAdapter, prBssDesc);
-			prBlackList->fgIsInFWKBlacklist = TRUE;
-			DBGLOG(REQ, INFO,
-			       "Receives roaming blacklist SSID=%s addr=%pM len=%d %d\n",
-			       prBlackList->aucSSID, prBlackList->aucBSSID,
-			       len_shift, u4SetBufferLen);
-		}
-	}
-
-	return WLAN_STATUS_SUCCESS;
-}
-
-uint32_t
-wlanoidExternalAuthDone(IN P_ADAPTER_T prAdapter,
-			IN void *pvSetBuffer,
-			IN uint32_t u4SetBufferLen,
-			OUT uint32_t *pu4SetInfoLen)
-{
-	P_STA_RECORD_T prStaRec = NULL;
-	uint8_t ucBssIndex = 0;
-	struct PARAM_EXTERNAL_AUTH *params;
-	struct MSG_SAA_EXTERNAL_AUTH_DONE *prExternalAuthMsg = NULL;
-
-	params = (struct PARAM_EXTERNAL_AUTH *) pvSetBuffer;
-	ucBssIndex = params->ucBssIdx;
-	if (!IS_BSS_INDEX_VALID(ucBssIndex)) {
-		DBGLOG(REQ, ERROR,
-		       "SAE-confirm failed with invalid BssIdx in ndev\n");
-		return WLAN_STATUS_INVALID_DATA;
-	}
-
-	prExternalAuthMsg = (struct MSG_SAA_EXTERNAL_AUTH_DONE *)cnmMemAlloc(
-			    prAdapter, RAM_TYPE_MSG,
-			    sizeof(struct MSG_SAA_EXTERNAL_AUTH_DONE));
-	if (!prExternalAuthMsg) {
-		DBGLOG(OID, WARN,
-		       "SAE-confirm failed to allocate Msg\n");
-		return WLAN_STATUS_RESOURCES;
-	}
-
-	prStaRec = cnmGetStaRecByAddress(prAdapter,
-					 (UINT_8) NETWORK_TYPE_AIS_INDEX,
-					 params->bssid);
-	if (!prStaRec) {
-		DBGLOG(REQ, WARN, "SAE-confirm failed with bssid:" MACSTR "\n",
-		       params->bssid);
-		return WLAN_STATUS_INVALID_DATA;
-	}
-
-	prExternalAuthMsg->rMsgHdr.eMsgId = MID_OID_SAA_FSM_EXTERNAL_AUTH;
-	prExternalAuthMsg->prStaRec = prStaRec;
-	prExternalAuthMsg->status = params->status;
-
-	mboxSendMsg(prAdapter, MBOX_ID_0, (P_MSG_HDR_T)prExternalAuthMsg,
-		    MSG_SEND_METHOD_BUF);
 
 	return WLAN_STATUS_SUCCESS;
 }

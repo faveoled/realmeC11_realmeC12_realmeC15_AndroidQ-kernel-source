@@ -71,7 +71,6 @@
  *                    E X T E R N A L   R E F E R E N C E S
  *******************************************************************************
  */
-#include "nic_cmd_event.h"
 
 /*******************************************************************************
  *                              C O N S T A N T S
@@ -81,14 +80,21 @@
 #define DBDC_5G_WMM_INDEX	0
 #define DBDC_2G_WMM_INDEX	1
 #endif
-#define HW_WMM_NUM		(prAdapter->ucWmmSetNum)
-#define MAX_HW_WMM_INDEX	(HW_WMM_NUM - 1)
-#define DEFAULT_HW_WMM_INDEX	MAX_HW_WMM_INDEX
 /*******************************************************************************
  *                             D A T A   T Y P E S
  *******************************************************************************
  */
 
+enum ENUM_CH_REQ_TYPE {
+	CH_REQ_TYPE_JOIN,
+	CH_REQ_TYPE_P2P_LISTEN,
+	CH_REQ_TYPE_OFFCHNL_TX,
+	CH_REQ_TYPE_GO_START_BSS,
+#if (CFG_SUPPORT_DFS_MASTER == 1)
+	CH_REQ_TYPE_DFS_CAC,
+#endif
+	CH_REQ_TYPE_NUM
+};
 #if (CFG_SUPPORT_IDC_CH_SWITCH == 1)
 enum ENUM_CH_SWITCH_TYPE {
 	CH_SWITCH_2G, /* Default */
@@ -172,6 +178,12 @@ struct DEVICE_TYPE {
 #endif
 
 #if CFG_SUPPORT_DBDC
+struct CNM_DBDC_CAP {
+	uint8_t ucBssIndex;
+	uint8_t ucNss;
+	uint8_t ucWmmSetIndex;
+};
+
 enum ENUM_CNM_DBDC_MODE {
 	/* A/G traffic separate by WMM, but both
 	 * TRX on band 0, CANNOT enable DBDC
@@ -228,12 +240,10 @@ enum ENUM_CNM_NETWORK_TYPE_T {
 	((_prAdapter)->rCnmInfo.fgChGranted && \
 	 (_prAdapter)->rCnmInfo.ucBssIndex == (_ucBssIndex))
 
-/* True if our TxNss > 1 && peer support 2ss rate && peer no Rx limit. */
 #define IS_CONNECTION_NSS2(prBssInfo, prStaRec) \
-	((((prBssInfo)->ucOpTxNss > 1) && \
-	((prStaRec)->aucRxMcsBitmask[1] != 0x00) \
+	((((prBssInfo)->ucNss > 1) && ((prStaRec)->aucRxMcsBitmask[1] != 0x00) \
 	&& (((prStaRec)->u2HtCapInfo & HT_CAP_INFO_SM_POWER_SAVE) != 0)) || \
-	(((prBssInfo)->ucOpTxNss > 1) && ((((prStaRec)->u2VhtRxMcsMap \
+	(((prBssInfo)->ucNss > 1) && ((((prStaRec)->u2VhtRxMcsMap \
 	& BITS(2, 3)) >> 2) != BITS(0, 1)) && ((((prStaRec)->ucVhtOpMode \
 	& VHT_OP_MODE_RX_NSS) >> VHT_OP_MODE_RX_NSS_OFFSET) > 0)))
 
@@ -305,11 +315,6 @@ u_int8_t cnmAisDetectP2PChannel(struct ADAPTER *prAdapter,
 	enum ENUM_BAND *prBand, uint8_t *pucPrimaryChannel);
 #endif
 
-u_int8_t cnmWmmIndexDecision(IN struct ADAPTER *prAdapter,
-	IN struct BSS_INFO *prBssInfo);
-void cnmFreeWmmIndex(IN struct ADAPTER *prAdapter,
-	IN struct BSS_INFO *prBssInfo);
-
 #if CFG_SUPPORT_DBDC
 void cnmInitDbdcSetting(IN struct ADAPTER *prAdapter);
 
@@ -320,20 +325,27 @@ void cnmDbdcOpModeChangeDoneCallback(
 
 void cnmUpdateDbdcSetting(IN struct ADAPTER *prAdapter, IN u_int8_t fgDbdcEn);
 
+void cnmGetDbdcCapability(
+	IN struct ADAPTER *prAdapter,
+	IN uint8_t ucBssIndex,
+	IN enum ENUM_BAND eRfBand,
+	IN uint8_t ucPrimaryChannel,
+	IN uint8_t ucNss,
+	OUT struct CNM_DBDC_CAP *prDbdcCap
+);
+
 uint8_t cnmGetDbdcBwCapability(
 	struct ADAPTER *prAdapter,
 	uint8_t ucBssIndex
 );
 
-void cnmDbdcPreConnectionEnableDecision(
+void cnmDbdcEnableDecision(
 	IN struct ADAPTER *prAdapter,
 	IN uint8_t ucChangedBssIndex,
-	IN enum ENUM_BAND eRfBand,
-	IN uint8_t ucPrimaryChannel,
-	IN uint8_t ucWmmQueIdx
+	IN enum ENUM_BAND eRfBand
 );
 
-void cnmDbdcRuntimeCheckDecision(IN struct ADAPTER *prAdapter,
+void cnmDbdcDisableDecision(IN struct ADAPTER *prAdapter,
 	IN uint8_t ucChangedBssIndex);
 void cnmDbdcGuardTimerCallback(IN struct ADAPTER *prAdapter,
 	IN unsigned long plParamPtr);
@@ -348,28 +360,6 @@ u_int8_t cnmSapIsActive(IN struct ADAPTER *prAdapter);
 u_int8_t cnmSapIsConcurrent(IN struct ADAPTER *prAdapter);
 
 struct BSS_INFO *cnmGetSapBssInfo(IN struct ADAPTER *prAdapter);
-
-enum ENUM_OP_CHANGE_STATUS_T cnmSetOpTRxNssBw(
-	IN struct ADAPTER *prAdapter,
-	IN uint8_t ucBssIndex,
-	IN enum ENUM_EVENT_OPMODE_CHANGE_REASON_T eSource,
-	IN bool fgEnable,
-	IN uint8_t ucOpRxNss,
-	IN uint8_t ucOpTxNss,
-	IN PFN_OPMODE_NOTIFY_DONE_FUNC pfnCallback
-);
-
-void cnmGetOpTRxNss(
-	IN struct ADAPTER *prAdapter,
-	IN uint8_t ucBssIndex,
-	OUT uint8_t *pucOpRxNss,
-	OUT uint8_t *pucOpTxNss
-);
-
-void cnmEventOpmodeChange(
-	IN struct ADAPTER *prAdapter,
-	IN struct WIFI_EVENT *prEvent
-);
 
 /*******************************************************************************
  *                              F U N C T I O N S

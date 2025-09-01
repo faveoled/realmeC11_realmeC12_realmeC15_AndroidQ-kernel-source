@@ -153,9 +153,7 @@
 						/* 0: Disable */
 
 #define CFG_SUPPORT_RRM             0	/* Radio Reasource Measurement (802.11k) */
-#ifndef CFG_SUPPORT_DFS
 #define CFG_SUPPORT_DFS             1	/* DFS (802.11h) */
-#endif
 #ifndef CFG_SUPPORT_DFS_MASTER
 #define CFG_SUPPORT_DFS_MASTER      1
 #endif
@@ -173,7 +171,7 @@
 #define CFG_SUPPORT_RX_STBC         1	/* 802.11n RX STBC (1SS) */
 #define CFG_SUPPORT_RX_SGI          1	/* 802.11n RX short GI for both 20M and 40M BW */
 #define CFG_SUPPORT_RX_HT_GF        1	/* 802.11n RX HT green-field capability */
-#define CFG_SUPPORT_BFER            1
+#define CFG_SUPPORT_BFER            0
 #define CFG_SUPPORT_BFEE            1
 #define CFG_SUPPORT_WAPI            1
 
@@ -278,9 +276,7 @@
 /* 1: Enable SDIO RX Tasklet De-Aggregation
  * 0(default): Disable
  */
-#ifndef CFG_SDIO_RX_AGG_TASKLET
-#define CFG_SDIO_RX_AGG_TASKLET			0
-#endif
+#define CFG_SDIO_RX_AGG_TASKLET			     0
 
 #if (CFG_SDIO_RX_AGG == 1) && (CFG_SDIO_INTR_ENHANCE == 0)
 #error "CFG_SDIO_INTR_ENHANCE should be 1 once CFG_SDIO_RX_AGG equals to 1"
@@ -324,7 +320,9 @@
 #define HW_BSSID_NUM                4	/* HW BSSID number by chip */
 #define HW_WMM_NUM                  4	/* HW WMM number by chip */
 
-#ifndef CFG_CHIP_RESET_SUPPORT
+#if (MTK_WCN_HIF_SDIO)
+#define CFG_CHIP_RESET_SUPPORT          1
+#else
 #define CFG_CHIP_RESET_SUPPORT          0
 #endif
 
@@ -432,7 +430,7 @@
 #define CFG_RAW_BUFFER_SIZE                      1024
 
 /*! Maximum size of IE buffer of each SCAN record */
-#define CFG_IE_BUFFER_SIZE                      800
+#define CFG_IE_BUFFER_SIZE                      512
 
 /*------------------------------------------------------------------------------
  * Flags and Parameters for Power management
@@ -746,11 +744,6 @@
 
 #define CFG_FIX_2_TX_PORT					0
 
-#ifndef CFG_DISCONN_DEBUG_FEATURE
-#define CFG_DISCONN_DEBUG_FEATURE      1
-#define MAX_DISCONNECT_RECORD          5
-#endif
-
 /*------------------------------------------------------------------------------
  * Flags of bus error tolerance
  *------------------------------------------------------------------------------
@@ -848,21 +841,6 @@
 #define CFG_SUPPORT_MSP				1
 
 
-/*------------------------------------------------------------------------------
- * Flags of Drop Packet Replay SUPPORT
- *------------------------------------------------------------------------------
- */
-#define CFG_SUPPORT_REPLAY_DETECTION		1
-
-/*------------------------------------------------------------------------------
- * Flags of Last Second MCS Tx/Rx Info
- *------------------------------------------------------------------------------
- */
-#define CFG_SUPPORT_LAST_SEC_MCS_INFO	1
-#if CFG_SUPPORT_LAST_SEC_MCS_INFO
-#define MCS_INFO_SAMPLE_CNT			10
-#endif
-
 
 /*------------------------------------------------------------------------------
  * Flags of driver fw customization
@@ -870,7 +848,6 @@
  */
 
 #define CFG_SUPPORT_EASY_DEBUG               1
-#define CFG_SUPPORT_FW_DBG_LEVEL_CTRL        1
 
 
 /*------------------------------------------------------------------------------
@@ -882,11 +859,11 @@
 
 /*------------------------------------------------------------------------------
  * Flags for E1 IC workaround (SPI clock divided by 2)
- * Disabled for MT7668 since external PMIC is NOT used.
- * TBD: Let chip info structs decide.
  *------------------------------------------------------------------------------
  */
-#define CFG_SUPPORT_PMIC_SPI_CLOCK_SWITCH       0
+#define CFG_SUPPORT_PMIC_SPI_CLOCK_SWITCH       1
+
+
 
 /*------------------------------------------------------------------------------
  * Flags of driver EEPROM pages for QA tool
@@ -993,12 +970,6 @@
  */
 #define CFG_SUPPORT_ADVANCE_CONTROL 1
 
-/*------------------------------------------------------------------------------
- * Support GO and STA SIGNLE CHANNEL CONCURRENT
- *------------------------------------------------------------------------------
- */
-#define GO_STA_SCC	0
-
 
 /*------------------------------------------------------------------------------
  * Driver pre-allocate total size of memory in one time
@@ -1016,21 +987,6 @@
 #ifndef CFG_SCAN_CHANNEL_SPECIFIED
 #define CFG_SCAN_CHANNEL_SPECIFIED 1
 #endif
-
-
-/*------------------------------------------------------------------------------
- * Support EFUSE / EEPROM Auto Detect
- *------------------------------------------------------------------------------
- */
-#ifndef CFG_EFUSE_AUTO_MODE_SUPPORT
-#define CFG_EFUSE_AUTO_MODE_SUPPORT 1
-#endif
-
-#ifndef CFG_SUPPORT_CSI
-#define CFG_SUPPORT_CSI 1
-#endif
-
-
 
 /*******************************************************************************
 *                             D A T A   T Y P E S

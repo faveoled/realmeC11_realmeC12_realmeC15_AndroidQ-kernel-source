@@ -1235,10 +1235,6 @@ kalP2PIndicateBssInfo(IN struct GLUE_INFO *prGlueInfo,
 		 */
 
 		if (u4BufLen > 0) {
-#if CFG_SUPPORT_TSF_USING_BOOTTIME
-			prBcnProbeRspFrame->u.beacon.timestamp =
-				kalGetBootTime();
-#endif
 			prCfg80211Bss = cfg80211_inform_bss_frame(
 				/* struct wiphy * wiphy, */
 				prGlueP2pInfo->prWdev->wiphy,
@@ -1378,6 +1374,9 @@ kalP2PIndicateRxMgmtFrame(IN struct GLUE_INFO *prGlueInfo,
 				prWlanHeader->u2FrameCtrl, ucChnlNum);
 			break;
 		}
+
+		DBGLOG(P2P, TRACE,
+			"from: " MACSTR "\n", MAC2STR(prWlanHeader->aucAddr2));
 #endif
 		i4Freq = nicChannelNum2Freq(ucChnlNum) / 1000;
 
@@ -1385,10 +1384,6 @@ kalP2PIndicateRxMgmtFrame(IN struct GLUE_INFO *prGlueInfo,
 			prNetdevice = prGlueP2pInfo->prDevHandler;
 		else
 			prNetdevice = prGlueP2pInfo->aprRoleHandler;
-
-		DBGLOG(P2P, TRACE, "from: " MACSTR ", netdev: %p\n",
-				MAC2STR(prWlanHeader->aucAddr2),
-				prNetdevice);
 
 #if (KERNEL_VERSION(3, 18, 0) <= CFG80211_VERSION_CODE)
 		cfg80211_rx_mgmt(
@@ -1970,6 +1965,7 @@ u_int8_t kalP2PMaxClients(IN struct GLUE_INFO *prGlueInfo,
 void kalP2pUnlinkBss(IN struct GLUE_INFO *prGlueInfo, IN uint8_t aucBSSID[])
 {
 	struct GL_P2P_INFO *prGlueP2pInfo = (struct GL_P2P_INFO *) NULL;
+	struct cfg80211_bss *bss = NULL;
 
 	ASSERT(prGlueInfo);
 	ASSERT(aucBSSID);
@@ -1980,6 +1976,29 @@ void kalP2pUnlinkBss(IN struct GLUE_INFO *prGlueInfo, IN uint8_t aucBSSID[])
 
 	if (prGlueP2pInfo == NULL)
 		return;
+
+#if (KERNEL_VERSION(4, 1, 0) <= CFG80211_VERSION_CODE)
+	bss = cfg80211_get_bss(prGlueP2pInfo->prWdev->wiphy,
+			NULL, /* channel */
+			aucBSSID,
+			NULL, /* ssid */
+			0, /* ssid length */
+			IEEE80211_BSS_TYPE_ESS,
+			IEEE80211_PRIVACY_ANY);
+#else
+	bss = cfg80211_get_bss(prGlueP2pInfo->prWdev->wiphy,
+			NULL, /* channel */
+			aucBSSID,
+			NULL, /* ssid */
+			0, /* ssid length */
+			WLAN_CAPABILITY_ESS,
+			WLAN_CAPABILITY_ESS);
+#endif
+
+	if (bss != NULL) {
+		cfg80211_unlink_bss(prGlueP2pInfo->prWdev->wiphy, bss);
+		cfg80211_put_bss(prGlueP2pInfo->prWdev->wiphy, bss);
+	}
 
 	if (scanSearchBssDescByBssidAndSsid(prGlueInfo->prAdapter,
 			aucBSSID, FALSE, NULL) != NULL)
@@ -2036,117 +2055,4 @@ void kalP2pIndicateQueuedMgmtFrame(IN struct GLUE_INFO *prGlueInfo,
 		prFrame->u2Length,
 		GFP_ATOMIC);
 #endif
-}
-
-void kalP2pIndicateAcsResult(IN struct GLUE_INFO *prGlueInfo,
-		IN uint8_t ucRoleIndex,
-		IN uint8_t ucPrimaryCh,
-		IN uint8_t ucSecondCh,
-		IN uint8_t ucSeg0Ch,
-		IN uint8_t ucSeg1Ch,
-		IN enum ENUM_MAX_BANDWIDTH_SETTING eChnlBw)
-{
-	struct GL_P2P_INFO *prGlueP2pInfo = (struct GL_P2P_INFO *) NULL;
-	struct sk_buff *vendor_event = NULL;
-	uint16_t ch_width = MAX_BW_20MHZ;
-
-	prGlueP2pInfo = prGlueInfo->prP2PInfo[ucRoleIndex];
-
-	if (!prGlueP2pInfo) {
-		DBGLOG(P2P, ERROR, "p2p glue info null.\n");
-		return;
-	}
-
-	switch (eChnlBw) {
-	case MAX_BW_20MHZ:
-		ch_width = 20;
-		break;
-	case MAX_BW_40MHZ:
-		ch_width = 40;
-		break;
-	case MAX_BW_80MHZ:
-		ch_width = 80;
-		break;
-	case MAX_BW_160MHZ:
-		ch_width = 160;
-		break;
-	default:
-		DBGLOG(P2P, ERROR, "unsupport width: %d.\n", ch_width);
-		break;
-	}
-
-	DBGLOG(P2P, INFO, "r=%d, c=%d, s=%d, s0=%d, s1=%d, ch_w=%d\n",
-			ucRoleIndex,
-			ucPrimaryCh,
-			ucSecondCh,
-			ucSeg0Ch,
-			ucSeg1Ch,
-			ch_width);
-
-#if KERNEL_VERSION(3, 14, 0) <= CFG80211_VERSION_CODE
-	vendor_event = cfg80211_vendor_event_alloc(prGlueP2pInfo->prWdev->wiphy,
-#if KERNEL_VERSION(4, 1, 0) <= CFG80211_VERSION_CODE
-			prGlueP2pInfo->prWdev,
-#endif
-			4 * sizeof(u8) + 1 * sizeof(u16) + 4 + NLMSG_HDRLEN,
-			WIFI_EVENT_ACS,
-			GFP_KERNEL);
-#endif
-
-	if (!vendor_event) {
-		DBGLOG(P2P, ERROR, "allocate vendor event fail.\n");
-		goto nla_put_failure;
-	}
-
-	if (unlikely(nla_put_u8(vendor_event,
-			WIFI_VENDOR_ATTR_ACS_PRIMARY_CHANNEL,
-			ucPrimaryCh) < 0)) {
-		DBGLOG(P2P, ERROR, "put primary channel fail.\n");
-		goto nla_put_failure;
-	}
-
-	if (unlikely(nla_put_u8(vendor_event,
-			WIFI_VENDOR_ATTR_ACS_SECONDARY_CHANNEL,
-			ucSecondCh) < 0)) {
-		DBGLOG(P2P, ERROR, "put secondary channel fail.\n");
-		goto nla_put_failure;
-	}
-
-	if (unlikely(nla_put_u8(vendor_event,
-			WIFI_VENDOR_ATTR_ACS_VHT_SEG0_CENTER_CHANNEL,
-			ucSeg0Ch) < 0)) {
-		DBGLOG(P2P, ERROR, "put vht seg0 fail.\n");
-		goto nla_put_failure;
-	}
-
-	if (unlikely(nla_put_u8(vendor_event,
-			WIFI_VENDOR_ATTR_ACS_VHT_SEG1_CENTER_CHANNEL,
-			ucSeg1Ch) < 0)) {
-		DBGLOG(P2P, ERROR, "put vht seg1 fail.\n");
-		goto nla_put_failure;
-	}
-
-	if (unlikely(nla_put_u16(vendor_event,
-			WIFI_VENDOR_ATTR_ACS_CHWIDTH,
-			ch_width) < 0)) {
-		DBGLOG(P2P, ERROR, "put ch width fail.\n");
-		goto nla_put_failure;
-	}
-
-	if (unlikely(nla_put_u8(vendor_event,
-			WIFI_VENDOR_ATTR_ACS_HW_MODE,
-			ucPrimaryCh > 14 ?
-				P2P_VENDOR_ACS_HW_MODE_11A :
-				P2P_VENDOR_ACS_HW_MODE_11G) < 0)) {
-		DBGLOG(P2P, ERROR, "put hw mode fail.\n");
-		goto nla_put_failure;
-	}
-#if KERNEL_VERSION(3, 14, 0) <= CFG80211_VERSION_CODE
-	cfg80211_vendor_event(vendor_event, GFP_KERNEL);
-#endif
-	return;
-
-nla_put_failure:
-	if (vendor_event)
-		kfree_skb(vendor_event);
 }

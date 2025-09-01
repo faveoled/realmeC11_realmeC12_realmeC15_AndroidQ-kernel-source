@@ -74,6 +74,41 @@
 
 /*----------------------------------------------------------------------------*/
 /*!
+*
+* \brief This routine is called to generate WPA IE for
+*        associate request frame.
+*
+* \param[in]  prCurrentBss     The Selected BSS description
+*
+* \retval The append WPA IE length
+*
+* \note
+*      Called by: AIS module, Associate request
+*/
+/*----------------------------------------------------------------------------*/
+VOID wapiGenerateWAPIIE(IN P_ADAPTER_T prAdapter, IN P_MSDU_INFO_T prMsduInfo)
+{
+	PUINT_8 pucBuffer;
+
+	ASSERT(prAdapter);
+	ASSERT(prMsduInfo);
+
+	if (prMsduInfo->ucBssIndex != prAdapter->prAisBssInfo->ucBssIndex)
+		return;
+
+	pucBuffer = (PUINT_8) ((ULONG) prMsduInfo->prPacket + (ULONG) prMsduInfo->u2FrameLength);
+
+	/* ASSOC INFO IE ID: 68 :0x44 */
+	if (/* prWlanInfo->fgWapiMode && */ prAdapter->prGlueInfo->u2WapiAssocInfoIESz) {
+		kalMemCopy(pucBuffer, &prAdapter->prGlueInfo->aucWapiAssocInfoIEs,
+			   prAdapter->prGlueInfo->u2WapiAssocInfoIESz);
+		prMsduInfo->u2FrameLength += prAdapter->prGlueInfo->u2WapiAssocInfoIESz;
+	}
+
+}
+
+/*----------------------------------------------------------------------------*/
+/*!
 * \brief This routine is called to parse WAPI IE.
 *
 * \param[in]  prInfoElem Pointer to the RSN IE
@@ -115,8 +150,7 @@ BOOLEAN wapiParseWapiIE(IN P_WAPI_INFO_ELEM_T prInfoElem, OUT P_WAPI_INFO_T prWa
 		return FALSE;
 	}
 
-	cp = (PUCHAR) prInfoElem;
-	cp += OFFSET_OF(struct _WAPI_INFO_ELEM_T, u2AKMSuiteCount);
+	cp = (PUCHAR) &prInfoElem->u2AuthKeyMgtSuiteCount;
 	u4RemainWapiIeLen = (INT_32) prInfoElem->ucLength - 2;
 
 	do {

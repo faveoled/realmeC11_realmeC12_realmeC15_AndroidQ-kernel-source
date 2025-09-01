@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -129,8 +127,6 @@
 #define CFG_SUPPORT_GAMING_MODE			1
 
 #define CFG_SUPPORT_OSHARE			1
-
-#define CFG_SUPPORT_WAPI			1
 
 /*------------------------------------------------------------------------------
  * SLT Option
@@ -609,7 +605,7 @@
 #ifdef LINUX
 #ifdef CONFIG_X86
 #define CFG_ENABLE_WIFI_DIRECT          0
-#define CFG_SUPPORT_802_11W             1
+#define CFG_SUPPORT_802_11W             0
 #else
 #define CFG_ENABLE_WIFI_DIRECT          1
 #define CFG_SUPPORT_802_11W             1
@@ -894,17 +890,6 @@
  */
 #define CFG_ENABLE_KEYWORD_EXCEPTION_MECHANISM  1
 
-/*------------------------------------------------------------------------------
- * Flags of WPA3 support
- *------------------------------------------------------------------------------
- */
-
-#include <linux/version.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
-#define CFG_SUPPORT_WPA3	0
-#else
-#define CFG_SUPPORT_WPA3	1
-#endif
 
 /*******************************************************************************
 *                             D A T A   T Y P E S

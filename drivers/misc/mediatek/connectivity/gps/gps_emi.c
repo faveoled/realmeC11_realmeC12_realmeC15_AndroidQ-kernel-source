@@ -29,6 +29,7 @@
 #include <linux/printk.h>
 #include <linux/version.h>
 #include <asm/memblock.h>
+#define EMI_MPU_PROTECTION_IS_READY  1
 #if EMI_MPU_PROTECTION_IS_READY
 #include <mt_emi_api.h>
 #endif
@@ -44,27 +45,21 @@
 ******************************************************************************/
 /* device name and major number */
 #define GPSEMI_DEVNAME            "gps_emi"
-#define IOCTL_EMI_MEMORY_INIT        1
+#define IOCTL_MNL_IMAGE_FILE_TO_MEM  1
 #define IOCTL_MNL_NVRAM_FILE_TO_MEM  2
 #define IOCTL_MNL_NVRAM_MEM_TO_FILE  3
-#define IOCTL_ADC_CAPTURE_ADDR_GET   4
 
-#if defined(CONFIG_MACH_MT6765) || defined(CONFIG_MACH_MT6761) || defined(CONFIG_MACH_MT6768)
+#if defined(CONFIG_MACH_MT6765) || defined(CONFIG_MACH_MT6761)
 #define GPS_EMI_MPU_REGION           29
 #define GPS_EMI_BASE_ADDR_OFFSET     (2*SZ_1M + SZ_1M/2 + 0x1000)
 #define GPS_EMI_MPU_SIZE             (SZ_1M + SZ_1M/2 - 0x2000)
-#endif
-#if defined(CONFIG_MACH_MT6779)
-#define GPS_EMI_MPU_REGION           29
-#define GPS_EMI_BASE_ADDR_OFFSET     (3*SZ_1M + 0x10000)
-#define GPS_EMI_MPU_SIZE             (0xF0000)
 #endif
 #if defined(CONFIG_MACH_MT6771) || defined(CONFIG_MACH_MT6775) || defined(CONFIG_MACH_MT6758)
 #define GPS_EMI_MPU_REGION           30
 #define GPS_EMI_BASE_ADDR_OFFSET     (SZ_1M)
 #define GPS_EMI_MPU_SIZE             (SZ_1M)
 #endif
-#define GPS_ADC_CAPTURE_BUFF_SIZE   0x50000
+
 /******************************************************************************
  * Debug configuration
 ******************************************************************************/
@@ -107,7 +102,7 @@ void mtk_wcn_consys_gps_memory_reserve(void)
 
 #endif
 	if (gGpsEmiPhyBase)
-		GPS_DBG("Con:0x%zx, Gps:0x%zx\n", (size_t)gConEmiPhyBase, (size_t)gGpsEmiPhyBase);
+		GPS_DBG("memblock done: 0x%zx\n", (size_t)gGpsEmiPhyBase);
 	else
 		GPS_DBG("memblock fail\n");
 }
@@ -180,8 +175,6 @@ INT32 mtk_wcn_consys_gps_emi_init(void)
 		#endif
 
 		pGpsEmibaseaddr = ioremap_nocache(gGpsEmiPhyBase, GPS_EMI_MPU_SIZE);
-		iRet = 1;
-		#if 0
 		if (pGpsEmibaseaddr != NULL) {
 			unsigned char *pFullPatchName = "MNL.bin";
 			osal_firmware *pPatch = NULL;
@@ -220,7 +213,6 @@ INT32 mtk_wcn_consys_gps_emi_init(void)
 		} else {
 			GPS_DBG("EMI mapping fail\n");
 		}
-		#endif
 	} else {
 		GPS_DBG("gps emi memory address gGpsEmiPhyBase invalid\n");
 	}
@@ -232,14 +224,15 @@ INT32 mtk_wcn_consys_gps_emi_init(void)
 long gps_emi_unlocked_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int retval = 0;
-	unsigned int *tmp;
 
-	GPS_DBG("gps_emi:cmd (%d),arg(%ld)\n", cmd, arg);
+	GPS_DBG("cmd (%d),arg(%ld)\n", cmd, arg);
 
 	switch (cmd) {
-	case IOCTL_EMI_MEMORY_INIT:
+	case IOCTL_MNL_IMAGE_FILE_TO_MEM:
+	#ifdef SUPPORT_GPS_OFFLOAD
 		retval = mtk_wcn_consys_gps_emi_init();
-		GPS_DBG("IOCTL_EMI_MEMORY_INIT\n");
+	#endif
+		GPS_DBG("IOCTL_MNL_IMAGE_FILE_TO_MEM\n");
 		break;
 
 	case IOCTL_MNL_NVRAM_FILE_TO_MEM:
@@ -248,15 +241,6 @@ long gps_emi_unlocked_ioctl(struct file *file, unsigned int cmd, unsigned long a
 
 	case IOCTL_MNL_NVRAM_MEM_TO_FILE:
 		GPS_DBG("IOCTL_MNL_NVRAM_MEM_TO_FILE\n");
-		break;
-
-	case IOCTL_ADC_CAPTURE_ADDR_GET:
-		tmp = (unsigned int *)&gGpsEmiPhyBase;
-		GPS_DBG("gps_emi:gGpsEmiPhyBase (%x)\n", &gGpsEmiPhyBase);
-		GPS_DBG("gps_emi:tmp  (%x)\n", tmp);
-		if (copy_to_user((unsigned int __user *)arg, tmp, sizeof(unsigned int)))
-			retval = -1;
-		GPS_DBG("IOCTL_ADC_CAPTURE_ADDR_GET,(%d)\n", retval);
 		break;
 
 	default:
@@ -296,14 +280,9 @@ static int gps_emi_release(struct inode *inode, struct file *file)
 static ssize_t gps_emi_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	ssize_t ret = 0;
-	GPS_DBG("gps_emi_read begin\n");
-	if (count > GPS_ADC_CAPTURE_BUFF_SIZE)
-		count = GPS_ADC_CAPTURE_BUFF_SIZE;
-	if (pGpsEmibaseaddr != NULL) {
-		if (copy_to_user(buf, (char *)pGpsEmibaseaddr, count))
-			pr_err("Copy to user failed\n");
-	}
-	GPS_DBG("gps_emi_read finish\n");
+
+	GPS_TRC();
+
 	return ret;
 }
 /******************************************************************************/
@@ -428,7 +407,7 @@ static const struct of_device_id apgps_of_ids[] = {
 	{}
 };
 #endif
-static struct platform_driver gps_emi_driver = {
+__attribute__((unused)) static struct platform_driver gps_emi_driver = {
 	.probe = gps_emi_probe,
 	.remove = gps_emi_remove,
 #if defined(CONFIG_PM)
@@ -447,12 +426,10 @@ static struct platform_driver gps_emi_driver = {
 /*****************************************************************************/
 static int __init gps_emi_mod_init(void)
 {
+        int ret = 0;
+        int err = 0;
+
 	GPS_ERR("gps emi mod register begin");
-	int ret = 0;
-	int err = 0;
-
-	sema_init(&fw_dl_mtx, 1);
-
 	devobj = kzalloc(sizeof(*devobj), GFP_KERNEL);
 	if (devobj == NULL) {
 		err = -ENOMEM;
@@ -483,6 +460,7 @@ static int __init gps_emi_mod_init(void)
 	}
 	devobj->dev = device_create(devobj->cls, NULL, devobj->devno, devobj, "gps_emi");
 
+	sema_init(&fw_dl_mtx, 1);
 
 	GPS_ERR("GPS EMI Done\n");
 	return 0;
@@ -501,7 +479,7 @@ err_out:
 }
 
 /*****************************************************************************/
-static void __exit gps_emi_mod_exit(void)
+static void gps_emi_mod_exit(void)
 {
 	if (!devobj) {
 		GPS_ERR("null pointer: %p\n", devobj);

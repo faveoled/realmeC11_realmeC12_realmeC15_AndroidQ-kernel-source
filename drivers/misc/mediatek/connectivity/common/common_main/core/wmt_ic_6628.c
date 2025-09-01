@@ -559,6 +559,8 @@ static const WMT_IC_INFO_S mt6628_info_table[] = {
 	 .cChipName = WMT_IC_NAME_MT6628,
 	 .cChipVersion = WMT_IC_VER_E1,
 	 .cPatchNameExt = WMT_IC_PATCH_E1_EXT,
+	 /* need to refine? */
+	 .eWmtHwVer = WMTHWVER_E1,
 	 .bWorkWithoutPatch = MTK_WCN_BOOL_FALSE,
 	 .bPsmSupport = MTK_WCN_BOOL_TRUE,
 	 },
@@ -567,6 +569,7 @@ static const WMT_IC_INFO_S mt6628_info_table[] = {
 	 .cChipName = WMT_IC_NAME_MT6628,
 	 .cChipVersion = WMT_IC_VER_E2,
 	 .cPatchNameExt = WMT_IC_PATCH_E2_EXT,
+	 .eWmtHwVer = WMTHWVER_E2,
 	 .bWorkWithoutPatch = MTK_WCN_BOOL_FALSE,
 	 .bPsmSupport = MTK_WCN_BOOL_TRUE,
 	 },
@@ -575,6 +578,7 @@ static const WMT_IC_INFO_S mt6628_info_table[] = {
 	 .cChipName = WMT_IC_NAME_MT6628,
 	 .cChipVersion = WMT_IC_VER_E3,
 	 .cPatchNameExt = WMT_IC_PATCH_E2_EXT,
+	 .eWmtHwVer = WMTHWVER_E3,
 	 .bWorkWithoutPatch = MTK_WCN_BOOL_FALSE,
 	 .bPsmSupport = MTK_WCN_BOOL_TRUE,
 	 },
@@ -583,6 +587,7 @@ static const WMT_IC_INFO_S mt6628_info_table[] = {
 	 .cChipName = WMT_IC_NAME_MT6628,
 	 .cChipVersion = WMT_IC_VER_E4,
 	 .cPatchNameExt = WMT_IC_PATCH_E2_EXT,
+	 .eWmtHwVer = WMTHWVER_E4,
 	 .bWorkWithoutPatch = MTK_WCN_BOOL_FALSE,
 	 .bPsmSupport = MTK_WCN_BOOL_TRUE,
 	 },
@@ -591,6 +596,7 @@ static const WMT_IC_INFO_S mt6628_info_table[] = {
 	 .cChipName = WMT_IC_NAME_MT6628,
 	 .cChipVersion = WMT_IC_VER_E5,
 	 .cPatchNameExt = WMT_IC_PATCH_E2_EXT,
+	 .eWmtHwVer = WMTHWVER_E5,
 	 .bWorkWithoutPatch = MTK_WCN_BOOL_FALSE,
 	 .bPsmSupport = MTK_WCN_BOOL_TRUE,
 	 }
@@ -1166,8 +1172,8 @@ WMT_CO_CLOCK mt6628_co_clock_get(VOID)
 
 static INT32 mt6628_ver_check(VOID)
 {
-	UINT32 hw_ver = 0;
-	UINT32 fw_ver = 0;
+	UINT32 hw_ver;
+	UINT32 fw_ver;
 	INT32 iret;
 	const WMT_IC_INFO_S *p_info;
 	unsigned long ctrlPa1;
@@ -1196,14 +1202,14 @@ static INT32 mt6628_ver_check(VOID)
 		return -3;
 	}
 
-	WMT_INFO_FUNC("MT6628: wmt ic info: %s.%s (0x%x, patch_ext:%s)\n",
+	WMT_INFO_FUNC("MT6628: wmt ic info: %s.%s (0x%x, WMTHWVER:%d, patch_ext:%s)\n",
 		      p_info->cChipName, p_info->cChipVersion,
-		      p_info->u4HwVer, p_info->cPatchNameExt);
+		      p_info->u4HwVer, p_info->eWmtHwVer, p_info->cPatchNameExt);
 
 	/* hw id & version */
 	ctrlPa1 = (0x00006628UL << 16) | (hw_ver & 0x0000FFFF);
-	/* translated fw rom version */
-	ctrlPa2 = (fw_ver & 0x0000FFFF);
+	/* translated hw version & fw rom version */
+	ctrlPa2 = ((UINT32) (p_info->eWmtHwVer) << 16) | (fw_ver & 0x0000FFFF);
 
 	iret = wmt_core_ctrl(WMT_CTRL_HWIDVER_SET, &ctrlPa1, &ctrlPa2);
 	if (iret)
@@ -1267,7 +1273,7 @@ static const WMT_IC_INFO_S *mt6628_find_wmt_ic_info(const UINT32 hw_ver)
 static INT32 wmt_stp_init_coex(VOID)
 {
 	INT32 iRet;
-	ULONG addr = 0;
+	ULONG addr;
 	WMT_GEN_CONF *pWmtGenConf;
 
 #define COEX_WMT  0
@@ -1384,7 +1390,7 @@ static INT32 mt6628_set_sdio_driving(VOID)
 {
 	INT32 ret = 0;
 
-	ULONG addr = 0;
+	ULONG addr;
 	WMT_GEN_CONF *pWmtGenConf;
 	UINT32 drv_val = 0;
 

@@ -230,10 +230,7 @@ VOID p2pDevFsmUninit(IN P_ADAPTER_T prAdapter)
 		p2pDevFsmStateTransition(prAdapter, prP2pDevFsmInfo, P2P_DEV_STATE_IDLE);
 		p2pDevFsmRunEventAbort(prAdapter, prP2pDevFsmInfo);
 
-		if (prP2pBssInfo->ucBssIndex < BSS_INFO_NUM) {
-			SET_NET_PWR_STATE_IDLE(prAdapter,
-				prP2pBssInfo->ucBssIndex);
-		}
+		SET_NET_PWR_STATE_IDLE(prAdapter, prP2pBssInfo->ucBssIndex);
 
 		/* Clear CmdQue */
 		kalClearMgmtFramesByBssIdx(prAdapter->prGlueInfo, prP2pBssInfo->ucBssIndex);
@@ -315,7 +312,7 @@ p2pDevFsmStateTransition(IN P_ADAPTER_T prAdapter,
 	ASSERT(prP2pDevFsmInfo->ucBssIndex == P2P_DEV_BSS_INDEX);
 	if (prP2pDevFsmInfo->ucBssIndex != P2P_DEV_BSS_INDEX) {
 		DBGLOG(P2P, ERROR,
-			"prP2pDevFsmInfo->ucBssIndex %d should be P2P_DEV_BSS_INDEX(%d)!\n",
+			"prP2pDevFsmInfo->ucBssIndex %s should be P2P_DEV_BSS_INDEX(%d)!\n",
 			prP2pDevFsmInfo->ucBssIndex, P2P_DEV_BSS_INDEX);
 		return;
 	}
@@ -661,14 +658,14 @@ VOID p2pDevFsmRunEventChannelAbort(IN P_ADAPTER_T prAdapter, IN P_MSG_HDR_T prMs
 					LINK_REMOVE_KNOWN_ENTRY(&prChnlReqInfo->rP2pChnlReqLink, prLinkEntry);
 					cnmMemFree(prAdapter, prP2pMsgChnlReq);
 					DBGLOG(P2P, TRACE,
-					       "p2pDevFsmRunEventChannelAbort: Channel Abort, cookie found:0x%llx\n",
+					       "p2pDevFsmRunEventChannelAbort: Channel Abort, cookie found:%d\n",
 					       prChnlAbortMsg->u8Cookie);
 					break;
 				}
 			}
 		} else {
 			DBGLOG(P2P, WARN,
-			       "p2pDevFsmRunEventChannelAbort: Channel Abort Fail, cookie not found:0x%llx\n",
+			       "p2pDevFsmRunEventChannelAbort: Channel Abort Fail, cookie not found:%d\n",
 			       prChnlAbortMsg->u8Cookie);
 		}
 	} while (FALSE);

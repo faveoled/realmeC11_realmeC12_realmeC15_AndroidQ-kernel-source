@@ -155,6 +155,7 @@ static const struct parse_data wmtcfg_fields[] = {
 	INT(coex_wmt_ext_elna_gain_p1_D2),
 	INT(coex_wmt_ext_elna_gain_p1_D3),
 	STRING(coex_wmt_antsel_invert_support),
+	CHAR(coex_wmt_ext_epa_mode),
 
 	BYTE_ARRAY(coex_wmt_epa_elna),
 
@@ -172,10 +173,6 @@ static const struct parse_data wmtcfg_fields[] = {
 	CHAR(coex_config_addjust_ble_scan_time_ratio),
 	CHAR(coex_config_addjust_ble_scan_time_ratio_bt_slot),
 	CHAR(coex_config_addjust_ble_scan_time_ratio_wifi_slot),
-
-	CHAR(wifi_ant_swap_mode),
-	CHAR(wifi_main_ant_polarity),
-	CHAR(wifi_ant_swap_ant_sel_gpio),
 };
 
 #define NUM_WMTCFG_FIELDS (osal_sizeof(wmtcfg_fields) / osal_sizeof(wmtcfg_fields[0]))
@@ -183,7 +180,7 @@ static const struct parse_data wmtcfg_fields[] = {
 static INT32 wmt_conf_parse_char(P_DEV_WMT pWmtDev, const struct parse_data *data, const PINT8 pos)
 {
 	PUINT8 dst;
-	long res = 0;
+	long res;
 
 	dst = (PINT8)(((PUINT8) pWmtDev) + (long)data->param1);
 
@@ -222,7 +219,7 @@ static PINT8 wmt_conf_write_char(P_DEV_WMT pWmtDev, const struct parse_data *dat
 static INT32 wmt_conf_parse_short(P_DEV_WMT pWmtDev, const struct parse_data *data, const PINT8 pos)
 {
 	PUINT16 dst;
-	long res = 0;
+	long res;
 
 	dst = (PINT16)(((PUINT8) pWmtDev) + (long)data->param1);
 
@@ -265,7 +262,7 @@ static PINT8 wmt_conf_write_short(P_DEV_WMT pWmtDev, const struct parse_data *da
 static INT32 wmt_conf_parse_int(P_DEV_WMT pWmtDev, const struct parse_data *data, const PINT8 pos)
 {
 	PUINT32 dst;
-	long res = 0;
+	long res;
 
 	dst = (PINT32)(((PUINT8) pWmtDev) + (long)data->param1);
 
@@ -594,39 +591,24 @@ INT32 wmt_conf_read_file(VOID)
 {
 	INT32 ret = -1;
 	ENUM_WMT_CHIP_TYPE chip_type;
-	UINT32 wmt_cfg_ver = 0;
-	INT8 str[10] = {0};
-	INT32 retry = 0;
 
 	osal_memset(&gDevWmt.rWmtGenConf, 0, osal_sizeof(gDevWmt.rWmtGenConf));
 	osal_memset(&gDevWmt.pWmtCfg, 0, osal_sizeof(gDevWmt.pWmtCfg));
 	chip_type = wmt_detect_get_chip_type();
 	if (chip_type == WMT_CHIP_TYPE_SOC) {
-	//	wmt_cfg_ver = wmt_detect_get_wmt_cfg_ver();
 		osal_memset(&gDevWmt.cWmtcfgName[0], 0, osal_sizeof(gDevWmt.cWmtcfgName));
-		
-		//if (wmt_cfg_ver) {
-	//		osal_strncat(&(gDevWmt.cWmtcfgName[0]), CUST_CFG_WMT_SOC_PREFIX,
-	//			     osal_sizeof(CUST_CFG_WMT_SOC_PREFIX));
-	//		osal_snprintf(&(str[0]), 10, "%d", wmt_cfg_ver);
-	//		osal_strncat(&(gDevWmt.cWmtcfgName[0]), &(str[0]), osal_strlen(&(str[0])));
-	//		osal_strncat(&(gDevWmt.cWmtcfgName[0]), CUST_CFG_WMT_SOC_SUFFIX,
-	//			     osal_sizeof(CUST_CFG_WMT_SOC_SUFFIX));
-	//	} else
-			osal_strncat(&(gDevWmt.cWmtcfgName[0]), CUST_CFG_WMT_SOC,
-				     osal_sizeof(CUST_CFG_WMT_SOC));
+
+		osal_strncat(&(gDevWmt.cWmtcfgName[0]), CUST_CFG_WMT_SOC, osal_sizeof(CUST_CFG_WMT_SOC));
 	}
 
-try_read:
 	if (!osal_strlen(&(gDevWmt.cWmtcfgName[0]))) {
 		WMT_ERR_FUNC("empty Wmtcfg name\n");
 		osal_assert(0);
 		return ret;
 	}
 	WMT_DBG_FUNC("WMT config file:%s\n", &(gDevWmt.cWmtcfgName[0]));
-
-	ret = wmt_dev_patch_get(&gDevWmt.cWmtcfgName[0], (osal_firmware **) &gDevWmt.pWmtCfg);
-	if (ret == 0) {
+	if (0 ==
+	    wmt_dev_patch_get(&gDevWmt.cWmtcfgName[0], (osal_firmware **) &gDevWmt.pWmtCfg)) {
 		/*get full name patch success */
 		WMT_DBG_FUNC("get full file name(%s) buf(0x%p) size(%zu)\n",
 			      &gDevWmt.cWmtcfgName[0], gDevWmt.pWmtCfg->data,
@@ -656,15 +638,7 @@ try_read:
 *	}
 */
 		return ret;
-	} else if (chip_type == WMT_CHIP_TYPE_SOC && wmt_cfg_ver && !retry) {
-		WMT_WARN_FUNC("read %s fails, try default config %s\n", &gDevWmt.cWmtcfgName[0], CUST_CFG_WMT_SOC);
-		osal_memset(&gDevWmt.cWmtcfgName[0], 0, osal_sizeof(gDevWmt.cWmtcfgName));
-		osal_strncat(&(gDevWmt.cWmtcfgName[0]), CUST_CFG_WMT_SOC,
-			     osal_sizeof(CUST_CFG_WMT_SOC));
-		retry = 1;
-		goto try_read;
 	}
-
 	WMT_ERR_FUNC("read %s file fails\n", &(gDevWmt.cWmtcfgName[0]));
 	osal_assert(0);
 	gDevWmt.rWmtGenConf.cfgExist = 0;
@@ -703,16 +677,3 @@ INT32 wmt_conf_deinit(VOID)
 	return 0;
 }
 
-void wmt_set_bt_tssi_target(int value)
-{
-	P_WMT_GEN_CONF pWmtGenConf = wmt_conf_get_cfg();
-
-	if (pWmtGenConf == NULL) {
-		WMT_INFO_FUNC("pWmtGenConf == NULL!!\n");
-		return;
-	}
-
-	pWmtGenConf->bt_tssi_target = value;
-	WMT_INFO_FUNC("bt_tssi_target = %d\n", value);
-}
-EXPORT_SYMBOL(wmt_set_bt_tssi_target);

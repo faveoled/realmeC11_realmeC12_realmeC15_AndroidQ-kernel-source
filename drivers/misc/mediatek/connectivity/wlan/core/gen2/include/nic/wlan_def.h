@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -281,7 +279,6 @@
 #define AUTH_TYPE_OPEN_SYSTEM                       BIT(AUTH_ALGORITHM_NUM_OPEN_SYSTEM)
 #define AUTH_TYPE_SHARED_KEY                        BIT(AUTH_ALGORITHM_NUM_SHARED_KEY)
 #define AUTH_TYPE_FAST_BSS_TRANSITION               BIT(AUTH_ALGORITHM_NUM_FAST_BSS_TRANSITION)
-#define AUTH_TYPE_SAE                               BIT(AUTH_ALGORITHM_NUM_SAE)
 
 /* Authentication Retry Limit */
 #define TX_AUTH_ASSOCI_RETRY_LIMIT                  2
@@ -654,7 +651,7 @@ typedef enum _ENUM_BSS_TYPE_T {
 
 #define MAX_NUM_SUPPORTED_CIPHER_SUITES 9	/* max number of supported cipher suites */
 #if CFG_SUPPORT_802_11W
-#define MAX_NUM_SUPPORTED_AKM_SUITES    13	/* max number of supported AKM suites */
+#define MAX_NUM_SUPPORTED_AKM_SUITES    11	/* max number of supported AKM suites */
 #else
 #define MAX_NUM_SUPPORTED_AKM_SUITES    9	/* max number of supported AKM suites */
 #endif

@@ -227,11 +227,6 @@ extern UINT_8 g_aucNvram[];
 #define GLUE_FLAG_HAL_MCR_RD_BIT    (16)
 #define GLUE_FLAG_HAL_MCR_WR_BIT    (17)
 #endif
-#define GLUE_FLAG_RESET_CONN_BIT  (18)
-
-#if CFG_SUPPORT_REPORT_MISC
-#define GLUE_FLAG_REPORT_MISC_BIT  (19)
-#endif
 
 #define GLUE_BOW_KFIFO_DEPTH        (1024)
 /* #define GLUE_BOW_DEVICE_NAME        "MT6620 802.11 AMP" */
@@ -508,6 +503,12 @@ struct _GLUE_INFO_T {
 	UINT_32 u4ExtCfgLength;	/* 0 means data is NOT valid */
 #endif
 
+#if 1				/* CFG_SUPPORT_WAPI */
+	/* Should be large than the PARAM_WAPI_ASSOC_INFO_T */
+	UINT_8 aucWapiAssocInfoIEs[42];
+	UINT_16 u2WapiAssocInfoIESz;
+#endif
+
 #if CFG_ENABLE_BT_OVER_WIFI
 	GL_BOW_INFO rBowInfo;
 #endif
@@ -522,6 +523,8 @@ struct _GLUE_INFO_T {
 	BOOLEAN fgWpsActive;
 	UINT_8 aucWSCIE[GLUE_INFO_WSCIE_LENGTH];	/*for probe req */
 	UINT_16 u2WSCIELen;
+	UINT_8 aucWSCAssocInfoIE[200];	/*for Assoc req */
+	UINT_16 u2WSCAssocInfoIELen;
 
 	/* NVRAM availability */
 	BOOLEAN fgNvramAvailable;
@@ -560,6 +563,8 @@ struct _GLUE_INFO_T {
 	BOOLEAN fgIsInSuspendMode;
 
 #if CFG_SUPPORT_PASSPOINT
+	UINT_8 aucHS20AssocInfoIE[200];	/*for Assoc req */
+	UINT_16 u2HS20AssocInfoIELen;
 	UINT_8 ucHotspotConfig;
 	BOOLEAN fgConnectHS20AP;
 
@@ -957,8 +962,6 @@ WLAN_STATUS wlanSetDebugLevel(IN UINT_32 u4DbgIdx, IN UINT_32 u4DbgMask);
 WLAN_STATUS wlanGetDebugLevel(IN UINT_32 u4DbgIdx, OUT PUINT_32 pu4DbgMask);
 
 VOID wlanSetSuspendMode(P_GLUE_INFO_T prGlueInfo, BOOLEAN fgEnable);
-
-BOOLEAN wlanIsFwOwn(VOID);
 
 /*******************************************************************************
 *			 E X T E R N A L   F U N C T I O N S / V A R I A B L E

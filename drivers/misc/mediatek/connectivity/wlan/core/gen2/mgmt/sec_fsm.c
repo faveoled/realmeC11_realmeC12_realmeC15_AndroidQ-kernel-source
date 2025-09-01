@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -362,11 +360,11 @@ VOID secFsmSteps(IN P_ADAPTER_T prAdapter, IN P_STA_RECORD_T prSta, IN ENUM_SEC_
 
 		/* Do entering Next State */
 #if DBG
-		DBGLOG(RSN, STATE, "%pM TRANSITION: [%s] -> [%s]\n",
+		DBGLOG(RSN, STATE, "\n %pM TRANSITION: [%s] -> [%s]\n\n",
 				    prSta->aucMacAddr,
 				    apucDebugSecState[prSecInfo->eCurrentState], apucDebugSecState[eNextState]);
 #else
-		DBGLOG(RSN, STATE, "%pM [%d] TRANSITION: [%d] -> [%d]\n",
+		DBGLOG(RSN, STATE, "\n %pM [%d] TRANSITION: [%d] -> [%d]\n\n",
 				    prSta->aucMacAddr, DBG_RSN_IDX, prSecInfo->eCurrentState, eNextState);
 #endif
 		prSecInfo->eCurrentState = eNextState;

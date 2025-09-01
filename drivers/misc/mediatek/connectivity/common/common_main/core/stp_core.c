@@ -32,10 +32,9 @@
 #define STP_DEL_SIZE   2	/* STP delimiter length */
 #define STP_MAX_TX_TIMEOUT_LOOP 3
 
-INT32 gStpDbgLvl = STP_LOG_INFO;
+UINT32 gStpDbgLvl = STP_LOG_INFO;
 unsigned int chip_reset_only;
 INT32 wmt_dbg_sdio_retry_ctrl = 1;
-INT32 gCrcErrorCount;
 
 #define STP_POLL_CPUPCR_NUM 5
 #define STP_POLL_CPUPCR_DELAY 1
@@ -104,10 +103,6 @@ static mtkstp_context_struct stp_core_ctx = { 0 };
 
 #define STP_ASSERT(x)		((x).f_evt_err_assert)
 #define STP_SET_ASSERT(x, v)	((x).f_evt_err_assert = (v))
-
-#define STP_ASSERT_IN_PROGRESS(x)           ((x).f_assert_in_progress)
-#define STP_SET_ASSERT_IN_PROGRESS(x, v)    ((x).f_assert_in_progress = (v))
-
 
 /*[PatchNeed]Need to calculate the timeout value*/
 static UINT32 mtkstp_tx_timeout = MTKSTP_TX_TIMEOUT;
@@ -243,7 +238,7 @@ static INT32 stp_ctx_unlock(mtkstp_context_struct *pctx)
 }
 
 
-MTK_WCN_BOOL mtk_wcn_stp_dbg_level(INT32 dbglevel)
+MTK_WCN_BOOL mtk_wcn_stp_dbg_level(UINT32 dbglevel)
 {
 	if (dbglevel >= 0 && dbglevel <= 4) {
 		gStpDbgLvl = dbglevel;
@@ -376,14 +371,13 @@ static VOID stp_sdio_trace32_dump(VOID)
 			if (stp_core_ctx.assert_info_cnt == 0) {
 				dmp_num = stp_parser_dmp_num(stp_core_ctx.rx_buf);
 				if (dmp_num > 0 && dmp_num < PARSER_CORE_DUMP_NUM) {
-					STP_INFO_FUNC("parser dmp_num is %ld\n", dmp_num);
+					STP_INFO_FUNC("parser dmp_num is %d\n", dmp_num);
 					stp_dbg_dump_num(dmp_num);
 				} else if (dmp_num > PARSER_CORE_DUMP_NUM) {
-					STP_INFO_FUNC("parser dmp_num is out of range %ld\n",
-							dmp_num);
+					STP_INFO_FUNC("parser dmp_num is out of range %d\n", dmp_num);
 					stp_dbg_dump_num(PARSER_CORE_DUMP_NUM);
 				} else {
-					STP_INFO_FUNC("parser dmp_num not found %ld\n", dmp_num);
+					STP_INFO_FUNC("parser dmp_num not found %d\n", dmp_num);
 					stp_dbg_dump_num(CORE_DUMP_NUM);
 				}
 			}
@@ -1527,7 +1521,6 @@ INT32 mtk_wcn_stp_init(const mtkstp_callback * const cb_func)
 	STP_SET_WMT_LAST_CLOSE(stp_core_ctx, 0);
 	STP_SET_EMI_DUMP_FLAG(stp_core_ctx, 0);
 	STP_SET_ASSERT(stp_core_ctx, 0);
-	STP_SET_ASSERT_IN_PROGRESS(stp_core_ctx, 0);
 
 	if (!STP_PSM_CORE(stp_core_ctx)) {
 		ret = (-3);
@@ -1933,7 +1926,6 @@ static INT32 stp_parser_data_in_mand_mode(UINT32 length, UINT8 *p_data)
 				}
 				continue;
 			}
-			mtk_wcn_stp_assert_flow_ctrl(1);
 			mtk_wcn_stp_coredump_start_ctrl(1);
 			if (mtk_wcn_stp_get_wmt_trg_assert() == 1)
 				stp_btm_stop_trigger_assert_timer(STP_BTM_CORE(stp_core_ctx));
@@ -2034,7 +2026,6 @@ static INT32 stp_parser_data_in_full_mode(UINT32 length, UINT8 *p_data)
 {
 	INT32 remain_length;	/* GeorgeKuo: sync from MAUI, change to unsigned */
 	INT32 i = length;
-	static DEFINE_RATELIMIT_STATE(_rs, 2 * HZ, 1);
 
 	while (i > 0) {
 		switch (stp_core_ctx.parser.state) {
@@ -2084,11 +2075,9 @@ static INT32 stp_parser_data_in_full_mode(UINT32 length, UINT8 *p_data)
 				/* do nothing for delimiter */
 			} else {	/* unexpected, drop them */
 				osal_assert(0);
-				if (__ratelimit(&_rs)) {
-					STP_WARN_FUNC("error header(0x%x) detected, discard %d bytes\n",
-						  *p_data, i);
-					osal_buffer_dump(p_data, "full mode unexpected header", i, 0);
-				}
+				STP_WARN_FUNC("error header(0x%x) detected, discard %d bytes\n",
+					      *p_data, i);
+				osal_buffer_dump(p_data, "full mode unexpected header", i, 0);
 				i = 0;
 				continue;
 			}
@@ -2130,17 +2119,18 @@ static INT32 stp_parser_data_in_full_mode(UINT32 length, UINT8 *p_data)
 			break;
 
 		case MTKSTP_CHECKSUM:
+			if ((stp_core_ctx.parser.type == STP_TASK_INDX) ||
+			    (stp_core_ctx.parser.type == INFO_TASK_INDX)) {
+				stp_change_rx_state(MTKSTP_FW_MSG);
+				stp_core_ctx.rx_counter = 0;
+				i -= 1;
+				if (i != 0)
+					p_data += 1;
+
+				continue;
+			}
 			if (((stp_core_ctx.rx_buf[0] +
 					stp_core_ctx.rx_buf[1] + stp_core_ctx.rx_buf[2]) & 0xff) == *p_data) {
-				if ((stp_core_ctx.parser.type == STP_TASK_INDX) ||
-				    (stp_core_ctx.parser.type == INFO_TASK_INDX)) {
-					stp_change_rx_state(MTKSTP_FW_MSG);
-					stp_core_ctx.rx_counter = 0;
-					i -= 1;
-					if (i != 0)
-						p_data += 1;
-					continue;
-				}
 				/* header only packet */
 				stp_process_header_only_packet();
 			} else {
@@ -2208,7 +2198,7 @@ static INT32 stp_parser_data_in_full_mode(UINT32 length, UINT8 *p_data)
 				else
 					STP_WARN_FUNC("inband reset state,drop the packet\n");
 			} else {
-				STP_ERR_FUNC("[%d]CRC error, drop the packet\n", gCrcErrorCount++);
+				STP_ERR_FUNC("CRC error, drop the packet\n");
 				osal_buffer_dump(&stp_core_ctx.rx_buf[0], "CRC data", stp_core_ctx.rx_counter, 0);
 				stp_change_rx_state(MTKSTP_SYNC);
 				stp_core_ctx.rx_counter = 0;
@@ -2262,7 +2252,6 @@ static INT32 stp_parser_data_in_full_mode(UINT32 length, UINT8 *p_data)
 				osal_assert(0);
 			}
 
-			mtk_wcn_stp_assert_flow_ctrl(1);
 			if (mtk_wcn_stp_coredump_start_get() == 0 && stp_core_ctx.rx_counter == 0 &&
 			    STP_IS_ENABLE_DBG(stp_core_ctx) && (stp_core_ctx.parser.type == STP_TASK_INDX)) {
 				mtk_wcn_stp_coredump_start_ctrl(1);
@@ -2270,8 +2259,6 @@ static INT32 stp_parser_data_in_full_mode(UINT32 length, UINT8 *p_data)
 				STP_INFO_FUNC("++ start to read paged dump and paged trace ++\n");
 				stp_btm_notify_wmt_dmp_wq(stp_core_ctx.btm);
 				STP_INFO_FUNC("++ start to read paged dump and paged trace --\n");
-				/* Dump CRC error count for debug only */
-				STP_INFO_FUNC("gCrcErrorCount = %d\n", gCrcErrorCount);
 			}
 
 			remain_length = stp_core_ctx.parser.length - stp_core_ctx.rx_counter;
@@ -3183,7 +3170,7 @@ VOID mtk_wcn_stp_flush_rx_queue(UINT32 type)
 {
 	INT32 ret = 0;
 
-	if (type < MTKSTP_MAX_TASK_NUM) {
+	if (type >= 0 && type < MTKSTP_MAX_TASK_NUM) {
 		ret = osal_lock_unsleepable_lock(&stp_core_ctx.ring[type].mtx);
 		if (ret != 0) {
 			STP_WARN_FUNC("stp context lock failed, ret=%d\n", ret);
@@ -3470,7 +3457,7 @@ INT32 mtk_wcn_stp_assert_timeout_handle(VOID)
 	mtk_wcn_consys_stp_btif_logger_ctrl(BTIF_DUMP_BTIF_REG);
 	mtk_wcn_consys_stp_btif_logger_ctrl(BTIF_DUMP_LOG);
 	mtk_wcn_stp_coredump_start_ctrl(1);
-	if (p_ecsi != NULL && wmt_plat_get_dump_info(p_ecsi->p_ecso->emi_apmem_ctrl_assert_flag)) {
+	if (wmt_plat_get_dump_info(p_ecsi->p_ecso->emi_apmem_ctrl_assert_flag)) {
 		STP_INFO_FUNC("EMI assert flag was set. To do coredump.\n");
 		mtk_wcn_stp_ctx_save();
 		ret = stp_btm_notify_wmt_dmp_wq(STP_BTM_CORE(stp_core_ctx));
@@ -3545,15 +3532,4 @@ INT32 mtk_stp_check_rx_has_pending_data(VOID)
 P_OSAL_THREAD mtk_stp_rx_thread_get(VOID)
 {
 	return sys_rx_thread_get();
-}
-
-VOID mtk_wcn_stp_assert_flow_ctrl(UINT32 on)
-{
-	STP_DBG_FUNC("Set assert progress flag to %d\n", on);
-	STP_SET_ASSERT_IN_PROGRESS(stp_core_ctx, on);
-}
-
-UINT32 mtk_wcn_stp_assert_flow_get(VOID)
-{
-	return STP_ASSERT_IN_PROGRESS(stp_core_ctx);
 }

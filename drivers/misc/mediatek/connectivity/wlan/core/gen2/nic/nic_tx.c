@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -1611,14 +1609,14 @@ VOID nicTxReturnMsduInfo(IN P_ADAPTER_T prAdapter, IN P_MSDU_INFO_T prMsduInfoLi
 BOOLEAN nicTxFillMsduInfo(IN P_ADAPTER_T prAdapter, IN P_MSDU_INFO_T prMsduInfo, IN P_NATIVE_PACKET prPacket)
 {
 	P_GLUE_INFO_T prGlueInfo;
-	UINT_8 ucPriorityParam = 0;
+	UINT_8 ucPriorityParam;
 	UINT_8 ucMacHeaderLen;
-	UINT_8 aucEthDestAddr[PARAM_MAC_ADDR_LEN] = {0};
+	UINT_8 aucEthDestAddr[PARAM_MAC_ADDR_LEN];
 	BOOLEAN fgIs1x = FALSE;
 	BOOLEAN fgIsPAL = FALSE;
-	UINT_32 u4PacketLen = 0;
+	UINT_32 u4PacketLen;
 	ULONG u4SysTime;
-	UINT_8 ucNetworkType = 0;
+	UINT_8 ucNetworkType;
 	struct sk_buff *prSkb = (struct sk_buff *)prPacket;
 
 	ASSERT(prAdapter);

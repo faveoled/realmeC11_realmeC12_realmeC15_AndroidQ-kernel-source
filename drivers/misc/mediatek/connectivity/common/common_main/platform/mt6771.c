@@ -59,8 +59,6 @@
 #include <linux/of_reserved_mem.h>
 #include <mtk_clkbuf_ctl.h>
 
-#include <linux/gpio.h>
-
 /*******************************************************************************
 *                              C O N S T A N T S
 ********************************************************************************
@@ -82,6 +80,7 @@ static INT32 consys_hw_power_ctrl(MTK_WCN_BOOL enable);
 static INT32 consys_ahb_clock_ctrl(MTK_WCN_BOOL enable);
 static INT32 polling_consys_chipid(VOID);
 static VOID update_consys_rom_desel(VOID);
+static VOID consys_hang_debug_info(VOID);
 static VOID consys_acr_reg_setting(VOID);
 static VOID consys_afe_reg_setting(VOID);
 static INT32 consys_hw_vcn18_ctrl(MTK_WCN_BOOL enable);
@@ -97,13 +96,13 @@ static INT32 consys_clk_get_from_dts(struct platform_device *pdev);
 static INT32 consys_pmic_get_from_dts(struct platform_device *pdev);
 static INT32 consys_read_irq_info_from_dts(struct platform_device *pdev, PINT32 irq_num, PUINT32 irq_flag);
 static INT32 consys_read_reg_from_dts(struct platform_device *pdev);
+static UINT32 consys_read_cpupcr(VOID);
 static VOID force_trigger_assert_debug_pin(VOID);
 static INT32 consys_co_clock_type(VOID);
 static P_CONSYS_EMI_ADDR_INFO consys_soc_get_emi_phy_add(VOID);
 static VOID consys_set_if_pinmux(MTK_WCN_BOOL enable);
 static INT32 consys_emi_coredump_remapping(UINT8 __iomem **addr, UINT32 enable);
 static INT32 consys_reset_emi_coredump(UINT8 __iomem *addr);
-static INT32 consys_is_ant_swap_enable_by_hwid(INT32 pin_num);
 
 /*******************************************************************************
 *                            P U B L I C   D A T A
@@ -160,6 +159,7 @@ WMT_CONSYS_IC_OPS consys_ic_ops = {
 	.consys_ic_ahb_clock_ctrl = consys_ahb_clock_ctrl,
 	.polling_consys_ic_chipid = polling_consys_chipid,
 	.update_consys_rom_desel_value = update_consys_rom_desel,
+	.consys_hang_debug = consys_hang_debug_info,
 	.consys_ic_acr_reg_setting = consys_acr_reg_setting,
 	.consys_ic_afe_reg_setting = consys_afe_reg_setting,
 	.consys_ic_hw_vcn18_ctrl = consys_hw_vcn18_ctrl,
@@ -175,13 +175,13 @@ WMT_CONSYS_IC_OPS consys_ic_ops = {
 	.consys_ic_pmic_get_from_dts = consys_pmic_get_from_dts,
 	.consys_ic_read_irq_info_from_dts = consys_read_irq_info_from_dts,
 	.consys_ic_read_reg_from_dts = consys_read_reg_from_dts,
+	.consys_ic_read_cpupcr = consys_read_cpupcr,
 	.ic_force_trigger_assert_debug_pin = force_trigger_assert_debug_pin,
 	.consys_ic_co_clock_type = consys_co_clock_type,
 	.consys_ic_soc_get_emi_phy_add = consys_soc_get_emi_phy_add,
 	.consys_ic_set_if_pinmux = consys_set_if_pinmux,
 	.consys_ic_emi_coredump_remapping = consys_emi_coredump_remapping,
 	.consys_ic_reset_emi_coredump = consys_reset_emi_coredump,
-	.consys_ic_is_ant_swap_enable_by_hwid = consys_is_ant_swap_enable_by_hwid,
 };
 
 /*******************************************************************************
@@ -599,6 +599,81 @@ static VOID update_consys_rom_desel(VOID)
 			CONSYS_REG_READ(conn_reg.mcu_base + CONSYS_ROM_DESEL_OFFSET));
 }
 
+static VOID consys_hang_debug_info(VOID)
+{
+	SIZE_T addr_1;
+	SIZE_T addr_2;
+	SIZE_T addr_3;
+
+	UINT32 rv1, wv1[2], rv2[2], rv3, wv3 = 0;
+	UINT32 i = 0;
+
+	addr_1 = conn_reg.mcu_base + CONSYS_HANG_DBG_OFFSET_1;
+	addr_2 = conn_reg.mcu_base + CONSYS_HANG_DBG_OFFSET_2;
+	addr_3 = conn_reg.mcu_base + CONSYS_HANG_DBG_OFFSET_3;
+	rv1 = CONSYS_REG_READ(addr_1);
+	rv3 = CONSYS_REG_READ(addr_3);
+	WMT_PLAT_PR_INFO("addr1:%zx:0x%x/addr2:%zx/addr3:%zx:0x%x\n",
+			   addr_1, rv1, addr_2, addr_3, rv3);
+
+	wv1[0] = (rv1 & 0xFF0000FF) | (0x0201 << 8);
+	CONSYS_REG_WRITE(addr_1, wv1[0]);
+	rv2[0] = CONSYS_REG_READ(addr_2);
+
+	wv1[1] = (rv1 & 0xFF0000FF) | (0x0403 << 8);
+	CONSYS_REG_WRITE(addr_1, wv1[1]);
+	rv2[1] = CONSYS_REG_READ(addr_2);
+	WMT_PLAT_PR_INFO("0x%x->addr1, addr2:0x%x/0x%x->addr1, addr2:0x%x\n",
+			   wv1[0], rv2[0], wv1[1], rv2[1]);
+
+	for (i = 0; i < 9; i++) {
+		wv3 = (rv3 & 0xFFFFFF0F) | (i << 4);
+		CONSYS_REG_WRITE(addr_3, wv3);
+
+		wv1[0] = (rv1 & 0xFF0000FF) | (0x5251 << 8);
+		CONSYS_REG_WRITE(addr_1, wv1[0]);
+		rv2[0] = CONSYS_REG_READ(addr_2);
+
+		wv1[1] = (rv1 & 0xFF0000FF) | (0x5453 << 8);
+		CONSYS_REG_WRITE(addr_1, wv1[1]);
+		rv2[1] = CONSYS_REG_READ(addr_2);
+		WMT_PLAT_PR_INFO("0x%x->addr3,0x%x->addr1,addr2:0x%x/0x%x->addr1,addr2:0x%x\n",
+				   wv3, wv1[0], rv2[0], wv1[1], rv2[1]);
+	}
+
+	WMT_PLAT_PR_INFO("apb0_dbg_prob\n");
+	for (i = 0; i < 10; i++) {
+		wv3 = (rv3 & 0xFFFF0FFF) | (i << 12);
+		CONSYS_REG_WRITE(addr_3, wv3);
+
+		wv1[0] = (rv1 & 0xFF0000FF) | (0x5655 << 8);
+		CONSYS_REG_WRITE(addr_1, wv1[0]);
+		rv2[0] = CONSYS_REG_READ(addr_2);
+
+		wv1[1] = (rv1 & 0xFF0000FF) | (0x5857 << 8);
+		CONSYS_REG_WRITE(addr_1, wv1[1]);
+		rv2[1] = CONSYS_REG_READ(addr_2);
+		WMT_PLAT_PR_INFO("0x%x->addr3,0x%x->addr1,addr2:0x%x/0x%x->addr1,addr2:0x%x\n",
+				   wv3, wv1[0], rv2[0], wv1[1], rv2[1]);
+	}
+
+	WMT_PLAT_PR_INFO("apb1_dbg_prob\n");
+	for (i = 0; i < 10; i++) {
+		wv3 = (rv3 & 0xFF0FFFFF) | (i << 20);
+		CONSYS_REG_WRITE(addr_3, wv3);
+
+		wv1[0] = (rv1 & 0xFF0000FF) | (0x5A59 << 8);
+		CONSYS_REG_WRITE(addr_1, wv1[0]);
+		rv2[0] = CONSYS_REG_READ(addr_2);
+
+		wv1[1] = (rv1 & 0xFF0000FF) | (0x5C5B << 8);
+		CONSYS_REG_WRITE(addr_1, wv1[1]);
+		rv2[1] = CONSYS_REG_READ(addr_2);
+		WMT_PLAT_PR_INFO("0x%x->addr3,0x%x->addr1,addr2:0x%x/0x%x->addr1,addr2:0x%x\n",
+				   wv3, wv1[0], rv2[0], wv1[1], rv2[1]);
+	}
+}
+
 static VOID consys_acr_reg_setting(VOID)
 {
 	/*
@@ -936,6 +1011,11 @@ static VOID force_trigger_assert_debug_pin(VOID)
 			CONSYS_REG_READ(conn_reg.topckgen_base + CONSYS_AP2CONN_OSC_EN_OFFSET));
 }
 
+static UINT32 consys_read_cpupcr(VOID)
+{
+	return CONSYS_REG_READ(conn_reg.mcu_base + CONSYS_CPUPCR_OFFSET);
+}
+
 static UINT32 consys_soc_chipid_get(VOID)
 {
 	return PLATFORM_SOC_CHIP;
@@ -984,9 +1064,4 @@ static INT32 consys_reset_emi_coredump(UINT8 __iomem *addr)
 	/* reset 0xF0088400 ~ 0xF0090400 (32K)  */
 	memset_io(addr + CONSYS_EMI_PAGED_DUMP_OFFSET, 0, 0x8000);
 	return 0;
-}
-
-static INT32 consys_is_ant_swap_enable_by_hwid(INT32 pin_num)
-{
-	return !gpio_get_value(pin_num);
 }

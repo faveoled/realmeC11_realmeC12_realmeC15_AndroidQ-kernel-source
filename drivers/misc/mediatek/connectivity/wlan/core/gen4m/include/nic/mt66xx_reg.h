@@ -472,7 +472,7 @@ extern struct mt66xx_hif_driver_data mt66xx_driver_data_ut;
 
 #define WPDMA_FIFO_TEST_MOD				(PCIE_HIF_BASE + 0x0140)
 
-#define WPDMA_APSRC_ACK_LOCK_SLPPROT                    (PCIE_HIF_BASE + 0x0160)
+#define WPDMA_APSRC_ACK_LOCK_SLPPROT			(PCIE_HIF_BASE + 0x0160)
 
 /* HIF Low Power Control Host Register */
 #define CFG_PCIE_LPCR_HOST				(PCIE_HIF_BASE + 0x01F0)
@@ -742,6 +742,7 @@ union DELAY_INT_CFG_STRUCT {
 #define WPDMA_RX_DONE_INT2				BIT(2)
 #define WPDMA_RX_DONE_INT1				BIT(1)
 #define WPDMA_RX_DONE_INT0				BIT(0)
+
 #else
 #define WIFI_CFG_SW_SYNC0			    0
 #define WIFI_CFG_SYNC0_RDY_OFFSET       0
@@ -1068,7 +1069,6 @@ struct mt66xx_chip_info {
 	/* chip ip version from FW */
 	uint32_t u4ChipIpVersion;
 	uint32_t u4ChipIpConfig;
-	uint16_t u2ADieChipVersion;
 
 	void (*asicCapInit)(IN struct ADAPTER *prAdapter);
 	void (*asicEnableFWDownload)(IN struct ADAPTER *prAdapter,
@@ -1076,13 +1076,10 @@ struct mt66xx_chip_info {
 	uint32_t (*asicGetChipID)(IN struct ADAPTER *prAdapter);
 	void (*fillHifTxDesc)(IN uint8_t **pDest, IN uint16_t *pInfoBufLen);
 	uint32_t (*downloadBufferBin)(IN struct ADAPTER *prAdapter);
-	void (*showTaskStack)(IN struct task_struct *tsk,
-				IN unsigned long *sp);
 
 	const uint32_t features;	/* feature bits */
 	u_int8_t is_support_hw_amsdu;
 	uint8_t ucMaxSwAmsduNum;
-	uint8_t ucMaxSwapAntenna;
 	uint32_t workAround;
 };
 

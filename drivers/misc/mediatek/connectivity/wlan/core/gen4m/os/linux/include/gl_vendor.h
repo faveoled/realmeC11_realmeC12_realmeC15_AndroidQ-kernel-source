@@ -87,27 +87,9 @@
  */
 #define GOOGLE_OUI 0x001A11
 #define OUI_QCA 0x001374
-#if CFG_SUPPORT_DATA_STALL
-#define OUI_MTK 0x000CE7
-#endif
 
 #define NL80211_VENDOR_SUBCMD_GET_PREFER_FREQ_LIST 103
-#define NL80211_VENDOR_SUBCMD_ACS 54
-#define NL80211_VENDOR_SUBCMD_GET_FEATURES 55
 #define QCA_NL80211_VENDOR_SUBCMD_SETBAND 105
-
-#define WIFI_VENDOR_ATTR_FEATURE_FLAGS 7
-
-enum NL80211_VENDOR_FEATURES {
-	VENDOR_FEATURE_KEY_MGMT_OFFLOAD        = 0,
-	VENDOR_FEATURE_SUPPORT_HW_MODE_ANY     = 1,
-	VENDOR_FEATURE_OFFCHANNEL_SIMULTANEOUS = 2,
-	VENDOR_FEATURE_P2P_LISTEN_OFFLOAD      = 3,
-	VENDOR_FEATURE_OCE_STA                 = 4,
-	VENDOR_FEATURE_OCE_AP                  = 5,
-	VENDOR_FEATURE_OCE_STA_CFON            = 6,
-	NUM_VENDOR_FEATURES /* keep last */
-};
 
 enum ANDROID_VENDOR_SUB_COMMAND {
 	/* Don't use 0 as a valid subcommand */
@@ -172,8 +154,7 @@ enum LSTATS_SUB_COMMAND {
 /* moved from wifi_logger.cpp */
 enum DEBUG_SUB_COMMAND {
 	LOGGER_START_LOGGING = ANDROID_NL80211_SUBCMD_DEBUG_RANGE_START,
-	LOGGER_GET_VER,
-	LOGGER_DRIVER_MEM_DUMP,
+	LOGGER_GET_VER
 };
 
 enum WIFI_OFFLOAD_SUB_COMMAND {
@@ -190,9 +171,7 @@ enum WIFI_VENDOR_EVENT {
 	RTT_EVENT_COMPLETE,
 	GSCAN_EVENT_COMPLETE_SCAN,
 	GSCAN_EVENT_HOTLIST_RESULTS_LOST,
-	WIFI_EVENT_RSSI_MONITOR,
-	WIFI_EVENT_DRIVER_ERROR,
-	WIFI_EVENT_ACS
+	WIFI_EVENT_RSSI_MONITOR
 };
 
 enum WIFI_ATTRIBUTE {
@@ -285,32 +264,8 @@ enum WIFI_VENDOR_ATTR_PREFERRED_FREQ_LIST {
 		WIFI_VENDOR_ATTR_PREFERRED_FREQ_LIST_LAST - 1
 };
 
-enum WIFI_VENDOR_ATTR_ACS {
-	WIFI_VENDOR_ATTR_ACS_CHANNEL_INVALID = 0,
-	WIFI_VENDOR_ATTR_ACS_PRIMARY_CHANNEL,
-	WIFI_VENDOR_ATTR_ACS_SECONDARY_CHANNEL,
-	WIFI_VENDOR_ATTR_ACS_HW_MODE,
-	WIFI_VENDOR_ATTR_ACS_HT_ENABLED,
-	WIFI_VENDOR_ATTR_ACS_HT40_ENABLED,
-	WIFI_VENDOR_ATTR_ACS_VHT_ENABLED,
-	WIFI_VENDOR_ATTR_ACS_CHWIDTH,
-	WIFI_VENDOR_ATTR_ACS_CH_LIST,
-	WIFI_VENDOR_ATTR_ACS_VHT_SEG0_CENTER_CHANNEL,
-	WIFI_VENDOR_ATTR_ACS_VHT_SEG1_CENTER_CHANNEL,
-	WIFI_VENDOR_ATTR_ACS_FREQ_LIST,
-	WIFI_VENDOR_ATTR_ACS_AFTER_LAST,
-	WIFI_VENDOR_ATTR_ACS_MAX =
-		WIFI_VENDOR_ATTR_ACS_AFTER_LAST - 1
-};
-
 #define MAX_FW_ROAMING_BLACKLIST_SIZE	16
 #define MAX_FW_ROAMING_WHITELIST_SIZE	8
-
-#if CFG_SUPPORT_DATA_STALL
-enum WIFI_DATA_STALL_ATTRIBUTE {
-	WIFI_ATTRIBUTE_ERROR_REASON = 0,
-};
-#endif
 
 /*******************************************************************************
  *                             D A T A   T Y P E S
@@ -366,18 +321,6 @@ keyStructBuf[100];	/* add/remove key shared buffer */
 #define NLA_PUT_U64(skb, attrtype, value) \
 	NLA_PUT_TYPE(skb, NLA_PUT_DATE_U64, attrtype, value)
 
-#endif
-
-#if KERNEL_VERSION(4, 12, 0) <= CFG80211_VERSION_CODE
-#define NLA_PARSE_NESTED(nlattr, maxtype, nla, policy)	\
-	nla_parse_nested(nlattr, maxtype, nla, policy, NULL)
-#define NLA_PARSE(tb, maxtype, head, len, policy) \
-	nla_parse(tb, maxtype, head, len, policy, NULL)
-#else
-#define NLA_PARSE_NESTED(nlattr, maxtype, nla, policy)	\
-	nla_parse_nested(nlattr, maxtype, nla, policy)
-#define NLA_PARSE(tb, maxtype, head, len, policy) \
-	nla_parse(tb, maxtype, head, len, policy)
 #endif
 
 /*******************************************************************************
@@ -743,16 +686,5 @@ int mtk_cfg80211_vendor_set_tx_power_scenario(
 int mtk_cfg80211_vendor_get_preferred_freq_list(struct wiphy
 		*wiphy, struct wireless_dev *wdev, const void *data,
 		int data_len);
-
-int mtk_cfg80211_vendor_driver_memory_dump(struct wiphy *wiphy,
-					   struct wireless_dev *wdev,
-					   const void *data,
-					   int data_len);
-
-int mtk_cfg80211_vendor_acs(struct wiphy *wiphy,
-		struct wireless_dev *wdev, const void *data, int data_len);
-
-int mtk_cfg80211_vendor_get_features(struct wiphy *wiphy,
-		struct wireless_dev *wdev, const void *data, int data_len);
 
 #endif /* _GL_VENDOR_H */

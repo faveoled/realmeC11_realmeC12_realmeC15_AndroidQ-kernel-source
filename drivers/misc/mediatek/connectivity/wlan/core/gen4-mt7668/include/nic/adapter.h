@@ -67,12 +67,6 @@
 *                         C O M P I L E R   F L A G S
 ********************************************************************************
 */
-#if CFG_SUPPORT_CSI
-#define CSI_RING_SIZE 1000
-#define CSI_MAX_DATA_COUNT 256
-#define CSI_MAX_RSVD1_COUNT 10
-#endif
-
 
 /*******************************************************************************
 *                    E X T E R N A L   R E F E R E N C E S
@@ -232,27 +226,6 @@ typedef struct _CONNECTION_SETTINGS_T {
 
 	/* for RSN info store, when upper layer set rsn info */
 	RSN_INFO_T rRsnInfo;
-
-#if CFG_SUPPORT_CFG80211_AUTH
-	struct cfg80211_bss *bss;
-
-	BOOLEAN fgIsConnInitialized;
-
-	BOOLEAN fgIsSendAssoc;
-
-	BOOLEAN ucAuthDataLen;
-	/* Temp assign a fixed large number
-	 * Additional elements for Authentication frame,
-	 * starts with the Authentication transaction sequence number field
-	 */
-	BOOLEAN aucAuthData[AUTH_DATA_MAX_LEN];
-	UINT_8 ucChannelNum;
-#endif
-#if CFG_SUPPORT_OWE
-	/* for OWE info store, when upper layer set rsn info */
-	struct OWE_INFO_T rOweInfo;
-#endif
-	struct LINK_MGMT rBlackList;
 } CONNECTION_SETTINGS_T, *P_CONNECTION_SETTINGS_T;
 
 struct _BSS_INFO_T {
@@ -510,11 +483,6 @@ struct _BSS_INFO_T {
 	/* AP PMF */
 	struct AP_PMF_CFG rApPmfCfg;
 #endif
-
-#if CFG_SUPPORT_REPLAY_DETECTION
-	struct SEC_DETECT_REPLAY_INFO rDetRplyInfo;
-#endif
-
 };
 
 struct _AIS_SPECIFIC_BSS_INFO_T {
@@ -764,14 +732,6 @@ typedef struct _WIFI_VAR_T {
 	/* Otherwise align cfg80211 */
 	UINT_8 ucApChnlDefFromCfg;
 
-	/*
-	 * According TGn/TGac 4.2.44, AP should not connect
-	 * to TKIP client with * HT/VHT capabilities. We leave
-	 * a wifi.cfg item for user to decide whether * to
-	 * enable HT/VHT capabilities in that case
-	 */
-	UINT_8 ucApAllowHtVhtTkip;
-
 	UINT_8 ucNSS;
 
 	UINT_8 ucRxMaxMpduLen;
@@ -849,16 +809,12 @@ typedef struct _WIFI_VAR_T {
 	UINT_8 ucCalTimingCtrl;
 	UINT_8 ucWow;
 	UINT_8 ucOffload;
-	UINT_8 ucAdvPws; /* enable LP multiple DTIM function, default disable */
+	UINT_8 ucAdvPws; /* enable LP multiple DTIM function, default enable */
 	UINT_8 ucWowOnMdtim; /* multiple DTIM if WOW enable, default 1 */
 	UINT_8 ucWowOffMdtim; /* multiple DTIM if WOW disable, default 3 */
 	UINT_8 ucWowPwsMode; /* when enter wow, automatically enter wow power-saving profile */
 	UINT_8 ucListenDtimInterval; /* adjust the listen interval by dtim interval */
 	UINT_8 ucEapolOffload; /* eapol offload when active mode / wow mode */
-
-#if CFG_SUPPORT_REPLAY_DETECTION
-	UINT_8 ucRpyDetectOffload; /* eapol offload when active mode / wow mode */
-#endif
 
 	UINT_8 u4SwTestMode;
 	UINT_8	ucCtrlFlagAssertPath;
@@ -886,14 +842,8 @@ typedef struct _WIFI_VAR_T {
 	BOOLEAN fgTdlsBufferSTASleep; /* Support TDLS 5.5.4.2 optional case */
 	BOOLEAN fgChipResetRecover;
 
-	UINT_8 ucN9Log2HostCtrl;
-	UINT_8 ucCR4Log2HostCtrl;
-
 #if CFG_SUPPORT_ANT_SELECT
 	UINT_8  ucSpeIdxCtrl;   /* 0:WF0, 1:WF1, 2: both WF0/1 */
-#endif
-#ifdef CFG_SUPPORT_ADJUST_JOIN_CH_REQ_INTERVAL
-	UINT_32 u4AisJoinChReqIntervel;
 #endif
 } WIFI_VAR_T, *P_WIFI_VAR_T;	/* end of _WIFI_VAR_T */
 
@@ -973,59 +923,6 @@ typedef struct _WIFI_FEM_CFG_T {
 	/* Reserved  */
 	UINT_32 au4Reserved[4];
 } WIFI_FEM_CFG_T, *P_WIFI_FEM_CFG_T;
-
-#if CFG_SUPPORT_CSI
-/*
- * CSI_DATA_T is used for representing
- * the CSI and other useful * information
- * for application usage
- */
-struct CSI_DATA_T {
-	UINT_8 ucBw;
-	BOOLEAN bIsCck;
-	UINT_16 u2DataCount;
-	INT_16 ac2IData[CSI_MAX_DATA_COUNT];
-	INT_16 ac2QData[CSI_MAX_DATA_COUNT];
-	UINT_8 ucDbdcIdx;
-	INT_8 cRssi;
-	UINT_8 ucSNR;
-	UINT_64 u8TimeStamp;
-	UINT_8 ucDataBw;
-	UINT_8 ucPrimaryChIdx;
-	UINT_8 aucTA[MAC_ADDR_LEN];
-	UINT_32 u4ExtraInfo;
-	UINT_8 ucRxMode;
-	INT_32 ai4Rsvd1[CSI_MAX_RSVD1_COUNT];
-	INT_32 au4Rsvd2[CSI_MAX_RSVD1_COUNT];
-	UINT_8 ucRsvd1Cnt;
-	INT_32 i4Rsvd3;
-	UINT_8 ucRsvd4;
-};
-
-/*
- * CSI_INFO_T is used to store the CSI
- * settings and CSI event data
- */
-struct CSI_INFO_T {
-	/* Variables for manipulate the CSI data in g_aucProcBuf */
-	BOOLEAN bIncomplete;
-	INT_32 u4CopiedDataSize;
-	INT_32 u4RemainingDataSize;
-	wait_queue_head_t waitq;
-	/* Variable for recording the CSI function config */
-	UINT_8 ucMode;
-	UINT_8 ucValue1[CSI_CONFIG_ITEM_NUM];
-	UINT_8 ucValue2[CSI_CONFIG_ITEM_NUM];
-	/* Variable for manipulating the CSI ring buffer */
-	struct CSI_DATA_T arCSIBuffer[CSI_RING_SIZE];
-	UINT_32 u4CSIBufferHead;
-	UINT_32 u4CSIBufferTail;
-	UINT_32 u4CSIBufferUsed;
-	INT_16 ai2TempIData[CSI_MAX_DATA_COUNT];
-	INT_16 ai2TempQData[CSI_MAX_DATA_COUNT];
-};
-#endif
-
 
 /*
  * Major ADAPTER structure
@@ -1202,11 +1099,6 @@ struct _ADAPTER_T {
 	EVENT_WLAN_INFO rEventWlanInfo;
 #endif
 
-#if CFG_SUPPORT_LAST_SEC_MCS_INFO
-	TIMER_T rRxMcsInfoTimer;
-	BOOLEAN fgIsMcsInfoValid;
-#endif
-
 	EVENT_LINK_QUALITY rLinkQuality;
 	OS_SYSTIME rLinkQualityUpdateTime;
 	BOOLEAN fgIsLinkQualityValid;
@@ -1250,12 +1142,6 @@ struct _ADAPTER_T {
 
 	UINT_32 u4CtiaPowerMode;
 	BOOLEAN fgEnCtiaPowerMode;
-
-	/* Bitmap is defined as #define KEEP_FULL_PWR_{FEATURE}_BIT in wlan_lib.h
-	 * Each feature controls KeepFullPwr(CMD_ID_KEEP_FULL_PWR) should
-	 * register bitmap to ensure low power during suspend.
-	 */
-	UINT_32 u4IsKeepFullPwrBitmap;
 
 	UINT_32 fgEnArpFilter;
 
@@ -1325,11 +1211,6 @@ struct _ADAPTER_T {
 	/* COEX feature */
 	UINT_32 u4FddMode;
 
-#if (CFG_EFUSE_BUFFER_MODE_DELAY_CAL == 1)
-	/* MAC address Efuse Offset */
-	UINT_32 u4EfuseMacAddrOffset;
-#endif
-
 #if CFG_WOW_SUPPORT
 	WOW_CTRL_T	rWowCtrl;
 #endif
@@ -1346,30 +1227,16 @@ struct _ADAPTER_T {
 	BOOLEAN fgIsSupportGetFreeEfuseBlockCount;
 	BOOLEAN fgIsSupportQAAccessEfuse;
 	BOOLEAN fgIsSupportPowerOnSendBufferModeCMD;
-	BOOLEAN fgIsBufferBinExtract;
 	BOOLEAN fgIsSupportGetTxPower;
 	BOOLEAN fgIsEnableLpdvt;
 
 	/* SER related info */
 	UINT_8 ucSerState;
 
-#if CFG_SUPPORT_BFER
-	BOOLEAN fgIsHwSupportBfer;
-#endif
-
 #if (CFG_HW_WMM_BY_BSS == 1)
 	UINT_8 ucHwWmmEnBit;
 #endif
 	WIFI_FEM_CFG_T rWifiFemCfg;
-
-	UINT_8 ucRModeOnlyFlag;
-	UINT_8 ucRModeReserve[7];
-
-#if CFG_SUPPORT_CSI
-	struct CSI_INFO_T rCSIInfo;
-#endif
-
-
 };				/* end of _ADAPTER_T */
 
 /*******************************************************************************

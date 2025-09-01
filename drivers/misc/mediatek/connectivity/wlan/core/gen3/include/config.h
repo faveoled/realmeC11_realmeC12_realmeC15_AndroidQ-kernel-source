@@ -134,8 +134,6 @@
 
 #define CFG_SUPPORT_LOWLATENCY_MODE		1
 
-#define CFG_SUPPORT_ANT_SWAP		1
-
 #define CFG_SUPPORT_OSHARE			1
 
 /*------------------------------------------------------------------------------
@@ -401,8 +399,7 @@
 #endif
 
 /*! RX BA capability */
-/* Each STA needs 8 TID; Hotspot supports 10 Clients */
-#define CFG_NUM_OF_RX_BA_AGREEMENTS             80
+#define CFG_NUM_OF_RX_BA_AGREEMENTS             8
 #if CFG_M0VE_BA_TO_DRIVER
 #define CFG_RX_BA_MAX_WINSIZE                   8
 #else
@@ -454,7 +451,7 @@
 #define CFG_ENABLE_WAKEUP_ON_LAN                0
 #define CFG_SUPPORT_WAKEUP_REASON_DEBUG		0	/* debug which packet wake up host */
 
-#define CFG_MODIFY_TX_POWER_BY_BAT_VOLT		0
+
 #define CFG_INIT_POWER_SAVE_PROF                    ENUM_PSP_FAST_SWITCH
 
 #define CFG_INIT_ENABLE_PATTERN_FILTER_ARP                    0
@@ -483,15 +480,8 @@
  * Auto Channel Selection maximun channel number
  *------------------------------------------------------------------------------
  */
-#ifndef VENDOR_EDIT
-//Pan.Zhang@PSW.CN.WiFi.Basic.SoftAP.1153775, 2018/01/17,
-//Modify for set softap max 2.4G band 11 channel.
 #define MAX_CHN_NUM                             39 /* CH1~CH14, CH36~CH48, CH52~CH64, CH100~CH144, CH149~CH165 */
 #define MAX_2G_BAND_CHN_NUM                     14
-#else /* VENDOR_EDIT */
-#define MAX_CHN_NUM                             36 /* CH1~CH11, CH36~CH48, CH52~CH64, CH100~CH144, CH149~CH165 */
-#define MAX_2G_BAND_CHN_NUM                     11
-#endif /* VENDOR_EDIT */
 #define ACS_PRINT_BUFFER_LEN                   200
 
 /*------------------------------------------------------------------------------
@@ -513,12 +503,6 @@
 #endif
 #define CFG_SCAN_SSID_MAX_NUM                   (10)
 #define CFG_SCAN_SSID_MATCH_MAX_NUM             (16)
-
-/*------------------------------------------------------------------------------
- * Flags and Parameters for Support Management Frame Debug
- *------------------------------------------------------------------------------
- */
-#define CFG_SUPPORT_MGMT_FRAME_DEBUG            1
 
 /*------------------------------------------------------------------------------
  * Flags and Parameters for Load Setup Default
@@ -647,8 +631,6 @@
 
 #define CFG_AUTO_CHANNEL_SEL_SUPPORT            1
 
-#define CFG_SAP_LIMIT_AIS_CHNL                  0 /* Restrict AIS operation channel in STA+SAP concurrent mode */
-
 /*------------------------------------------------------------------------------
  * Configuration Flags (Linux Only)
  *------------------------------------------------------------------------------
@@ -750,8 +732,6 @@
 #define CFG_SUPPORT_OSC_SETTING     1
 
 #define CFG_SUPPORT_P2P_RSSI_QUERY        0
-
-#define CFG_SUPPORT_RSSI_DISCONNECT	1
 
 #define CFG_SHOW_MACADDR_SOURCE     1
 #define CFG_SUPPORT_VO_ENTERPRISE               1
@@ -869,24 +849,7 @@
  */
 #define CFG_SUPPORT_SNIFFER                 1
 
-//Shimin.Jiang@PSW.CN.WiFi.Connect.disconnect.1367902, 2018/5/4
-//Modify for 1367902 avoding disconnect
-/*
 #define CFG_SUPPORT_DETECT_SECURITY_MODE_CHANGE 1
-*/
-//#else
-#define CFG_SUPPORT_DETECT_SECURITY_MODE_CHANGE 0
-//#endif /*VENDOR_EDIT*/
-
-//#ifdef VENDOR_EDIT
-//Shimin.Jiang@PSW.CN.WiFi.Connect.disconnect.1568769, 2018/10/02
-//Modify for 1568769 can not connect cam device
-/*
-#define CFG_IGNORE_INVALID_AUTH_TSN		0
-*/
-//#else
-#define CFG_IGNORE_INVALID_AUTH_TSN		1
-//#endif /*VENDOR_EDIT*/
 
 /*------------------------------------------------------------------------------
  * Flags of Drop Packet Replay SUPPORT
@@ -924,8 +887,6 @@
 
 #define CFG_SUPPORT_ABORT_SCAN			1
 
-#define CFG_SUPPORT_REPORT_MISC		0
-
 /*------------------------------------------------------------------------------
  * Flags of driver support scan random mac
  *------------------------------------------------------------------------------
@@ -935,30 +896,14 @@
 #else
 #define CFG_SUPPORT_SCAN_RANDOM_MAC     0
 #endif
+
 /*------------------------------------------------------------------------------
- * Need FW support
- * If FW can support, then driver enables it.
+ * Flags of driver add HT/VHT IE in probe request
  *------------------------------------------------------------------------------
  */
-/*
-#if defined(__LP64__) || defined(LP64)
-#if defined(MT6631)
-#define CFG_SUPPORT_DATA_STALL
-#define CFG_SUPPORT_LINK_QUALITY_MONITOR
-#endif
-#endif
-*/
-/*------------------------------------------------------------------------------
- * Link Quality Monitor
- * Link quality monitor execution period base on performance monitor timer
- *------------------------------------------------------------------------------
- */
-#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
-#define CFG_LINK_QUALITY_MONITOR_UPDATE_INTERVAL	1000
-#endif
-#ifdef FW_CFG_SUPPORT
-#define CFG_SUPPORT_COEX_IOT_AP
-#endif
+
+#define CFG_ADD_HT_VHT_PROBE_REQUEST		1
+
 /*******************************************************************************
 *                             D A T A   T Y P E S
 ********************************************************************************

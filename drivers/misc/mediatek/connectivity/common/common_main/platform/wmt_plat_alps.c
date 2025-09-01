@@ -121,7 +121,7 @@ static INT32 wmt_plat_dump_pin_conf(VOID);
 INT32 gWmtMergeIfSupport;
 UINT32 gCoClockFlag;
 BGF_IRQ_BALANCE g_bgf_irq_lock;
-INT32 wmtPlatLogLvl = WMT_PLAT_LOG_INFO;
+UINT32 wmtPlatLogLvl = WMT_PLAT_LOG_INFO;
 
 /*******************************************************************************
 *                           P R I V A T E   D A T A
@@ -138,7 +138,6 @@ irq_cb wmt_plat_bgf_irq_cb;
 device_audio_if_cb wmt_plat_audio_if_cb;
 func_ctrl_cb wmt_plat_func_ctrl_cb;
 thermal_query_ctrl_cb wmt_plat_thermal_query_ctrl_cb;
-trigger_assert_cb wmt_plat_trigger_assert_cb;
 deep_idle_ctrl_cb wmt_plat_deep_idle_ctrl_cb;
 
 static const fp_set_pin gfp_set_pin_table[] = {
@@ -181,6 +180,7 @@ static const fp_set_pin gfp_set_pin_table[] = {
 INT32 wmt_plat_audio_ctrl(enum CMB_STUB_AIF_X state, enum CMB_STUB_AIF_CTRL ctrl)
 {
 	INT32 iRet = 0;
+	UINT32 pinShare = 0;
 	UINT32 mergeIfSupport = 0;
 
 	/* input sanity check */
@@ -232,7 +232,8 @@ INT32 wmt_plat_audio_ctrl(enum CMB_STUB_AIF_X state, enum CMB_STUB_AIF_CTRL ctrl
 			WMT_INFO_FUNC("call chip aif setting\n");
 			/* need to control chip side GPIO */
 			if (wmt_plat_audio_if_cb != NULL)
-				iRet += (*wmt_plat_audio_if_cb)(state, MTK_WCN_BOOL_FALSE);
+				iRet += (*wmt_plat_audio_if_cb)(state, (pinShare) ? MTK_WCN_BOOL_TRUE :
+						MTK_WCN_BOOL_FALSE);
 			else {
 				WMT_WARN_FUNC("wmt_plat_audio_if_cb is not registered\n");
 				iRet -= 1;
@@ -260,16 +261,6 @@ static long wmt_plat_thermal_ctrl(VOID)
 		temp = (*wmt_plat_thermal_query_ctrl_cb)();
 
 	return temp;
-}
-
-static INT32 wmt_plat_assert_ctrl(VOID)
-{
-	INT32 ret = 0;
-
-	if (wmt_plat_trigger_assert_cb)
-		ret = (*wmt_plat_trigger_assert_cb)(WMTDRV_TYPE_WMT, 45);
-
-	return ret;
 }
 
 static INT32 wmt_plat_deep_idle_ctrl(UINT32 dpilde_ctrl)
@@ -331,11 +322,6 @@ VOID wmt_plat_thermal_ctrl_cb_reg(thermal_query_ctrl_cb thermal_query_ctrl)
 	wmt_plat_thermal_query_ctrl_cb = thermal_query_ctrl;
 }
 
-VOID wmt_plat_trigger_assert_cb_reg(trigger_assert_cb trigger_assert)
-{
-	wmt_plat_trigger_assert_cb = trigger_assert;
-}
-
 VOID wmt_plat_deep_idle_ctrl_cb_reg(deep_idle_ctrl_cb deep_idle_ctrl)
 {
 	wmt_plat_deep_idle_ctrl_cb = deep_idle_ctrl;
@@ -367,7 +353,6 @@ INT32 wmt_plat_init(P_PWR_SEQ_TIME pPwrSeqTime, UINT32 co_clock_type)
 	stub_cb.aif_ctrl_cb = wmt_plat_audio_ctrl;
 	stub_cb.func_ctrl_cb = wmt_plat_func_ctrl;
 	stub_cb.thermal_query_cb = wmt_plat_thermal_ctrl;
-	stub_cb.trigger_assert_cb = wmt_plat_assert_ctrl;
 	stub_cb.deep_idle_ctrl_cb = wmt_plat_deep_idle_ctrl;
 	stub_cb.wmt_do_reset_cb = NULL;
 	stub_cb.clock_fail_dump_cb = wmt_plat_clock_fail_dump;
@@ -1799,6 +1784,8 @@ INT32 wmt_plat_write_emi_l(UINT32 offset, UINT32 value)
 UINT32 wmt_plat_get_soc_chipid(VOID)
 {
 	UINT32 chipId = mtk_wcn_consys_soc_chipid();
+
+	WMT_PLAT_PR_INFO("current SOC chip:0x%x\n", chipId);
 
 	return chipId;
 }

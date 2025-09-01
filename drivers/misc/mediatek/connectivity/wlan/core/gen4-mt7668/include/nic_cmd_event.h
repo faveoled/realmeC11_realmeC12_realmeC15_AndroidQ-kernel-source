@@ -447,8 +447,6 @@ typedef enum _ENUM_CMD_ID_T {
 	CMD_ID_P2P_ABORT,	/* 0x26 (Set) */
 	CMD_ID_SET_DBDC_PARMS = 0x28,	/* 0x28 (Set) */
 
-	CMD_ID_KEEP_FULL_PWR = 0x2A,	/* 0x2A (Set) */
-
 	/* SLT commands */
 	CMD_ID_RANDOM_RX_RESET_EN = 0x2C,	/* 0x2C (Set ) */
 	CMD_ID_RANDOM_RX_RESET_DE = 0x2D,	/* 0x2D (Set ) */
@@ -484,12 +482,6 @@ typedef enum _ENUM_CMD_ID_T {
 #if CFG_WOW_SUPPORT
 	CMD_ID_SET_WOWLAN,			/* 0x4a (Set) */
 #endif
-
-#if CFG_SUPPORT_CSI
-	CMD_ID_CSI_CONTROL = 0x4c, /* 0x4c (Set /Query) */
-#endif
-
-	CMD_ID_SET_MDNS_RECORD = 0X4e,
 
 #if CFG_SUPPORT_WIFI_HOST_OFFLOAD
 	CMD_ID_SET_AM_FILTER = 0x55,	/* 0x55 (Set) */
@@ -542,11 +534,6 @@ typedef enum _ENUM_CMD_ID_T {
 
 	CMD_ID_WLAN_INFO	= 0xCD, /* 0xcd (Query) */
 	CMD_ID_MIB_INFO		= 0xCE, /* 0xce (Query) */
-
-#if CFG_SUPPORT_LAST_SEC_MCS_INFO
-	CMD_ID_TX_MCS_INFO	= 0xCF, /* 0xcf (Query) */
-#endif
-	CMD_ID_GET_TXPWR_TBL = 0xD0, /* 0xd0 (Query) */
 
 	CMD_ID_SET_RDD_CH = 0xE1,
 
@@ -615,12 +602,6 @@ typedef enum _ENUM_EVENT_ID_T {
 	EVENT_ID_CHECK_REORDER_BUBBLE = 0x2a,	/* 0x2a (Unsoiicited) */
 	EVENT_ID_BATCH_RESULT = 0x2b,	/* 0x2b (Query) */
 
-#if CFG_SUPPORT_CSI
-	EVENT_ID_CSI_DATA = 0x3c, /* 0x3c (Query) */
-#endif
-
-	EVENT_ID_GET_GTK_REKEY_DATA = 0x3d, /* 0x3d (Query) */
-
 	EVENT_ID_UART_ACK = 0x40,	/* 0x40 (Unsolicited) */
 	EVENT_ID_UART_NAK,	/* 0x41 (Unsolicited) */
 	EVENT_ID_GET_CHIPID,	/* 0x42 (Query - CMD_ID_GET_CHIPID) */
@@ -663,11 +644,6 @@ typedef enum _ENUM_EVENT_ID_T {
 	EVENT_ID_WLAN_INFO = 0xCD,
 	EVENT_ID_MIB_INFO = 0xCE,
 
-#if CFG_SUPPORT_LAST_SEC_MCS_INFO
-	EVENT_ID_TX_MCS_INFO = 0xCF,
-#endif
-	EVENT_ID_GET_TXPWR_TBL = 0xD0,
-
 	EVENT_ID_NIC_CAPABILITY_V2 = 0xEC,		/* 0xEC (Query - CMD_ID_GET_NIC_CAPABILITY_V2) */
 /*#if (CFG_EFUSE_BUFFER_MODE_DELAY_CAL == 1)*/
 	EVENT_ID_LAYER_0_EXT_MAGIC_NUM	= 0xED,	    /* magic number for Extending MT6630 original EVENT header  */
@@ -706,7 +682,6 @@ typedef enum _ENUM_EVENT_ID_T {
 #define WOWLAN_DETECT_TYPE_BCN_LOST             BIT(4)
 
 /* Wakeup command bit define */
-#define WOWLAN_DETECT_TYPE_NONE                 0
 #define PF_WAKEUP_CMD_BIT0_OUTPUT_MODE_EN   BIT(0)
 #define PF_WAKEUP_CMD_BIT1_OUTPUT_DATA      BIT(1)
 #define PF_WAKEUP_CMD_BIT2_WAKEUP_LEVEL     BIT(2)
@@ -1183,7 +1158,7 @@ typedef struct _EVENT_NIC_CAPABILITY_T {
 	UINT_8 ucFwBuildNumber;
 	UINT_8 ucHwSetNss1x1;
 	UINT_8 ucHwNotSupportDBDC;
-	UINT_8 ucHwWiFiZeroOnly;
+	UINT_8 aucReserved0[1];
 	UINT_8 aucReserved1[56];
 } EVENT_NIC_CAPABILITY_T, *P_EVENT_NIC_CAPABILITY_T;
 
@@ -1213,15 +1188,12 @@ typedef enum _NIC_CAPABILITY_V2_TAG_T {
 #if CFG_TCP_IP_CHKSUM_OFFLOAD
 	TAG_CAP_CSUM_OFFLOAD = 0x4,
 #endif
-	TAG_CAP_R_MODE_CAP = 0xf,
-	TAG_CAP_MAC_EFUSE_OFFSET = 0x14,
 	TAG_CAP_TOTAL
 } NIC_CAPABILITY_V2_TAG_T;
 
 #if CFG_TCP_IP_CHKSUM_OFFLOAD
 typedef struct _NIC_CSUM_OFFLOAD_T {
 	UINT_8 ucIsSupportCsumOffload;  /* 1: Support, 0: Not Support */
-	UINT_8 acReseved[3];
 } NIC_CSUM_OFFLOAD_T, *P_NIC_CSUM_OFFLOAD_T;
 #endif
 
@@ -1233,17 +1205,6 @@ typedef struct _NIC_EFUSE_ADDRESS_T {
 	UINT_32 u4EfuseStartAddress;  /* Efuse Start Address */
 	UINT_32 u4EfuseEndAddress;   /* Efuse End Address */
 } NIC_EFUSE_ADDRESS_T, *P_NIC_EFUSE_ADDRESS_T;
-
-struct _NIC_EFUSE_OFFSET_T {
-	UINT_32 u4TotalItem;	/* Efuse offset items */
-	UINT_32 u4WlanMacAddr;  /* Efuse Offset 1 */
-};
-
-
-struct _CAP_R_MODE_CAP_T {
-	UINT_8 ucRModeOnlyFlag;     /* 1: R mode only, 0:not R mode only */
-	UINT_8 ucRModeReserve[7];   /* reserve fields for future use */
-};
 
 typedef struct _NIC_TX_RESOURCE_T {
 	UINT_32 u4McuTotalResource;  /* the total usable resource for MCU port */
@@ -1306,9 +1267,6 @@ typedef struct _CMD_ACCESS_REG {
 	UINT_32 u4Data;
 } CMD_ACCESS_REG, *P_CMD_ACCESS_REG;
 
-#define COEX_CTRL_BUF_LEN 460
-#define COEX_INFO_LEN 115
-
 /* CMD_COEX_CTRL & EVENT_COEX_CTRL */
 /************************************************/
 /*  UINT_32 u4SubCmd : Coex Ctrl Sub Command    */
@@ -1317,7 +1275,7 @@ typedef struct _CMD_ACCESS_REG {
 /************************************************/
 struct CMD_COEX_CTRL {
 	UINT_32 u4SubCmd;
-	UINT_8  aucBuffer[COEX_CTRL_BUF_LEN];
+	UINT_8  aucBuffer[64];
 };
 
 /* Sub Command Data Structure */
@@ -1334,18 +1292,9 @@ struct CMD_COEX_ISO_DETECT {
 	UINT_32 u4Isolation;
 };
 
-
-/************************************************/
-/*  PCHAR   pucCoexInfo : CoexInfoTag           */
-/************************************************/
-struct CMD_COEX_GET_INFO {
-	UINT_32   u4CoexInfo[COEX_INFO_LEN];
-};
-
 /* Use for Coex Ctrl Cmd */
 enum ENUM_COEX_CTRL_CMD {
 	ENUM_COEX_CTRL_ISO_DETECT = 1,
-	ENUM_COEX_CTRL_GET_INFO = 2,
 	ENUM_COEX_CTRL_NUM
 };
 
@@ -1548,14 +1497,7 @@ typedef struct _CMD_SW_DBG_CTRL_T {
 typedef struct _CMD_FW_LOG_2_HOST_CTRL_T {
 	UINT_8 ucFwLog2HostCtrl;
 	UINT_8 ucMcuDest;
-#if     CFG_SUPPORT_FW_DBG_LEVEL_CTRL
-	UINT_8 ucFwLogLevel;
-	UINT_8 ucReserve;
-#else
 	UINT_8 ucReserve[2];
-#endif
-	UINT_32 u4HostTimeSec;
-	UINT_32 u4HostTimeMSec;
 } CMD_FW_LOG_2_HOST_CTRL_T, *P_CMD_FW_LOG_2_HOST_CTRL_T;
 
 typedef struct _CMD_CHIP_CONFIG_T {
@@ -1581,12 +1523,6 @@ typedef struct _CMD_NIC_POWER_CTRL {
 	UINT_8 ucPowerMode;
 	UINT_8 aucReserved[3];
 } CMD_NIC_POWER_CTRL, *P_CMD_NIC_POWER_CTRL;
-
-/* CMD_ID_KEEP_FULL_PWR */
-struct CMD_KEEP_FULL_PWR_T {
-	UINT_8 ucEnable;
-	UINT_8 aucReserved[3];
-};
 
 /* CMD_ID_POWER_SAVE_MODE */
 typedef struct _CMD_PS_PROFILE_T {
@@ -2510,29 +2446,6 @@ typedef struct _CMD_TDLS_CH_SW_T {
 } CMD_TDLS_CH_SW_T, *P_CMD_TDLS_CH_SW_T;
 #endif
 
-#if CFG_SUPPORT_CSI
-enum CSI_EVENT_TLV_TAG {
-	CSI_EVENT_IS_CCK,
-	CSI_EVENT_CBW,
-	CSI_EVENT_RSSI,
-	CSI_EVENT_SNR,
-	CSI_EVENT_BAND,
-	CSI_EVENT_CSI_NUM,
-	CSI_EVENT_CSI_I_DATA,
-	CSI_EVENT_CSI_Q_DATA,
-	CSI_EVENT_DBW,
-	CSI_EVENT_CH_IDX,
-	CSI_EVENT_TA,
-	CSI_EVENT_EXTRA_INFO,
-	CSI_EVENT_RX_MODE,
-	CSI_EVENT_RSVD1,
-	CSI_EVENT_RSVD2,
-	CSI_EVENT_RSVD3,
-	CSI_EVENT_RSVD4,
-	CSI_EVENT_TLV_TAG_NUM,
-};
-#endif
-
 #if CFG_SUPPORT_ADVANCE_CONTROL
 /* command type */
 #define CMD_ADV_CONTROL_SET (1<<15)
@@ -2540,7 +2453,6 @@ enum CSI_EVENT_TLV_TAG {
 #define CMD_AFH_CONFIG_TYPE (0x2)
 #define CMD_BA_CONFIG_TYPE (0x3)
 #define CMD_GET_REPORT_TYPE (0x4)
-#define CMD_NOISE_HISTOGRAM_TYPE (0x5)
 
 /* for PtaConfig field */
 #define CMD_PTA_CONFIG_PTA_EN (1<<0)
@@ -2691,33 +2603,6 @@ typedef struct _CMD_ADV_CONFIG_HEADER {
 	UINT_16 u2Type;
 	UINT_16 u2Len;
 } CMD_ADV_CONFIG_HEADER_T, *P_CMD_ADV_CONFIG_HEADER_T;
-
-/* noise histogram related */
-enum _ENUM_NOISE_HISTOGRAM_ACTION_T {
-	CMD_NOISE_HISTOGRAM_ENABLE = 1,
-	CMD_NOISE_HISTOGRAM_DISABLE,
-	CMD_NOISE_HISTOGRAM_RESET,
-	CMD_NOISE_HISTOGRAM_GET
-};
-struct CMD_NOISE_HISTOGRAM_REPORT {
-	UINT_16 u2Type;
-	UINT_16 u2Len;
-	/* parameter */
-	UINT_8 ucAction;
-	UINT_8 reserved[3];
-	/* IPI_report */
-	UINT_32 u4IPI0;  /* Power <= -92 */
-	UINT_32 u4IPI1;  /* -92 < Power <= -89 */
-	UINT_32 u4IPI2;  /* -89 < Power <= -86 */
-	UINT_32 u4IPI3;  /* -86 < Power <= -83 */
-	UINT_32 u4IPI4;  /* -83 < Power <= -80 */
-	UINT_32 u4IPI5;  /* -80 < Power <= -75 */
-	UINT_32 u4IPI6;  /* -75 < Power <= -70 */
-	UINT_32 u4IPI7;  /* -70 < Power <= -65 */
-	UINT_32 u4IPI8;  /* -65 < Power <= -60 */
-	UINT_32 u4IPI9;  /* -60 < Power <= -55 */
-	UINT_32 u4IPI10; /* -55 < Power  */
-};
 #endif
 typedef struct _CMD_SET_DEVICE_MODE_T {
 	UINT_16 u2ChipID;
@@ -3107,14 +2992,6 @@ typedef struct _EVENT_MIB_INFO {
 } EVENT_MIB_INFO, *P_EVENT_MIB_INFO;
 #endif
 
-#if CFG_SUPPORT_LAST_SEC_MCS_INFO
-struct EVENT_TX_MCS_INFO {
-	UINT_16		au2TxRateCode[MCS_INFO_SAMPLE_CNT];
-	UINT_8		aucTxRatePer[MCS_INFO_SAMPLE_CNT];
-	UINT_8      aucReserved[2];
-};
-#endif
-
 /*#if (CFG_EEPROM_PAGE_ACCESS == 1)*/
 typedef struct _EVENT_ACCESS_EFUSE {
 
@@ -3155,63 +3032,6 @@ typedef struct _EVENT_UPDATE_COEX_PHYRATE_T {
 	UINT_32 au4PhyRateLimit[HW_BSSID_NUM+1];
 } EVENT_UPDATE_COEX_PHYRATE_T, *P_EVENT_UPDATE_COEX_PHYRATE_T;
 
-#if CFG_SUPPORT_CSI
-
-#define CSI_INFO_RSVD1 BIT(0)
-#define CSI_INFO_RSVD2 BIT(1)
-
-enum CSI_CONTROL_MODE_T {
-	CSI_CONTROL_MODE_STOP,
-	CSI_CONTROL_MODE_START,
-	CSI_CONTROL_MODE_SET,
-	CSI_CONTROL_MODE_NUM
-};
-
-enum CSI_CONFIG_ITEM_T {
-	CSI_CONFIG_RSVD1,
-	CSI_CONFIG_WF,
-	CSI_CONFIG_RSVD2,
-	CSI_CONFIG_FRAME_TYPE,
-	CSI_CONFIG_TX_PATH,
-	CSI_CONFIG_OUTPUT_FORMAT,
-	CSI_CONFIG_INFO,
-	CSI_CONFIG_ITEM_NUM
-};
-
-struct CMD_CSI_CONTROL_T {
-	UINT_8 ucMode;
-	UINT_8 ucCfgItem;
-	UINT_8 ucValue1;
-	UINT_8 ucValue2;
-};
-
-enum CSI_OUTPUT_FORMAT_T {
-	CSI_OUTPUT_RAW,
-	CSI_OUTPUT_TONE_MASKED,
-	CSI_OUTPUT_TONE_MASKED_SHIFTED,
-	CSI_OUTPUT_FORMAT_NUM
-};
-
-#endif
-
-
-struct CMD_GET_TXPWR_TBL {
-	UINT_8 ucDbdcIdx;
-	UINT_8 aucReserved[3];
-};
-
-struct EVENT_GET_TXPWR_TBL {
-	UINT_8 ucCenterCh;
-	UINT_8 aucReserved[3];
-	struct POWER_LIMIT tx_pwr_tbl[TXPWR_TBL_NUM];
-};
-
-struct TLV_ELEMENT {
-	UINT_32 tag_type;
-	UINT_32 body_len;
-	UINT_8 aucbody[0];
-};
-
 /*#endif*/
 
 /*******************************************************************************
@@ -3234,10 +3054,8 @@ struct TLV_ELEMENT {
 ********************************************************************************
 */
 VOID nicCmdEventQueryMcrRead(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prCmdInfo, IN PUINT_8 pucEventBuf);
-
 /* Nic cmd/event for Coex related */
 VOID nicCmdEventQueryCoexIso(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prCmdInfo, IN PUINT_8 pucEventBuf);
-VOID nicCmdEventQueryCoexGetInfo(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prCmdInfo, IN PUINT_8 pucEventBuf);
 
 #if CFG_SUPPORT_QA_TOOL
 VOID nicCmdEventQueryRxStatistics(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prCmdInfo, IN PUINT_8 pucEventBuf);
@@ -3349,19 +3167,11 @@ VOID nicCmdEventQueryWlanInfo(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prCmdInf
 
 VOID nicCmdEventQueryMibInfo(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prCmdInfo, IN PUINT_8 pucEventBuf);
 
-#if CFG_SUPPORT_LAST_SEC_MCS_INFO
-VOID nicCmdEventTxMcsInfo(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prCmdInfo, IN PUINT_8 pucEventBuf);
-#endif
-
 VOID nicCmdEventQueryNicCapabilityV2(IN P_ADAPTER_T prAdapter, IN PUINT_8 pucEventBuf);
 
 WLAN_STATUS nicCmdEventQueryNicTxResource(IN P_ADAPTER_T prAdapter, IN PUINT_8 pucEventBuf);
 
 WLAN_STATUS nicCmdEventQueryNicEfuseAddr(IN P_ADAPTER_T prAdapter, IN PUINT_8 pucEventBuf);
-
-WLAN_STATUS nicCmdEventQueryEfuseOffset(IN P_ADAPTER_T prAdapter, IN PUINT_8 pucEventBuf);
-
-WLAN_STATUS nicCmdEventQueryRModeCapability(IN P_ADAPTER_T prAdapter, IN PUINT_8 pucEventBuf);
 
 WLAN_STATUS nicCmdEventQueryNicCoexFeature(IN P_ADAPTER_T prAdapter, IN PUINT_8 pucEventBuf);
 
@@ -3379,9 +3189,6 @@ VOID nicEventBtOverWifi(IN P_ADAPTER_T prAdapter, IN P_WIFI_EVENT_T prEvent);
 VOID nicEventStatistics(IN P_ADAPTER_T prAdapter, IN P_WIFI_EVENT_T prEvent);
 VOID nicEventWlanInfo(IN P_ADAPTER_T prAdapter, IN P_WIFI_EVENT_T prEvent);
 VOID nicEventMibInfo(IN P_ADAPTER_T prAdapter, IN P_WIFI_EVENT_T prEvent);
-#if CFG_SUPPORT_LAST_SEC_MCS_INFO
-VOID nicEventTxMcsInfo(IN P_ADAPTER_T prAdapter, IN P_WIFI_EVENT_T prEvent);
-#endif
 VOID nicEventBeaconTimeout(IN P_ADAPTER_T prAdapter, IN P_WIFI_EVENT_T prEvent);
 VOID nicEventUpdateNoaParams(IN P_ADAPTER_T prAdapter, IN P_WIFI_EVENT_T prEvent);
 VOID nicEventStaAgingTimeout(IN P_ADAPTER_T prAdapter, IN P_WIFI_EVENT_T prEvent);
@@ -3406,19 +3213,6 @@ VOID nicEventUpdateCoexPhyrate(IN P_ADAPTER_T prAdapter, IN P_WIFI_EVENT_T prEve
 #if (CFG_WOW_SUPPORT == 1)
 VOID nicEventWakeUpReason(IN P_ADAPTER_T prAdapter, IN P_WIFI_EVENT_T prEvent);
 #endif
-VOID nicEventCSIData(IN P_ADAPTER_T prAdapter, IN P_WIFI_EVENT_T prEvent);
-
-#if CFG_SUPPORT_REPLAY_DETECTION
-VOID nicCmdEventSetAddKey(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prCmdInfo, IN PUINT_8 pucEventBuf);
-VOID nicOidCmdTimeoutSetAddKey(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prCmdInfo);
-
-VOID nicEventGetGtkDataSync(IN P_ADAPTER_T prAdapter, IN P_WIFI_EVENT_T prEvent);
-#endif
-
-VOID nicCmdEventGetTxPwrTbl(IN P_ADAPTER_T prAdapter,
-			    IN P_CMD_INFO_T prCmdInfo,
-			    IN PUINT_8 pucEventBuf);
-
 /*******************************************************************************
 *                              F U N C T I O N S
 ********************************************************************************

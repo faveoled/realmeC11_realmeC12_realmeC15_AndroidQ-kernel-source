@@ -214,12 +214,7 @@ struct SEC_INFO {
 
 /* Fragment information structure */
 struct FRAG_INFO {
-	uint16_t u2SeqNo;
-	uint8_t ucNextFragNo;
-#if CFG_SUPPORT_FRAG_AGG_ATTACK_DETECTION
-	uint8_t ucSecMode;
-	uint64_t u8NextPN;
-#endif /* CFG_SUPPORT_FRAG_AGG_ATTACK_DETECTION */
+	uint16_t u2NextFragSeqCtrl;
 	uint8_t *pucNextFragStart;
 	struct SW_RFB *pr1stFrag;
 
@@ -255,24 +250,6 @@ struct STA_PMF_CFG {
 	uint8_t ucSAQueryTimedOut;	/* retry more than 1000ms */
 	struct TIMER rSAQueryTimer;
 	uint16_t u2TransactionID;
-};
-#endif
-
-#if DSCP_SUPPORT
-struct _DSCP_EXCEPTION {
-	uint8_t dscp;
-	uint8_t userPriority;
-};
-
-struct _DSCP_RANGE {
-	uint8_t lDscp;
-	uint8_t hDscp;
-};
-
-struct _QOS_MAP_SET {
-	struct _DSCP_RANGE dscpRange[8];
-	uint8_t dscpExceptionNum;
-	struct _DSCP_EXCEPTION dscpException[1];
 };
 #endif
 
@@ -383,7 +360,6 @@ struct STA_RECORD {
 	 */
 	uint32_t u4VhtCapInfo;
 	uint16_t u2VhtRxMcsMap;
-	uint16_t u2VhtRxMcsMapAssoc;
 	uint16_t u2VhtRxHighestSupportedDataRate;
 	uint16_t u2VhtTxMcsMap;
 	uint16_t u2VhtTxHighestSupportedDataRate;
@@ -502,11 +478,6 @@ struct STA_RECORD {
 	uint16_t au2CachedSeqCtrl[TID_NUM + 1];
 
 	u_int8_t afgIsIgnoreAmsduDuplicate[TID_NUM + 1];
-
-#if CFG_SUPPORT_FRAG_AGG_ATTACK_DETECTION
-	uint16_t au2AmsduInvalidSN[TID_NUM + 1];
-	u_int8_t afgIsAmsduInvalid[TID_NUM + 1];
-#endif /* CFG_SUPPORT_FRAG_AGG_ATTACK_DETECTION */
 
 #if 0
 	/* RXM */
@@ -705,7 +676,7 @@ struct STA_RECORD {
 	struct STA_PMF_CFG rPmfCfg;
 #endif
 #if DSCP_SUPPORT
-	struct _QOS_MAP_SET *qosMapSet;
+	uint8_t  qosMapSet[64];
 #endif
 	u_int8_t fgSupportBTM; /* Indicates whether to support BTM */
 
@@ -894,7 +865,6 @@ struct CMD_PEER_ADD {
 
 	uint8_t aucPeerMac[6];
 	enum ENUM_STA_TYPE eStaType;
-	uint8_t ucBssIdx;
 };
 
 struct CMD_PEER_UPDATE_HT_CAP_MCS_INFO {
@@ -953,7 +923,6 @@ struct CMD_PEER_UPDATE {
 
 	u_int8_t fgIsSupHt;
 	enum ENUM_STA_TYPE eStaType;
-	uint8_t ucBssIdx;
 
 	/* TODO */
 	/* So far, TDLS only a few of the parameters, the rest will be added
@@ -989,14 +958,6 @@ struct CMD_PEER_UPDATE {
 };
 
 #endif
-
-#if CFG_DBG_MGT_BUF
-struct MEM_TRACK {
-	struct LINK_ENTRY rLinkEntry;
-	uint16_t u2CmdIdAndWhere;
-	uint8_t *pucFileAndLine;
-};
-#endif
 /*******************************************************************************
  *                            P U B L I C   D A T A
  *******************************************************************************
@@ -1011,8 +972,6 @@ struct MEM_TRACK {
  *                                 M A C R O S
  *******************************************************************************
  */
-#define STRL(x) #x
-#define STRLINE(x) STRL(x)
 
 #if CFG_DBG_MGT_BUF
 #define cnmMgtPktAlloc(_prAdapter, _u4Length) \
@@ -1020,16 +979,6 @@ struct MEM_TRACK {
 
 #define cnmMgtPktFree(_prAdapter, _prMsduInfo) \
 	cnmPktFreeWrapper((_prAdapter), (_prMsduInfo), (uint8_t *)__func__)
-
-#define cnmMemAlloc(_prAdapter, eRameType, u4Length) \
-	cnmMemAllocX(_prAdapter, eRameType, u4Length, \
-		__FILE__ ":" STRLINE(__LINE__))
-
-#define IS_FROM_BUF(_prAdapter, pucInfoBuffer) \
-	(((uint8_t *)(pucInfoBuffer) >= \
-		(uint8_t *)_prAdapter->rMgtBufInfo.pucBuf) && \
-	((uint8_t *)(pucInfoBuffer) < \
-		(uint8_t *)_prAdapter->rMgtBufInfo.pucBuf + MGT_BUFFER_SIZE))
 #else
 #define cnmMgtPktAlloc cnmPktAlloc
 #define cnmMgtPktFree cnmPktFree
@@ -1053,14 +1002,8 @@ void cnmPktFree(IN struct ADAPTER *prAdapter, IN struct MSDU_INFO *prMsduInfo);
 
 void cnmMemInit(IN struct ADAPTER *prAdapter);
 
-#if CFG_DBG_MGT_BUF
-void *cnmMemAllocX(IN struct ADAPTER *prAdapter,
-	IN enum ENUM_RAM_TYPE eRamType, IN uint32_t u4Length,
-	uint8_t *fileAndLine);
-#else
 void *cnmMemAlloc(IN struct ADAPTER *prAdapter, IN enum ENUM_RAM_TYPE eRamType,
 	IN uint32_t u4Length);
-#endif
 
 void cnmMemFree(IN struct ADAPTER *prAdapter, IN void *pvMemory);
 

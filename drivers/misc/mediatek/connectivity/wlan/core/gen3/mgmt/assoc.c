@@ -55,8 +55,17 @@ APPEND_VAR_IE_ENTRY_T txAssocReqIETable[] = {
 
 	{(ELEM_HDR_LEN + ELEM_MAX_LEN_HT_CAP), NULL, rlmReqGenerateHtCapIE}
 	,			/* 45 */
+#if CFG_SUPPORT_WPS2
+	{(ELEM_HDR_LEN + ELEM_MAX_LEN_WSC), NULL, rsnGenerateWSCIE}
+	,			/* 221 */
+#endif
 	{(ELEM_HDR_LEN + 1), NULL, assocGenerateMDIE}, /* Element ID: 54 */
 	{0, rsnCalculateFTIELen, rsnGenerateFTIE}, /* Element ID: 55 */
+
+#if CFG_SUPPORT_WAPI
+	{(ELEM_HDR_LEN + ELEM_MAX_LEN_WAPI), NULL, wapiGenerateWAPIIE}
+	,			/* 68 */
+#endif
 #if CFG_SUPPORT_802_11K
 	{(ELEM_HDR_LEN + 5), NULL, rlmGenerateRRMEnabledCapIE}, /* Element ID: 70 */
 #endif
@@ -196,15 +205,15 @@ UINT_16 assocBuildCapabilityInfo(IN P_ADAPTER_T prAdapter, IN P_STA_RECORD_T prS
 #if CFG_SUPPORT_SPEC_MGMT	/*Add by Enlai */
 		/* Support 802.11h */
 		if (prStaRec->u2CapInfo & CAP_INFO_SPEC_MGT) {
-		/*
-		*1.	The Power Capability element shall be present if
-		*	dot11SpectrumManagementRequired is true.
-		*
-		*2.	A STA shall set dot11SpectrumManagementRequired to TRUE before
-		*	associating with a BSS or IBSS in which the Spectrum Management
-		*	bit is set to 1 in the Capability Information field in Beacon frames
-		*	and Probe Response frames received from the BSS or IBSS.
-		*/
+			/*
+			 * 1.	The Power Capability element shall be present if
+			 * dot11SpectrumManagementRequired is true.
+			 *
+			 *	2.	 A STA shall set dot11SpectrumManagementRequired to TRUE before
+			 *	associating with a BSS or IBSS in which the Spectrum Management
+			 *	bit is set to 1 in the Capability Information field in Beacon frames
+			 *	and Probe Response frames received from the BSS or IBSS.
+			 */
 			if (prAdapter->fgEnable5GBand == TRUE)
 				u2CapInfo |= CAP_INFO_SPEC_MGT;
 		}
@@ -216,7 +225,7 @@ UINT_16 assocBuildCapabilityInfo(IN P_ADAPTER_T prAdapter, IN P_STA_RECORD_T prS
 		}
 	}
 
-	DBGLOG(SAA, LOUD, "ASSOC REQ: Compose Capability = 0x%04x for Target BSS [" MACSTR "].\n",
+	DBGLOG(SAA, INFO, "ASSOC REQ: Compose Capability = 0x%04x for Target BSS [" MACSTR "].\n",
 			   u2CapInfo, MAC2STR(prStaRec->aucMacAddr));
 
 	return u2CapInfo;
@@ -351,11 +360,6 @@ __KAL_INLINE__ VOID assocBuildReAssocReqFrameCommonIEs(IN P_ADAPTER_T prAdapter,
 			prMsduInfo->u2FrameLength += IE_SIZE(pucBuffer);
 			pucBuffer += IE_SIZE(pucBuffer);
 		}
-	}
-	if (IS_STA_IN_AIS(prStaRec) && prConnSettings->assocIeLen != 0) {
-		kalMemCopy(pucBuffer, prConnSettings->pucAssocIEs, prConnSettings->assocIeLen);
-		prMsduInfo->u2FrameLength += prConnSettings->assocIeLen;
-		pucBuffer += prConnSettings->assocIeLen;
 	}
 
 }				/* end of assocBuildReAssocReqFrameCommonIEs() */
@@ -539,8 +543,7 @@ WLAN_STATUS assocSendReAssocReqFrame(IN P_ADAPTER_T prAdapter, IN P_STA_RECORD_T
 	ASSERT(prStaRec->ucBssIndex <= MAX_BSS_INDEX);
 
 	u2EstimatedFrameLen += u2EstimatedExtraIELen;
-	if (IS_STA_IN_AIS(prStaRec))
-		u2EstimatedFrameLen += prAdapter->rWifiVar.rConnSettings.assocIeLen;
+
 	/* Allocate a MSDU_INFO_T */
 	prMsduInfo = cnmMgtPktAlloc(prAdapter, u2EstimatedFrameLen);
 	if (prMsduInfo == NULL) {
@@ -621,11 +624,6 @@ WLAN_STATUS assocSendReAssocReqFrame(IN P_ADAPTER_T prAdapter, IN P_STA_RECORD_T
 
 	/* 4 <6> Enqueue the frame to send this (Re)Association Request frame. */
 	DBGLOG(SAA, TRACE, "Send (Re)Assoc Req, SeqNo: %d\n", prMsduInfo->ucTxSeqNum);
-
-#if CFG_SUPPORT_MGMT_FRAME_DEBUG
-	wlanMgmtFrameDebugAdd(prMsduInfo->prPacket, prMsduInfo->u2FrameLength);
-#endif
-
 	nicTxEnqueueMsdu(prAdapter, prMsduInfo);
 
 	return WLAN_STATUS_SUCCESS;
@@ -781,10 +779,6 @@ assocCheckRxReAssocRspFrameStatus(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRf
 		}
 	}
 
-#if CFG_SUPPORT_MGMT_FRAME_DEBUG
-	wlanMgmtFrameDebugAdd(prSwRfb->pvHeader, prSwRfb->u2PacketLen);
-#endif
-
 	/* 4 <3> Parse the Fixed Fields of (Re)Association Resp Frame Body. */
 	/* WLAN_GET_FIELD_16(&prAssocRspFrame->u2CapInfo, &u2RxCapInfo); */
 	u2RxCapInfo = prAssocRspFrame->u2CapInfo;	/* NOTE(Kevin): Optimized for ARM */
@@ -819,8 +813,7 @@ assocCheckRxReAssocRspFrameStatus(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRf
 		 * OID_802_11_ASSOCIATION_INFORMATION.
 		 */
 		kalUpdateReAssocRspInfo(prAdapter->prGlueInfo,
-					(PUINT_8)&prAssocRspFrame->u2CapInfo,
-					(UINT_32) (prSwRfb->u2PacketLen));
+					(PUINT_8)&prAssocRspFrame->u2CapInfo, (UINT_32) (prSwRfb->u2PacketLen));
 
 		/* 4 <5> Update CAP_INFO and ASSOC_ID */
 		prStaRec->u2CapInfo = u2RxCapInfo;

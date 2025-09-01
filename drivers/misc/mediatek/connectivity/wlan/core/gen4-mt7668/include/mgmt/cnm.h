@@ -277,7 +277,6 @@ VOID cnmDbdcEnableDecision(
 VOID cnmDbdcDisableDecision(IN P_ADAPTER_T prAdapter,	IN UINT_8 ucChangedBssIndex);
 VOID cnmDbdcDecision(IN P_ADAPTER_T prAdapter, IN ULONG plParamPtr);
 #endif /*CFG_SUPPORT_DBDC*/
-VOID cnmCheckPendingTimer(IN P_ADAPTER_T prAdapter);
 
 /*******************************************************************************
 *                              F U N C T I O N S

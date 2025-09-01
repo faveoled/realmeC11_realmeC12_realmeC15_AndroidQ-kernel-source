@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -60,7 +58,6 @@
 #endif
 
 /* #define MTK_DMA_BUF_MEMCPY_SUP */ /* no virt_to_phys() use */
-
 /* #define HIF_DEBUG_SUP */
 /* #define HIF_DEBUG_SUP_TX */
 
@@ -264,8 +261,7 @@ VOID glUnregisterBus(remove_card pfRemove)
 {
 	ASSERT(pfRemove);
 
-	if (pfRemove)
-		pfRemove();
+	pfRemove();
 
 #if (CONF_HIF_DEV_MISC == 1)
 	HifAhbRemove();
@@ -295,12 +291,9 @@ VOID glResetHif(GLUE_INFO_T *GlueInfo)
 	GL_HIF_INFO_T *HifInfo;
 
 	ASSERT(GlueInfo);
-
-	if (GlueInfo) {
-		HifInfo = &GlueInfo->rHifInfo;
-		if (HifInfo->DmaOps)
-			HifInfo->DmaOps->DmaReset(HifInfo);
-	}
+	HifInfo = &GlueInfo->rHifInfo;
+	if (HifInfo->DmaOps)
+		HifInfo->DmaOps->DmaReset(HifInfo);
 }
 
 /*----------------------------------------------------------------------------*/
@@ -320,12 +313,6 @@ VOID glSetHifInfo(GLUE_INFO_T *GlueInfo, ULONG ulCookie)
 
 	/* Init HIF */
 	ASSERT(GlueInfo);
-
-	if (GlueInfo == NULL) {
-		DBGLOG(INIT, ERROR, "GlueInfo is NULL.");
-		return;
-	}
-
 	HifInfo = &GlueInfo->rHifInfo;
 #if (CONF_HIF_DEV_MISC == 1)
 	HifInfo->Dev = MtkAhbDriver.this_device;
@@ -718,12 +705,6 @@ BOOLEAN kalDevRegRead(IN GLUE_INFO_T *GlueInfo, IN UINT_32 RegOffset, OUT UINT_3
 	/* sanity check and init */
 	ASSERT(GlueInfo);
 	ASSERT(pu4Value);
-
-	if (GlueInfo == NULL || pu4Value == NULL) {
-		DBGLOG(HAL, ERROR, "Passing NULL pointer.");
-		return FALSE;
-	}
-
 	HifInfo = &GlueInfo->rHifInfo;
 
 	/* use PIO mode to read register */
@@ -756,13 +737,6 @@ BOOLEAN kalDevRegWrite(IN GLUE_INFO_T *GlueInfo, IN UINT_32 RegOffset, IN UINT_3
 
 	/* sanity check and init */
 	ASSERT(GlueInfo);
-
-	if (GlueInfo == NULL) {
-		DBGLOG(INIT, ERROR, "GlueInfo is NULL.");
-		return FALSE;
-	}
-
-
 	HifInfo = &GlueInfo->rHifInfo;
 
 	/* use PIO mode to write register */
@@ -852,9 +826,9 @@ kalDevPortRead(IN P_GLUE_INFO_T GlueInfo, IN UINT_16 Port, IN UINT_32 Size, OUT 
 		/* TODO: use virt_to_phys() */
 		if (DmaConf.Dst == NULL) {
 			HIF_DBG(("[WiFi/HIF] Use Dma Buffer to RX packet (%d %d)...\n", Size, CFG_RX_MAX_PKT_SIZE));
-			/* ASSERT(Size <= CFG_RX_MAX_PKT_SIZE); */
+			ASSERT(Size <= CFG_RX_MAX_PKT_SIZE);
 
-			kalDmaBufGet(HifInfo->Dev, &DmaVBuf, &DmaPBuf);
+			kalDmaBufGet(&DmaVBuf, &DmaPBuf);
 			DmaConf.Dst = (ULONG) DmaPBuf;
 		}
 #else
@@ -990,17 +964,14 @@ kalDevPortRead(IN P_GLUE_INFO_T GlueInfo, IN UINT_16 Port, IN UINT_32 Size, OUT 
 			MaxLoop++;
 		LoopBuf = (UINT_32 *) Buf;
 
-		if (LoopBuf != NULL) {
-			for (IdLoop = 0;
-				IdLoop < MaxLoop; IdLoop++) {
+		for (IdLoop = 0; IdLoop < MaxLoop; IdLoop++) {
 
-				*LoopBuf = HIF_REG_READL(HifInfo, Port);
-				LoopBuf++;
-			}
-
-			if ((RegWHLPCR & WHLPCR_INT_EN_SET) == 1)
-				HIF_REG_WRITEL(HifInfo, MCR_WHLPCR, WHLPCR_INT_EN_SET);
+			*LoopBuf = HIF_REG_READL(HifInfo, Port);
+			LoopBuf++;
 		}
+
+		if ((RegWHLPCR & WHLPCR_INT_EN_SET) == 1)
+			HIF_REG_WRITEL(HifInfo, MCR_WHLPCR, WHLPCR_INT_EN_SET);
 	}
 
 	return TRUE;
@@ -1087,9 +1058,9 @@ kalDevPortWrite(IN P_GLUE_INFO_T GlueInfo, IN UINT_16 Port, IN UINT_32 Size, IN 
 		/* TODO: use virt_to_phys() */
 		if (DmaConf.Src == NULL) {
 			HIF_DBG_TX(("[WiFi/HIF] Use Dma Buffer to TX packet (%d %d)...\n", Size, CFG_RX_MAX_PKT_SIZE));
-			/* ASSERT(Size <= CFG_RX_MAX_PKT_SIZE); */
+			ASSERT(Size <= CFG_RX_MAX_PKT_SIZE);
 
-			kalDmaBufGet(HifInfo->Dev, &DmaVBuf, &DmaPBuf);
+			kalDmaBufGet(&DmaVBuf, &DmaPBuf);
 			DmaConf.Src = (ULONG) DmaPBuf;
 
 			kalMemCopy(DmaVBuf, Buf, Size);
@@ -1205,24 +1176,21 @@ kalDevPortWrite(IN P_GLUE_INFO_T GlueInfo, IN UINT_16 Port, IN UINT_32 Size, IN 
 		MaxLoop = Size >> 2;
 		LoopBuf = (UINT_32 *) Buf;
 
-		if (LoopBuf != NULL) {
-			HIF_DBG_TX(("[WiFi/HIF/PIO] Prepare to send data (%d 0x%p-0x%p)...\n",
-				Size, LoopBuf, (((UINT8 *) LoopBuf) + (Size & (~0x03)))));
+		HIF_DBG_TX(("[WiFi/HIF/PIO] Prepare to send data (%d 0x%p-0x%p)...\n",
+			    Size, LoopBuf, (((UINT8 *) LoopBuf) + (Size & (~0x03)))));
 
-			if (Size & 0x3)
-				MaxLoop++;
+		if (Size & 0x3)
+			MaxLoop++;
 
-			for (IdLoop = 0;
-				IdLoop < MaxLoop; IdLoop++) {
-				HIF_REG_WRITEL(HifInfo, Port, *LoopBuf);
-				LoopBuf++;
-			}
-
-			if ((RegWHLPCR & WHLPCR_INT_EN_SET) == 1)
-				HIF_REG_WRITEL(HifInfo, MCR_WHLPCR, WHLPCR_INT_EN_SET);
-
-			HIF_DBG_TX(("\n\n"));
+		for (IdLoop = 0; IdLoop < MaxLoop; IdLoop++) {
+			HIF_REG_WRITEL(HifInfo, Port, *LoopBuf);
+			LoopBuf++;
 		}
+
+		if ((RegWHLPCR & WHLPCR_INT_EN_SET) == 1)
+			HIF_REG_WRITEL(HifInfo, MCR_WHLPCR, WHLPCR_INT_EN_SET);
+
+		HIF_DBG_TX(("\n\n"));
 	}
 
 	return TRUE;
@@ -1252,10 +1220,6 @@ static irqreturn_t HifAhbISR(IN int Irq, IN void *Arg)
 	/* Init */
 	IsrCnt++;
 	ASSERT(prNetDevice);
-
-	if (!prNetDevice)
-		return IRQ_HANDLED;
-
 	GlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDevice));
 	ASSERT(GlueInfo);
 
@@ -1497,12 +1461,6 @@ static UINT_32 HifAhbDmaEnhanceModeConf(GLUE_INFO_T *GlueInfo, UINT_32 BurstLen,
 	UINT_32 RegHSTCR;
 
 	ASSERT(GlueInfo);
-
-	if (GlueInfo == NULL) {
-		DBGLOG(INIT, ERROR, "GlueInfo is NULL.");
-		return 0;
-	}
-
 	HifInfo = &GlueInfo->rHifInfo;
 
 	RegHSTCR = HIF_REG_READL(HifInfo, MCR_WHIER);
@@ -1580,7 +1538,6 @@ static int HifAhbPltmProbe(IN struct platform_device *PDev)
 	{
 		MTK_WCN_WMT_WLAN_CB_INFO WmtCb;
 
-		kalMemZero(&WmtCb, sizeof(MTK_WCN_WMT_WLAN_CB_INFO));
 		WmtCb.wlan_probe_cb = HifAhbProbe;
 		WmtCb.wlan_remove_cb = HifAhbRemove;
 		WmtCb.wlan_bus_cnt_get_cb = HifAhbBusCntGet;

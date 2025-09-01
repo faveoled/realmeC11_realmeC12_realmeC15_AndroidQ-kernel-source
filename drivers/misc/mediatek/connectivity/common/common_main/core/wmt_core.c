@@ -161,8 +161,6 @@ static INT32 opfunc_try_pwr_off(P_WMT_OP pWmtOp);
 static INT32 opfunc_gps_mcu_ctrl(P_WMT_OP pWmtOp);
 static INT32 opfunc_blank_status_ctrl(P_WMT_OP pWmtOp);
 static INT32 opfunc_met_ctrl(P_WMT_OP pWmtOp);
-static INT32 opfunc_gps_suspend(P_WMT_OP pWmtOp);
-static INT32 opfunc_resume_dump_info(P_WMT_OP pWmtOp);
 
 /*******************************************************************************
 *                            P U B L I C   D A T A
@@ -283,7 +281,7 @@ static UINT8 WMT_FW_LOG_CTRL_CMD[] = { 0x01, 0xF0, 0x04, 0x00, 0x01
 	, 0x00 /* on/off */
 	, 0x00 /* level (subsys-specific) */
 };
-static UINT8 WMT_FW_LOG_CTRL_EVT[] = { 0x02, 0xF0, 0x02, 0x00, 0x01, 0x00 };
+static UINT8 WMT_FW_LOG_CTRL_EVT[] = { 0x02, 0xF0, 0x01, 0x00, 0x01 };
 
 /* GeorgeKuo: Use designated initializers described in
  * http://gcc.gnu.org/onlinedocs/gcc-4.0.4/gcc/Designated-Inits.html
@@ -330,8 +328,6 @@ static const WMT_OPID_FUNC wmt_core_opfunc[] = {
 	[WMT_OPID_TRY_PWR_OFF] = opfunc_try_pwr_off,
 	[WMT_OPID_BLANK_STATUS_CTRL] = opfunc_blank_status_ctrl,
 	[WMT_OPID_MET_CTRL] = opfunc_met_ctrl,
-	[WMT_OPID_GPS_SUSPEND] = opfunc_gps_suspend,
-	[WMT_OPID_RESUME_DUMP_INFO] = opfunc_resume_dump_info,
 };
 
 atomic_t g_wifi_on_off_ready;
@@ -787,10 +783,6 @@ static INT32 wmt_core_stp_init(VOID)
 		WMT_ERR_FUNC("WMT-CORE: wmt_conf_get_cfg return NULL!!\n");
 	if (!(pctx->wmtInfoBit & WMT_OP_HIF_BIT)) {
 		WMT_ERR_FUNC("WMT-CORE: no hif info!\n");
-		/* turn off VCN33_2 */
-		ctrlPa1 = EFUSE_PALDO;
-		ctrlPa2 = PALDO_OFF;
-		iRet = wmt_core_ctrl(WMT_CTRL_SOC_PALDO_CTRL, &ctrlPa1, &ctrlPa2);
 		osal_assert(0);
 		return -1;
 	}
@@ -1078,10 +1070,6 @@ static INT32 wmt_core_hw_check(VOID)
 	case 0x6765:
 	case 0x3967:
 	case 0x6761:
-	case 0x6779:
-	case 0x6768:
-	case 0x6785:
-	case 0x8168:
 		p_ops = &wmt_ic_ops_soc;
 		break;
 #endif
@@ -1182,8 +1170,6 @@ pwr_on_rty:
 
 		/* deinit stp */
 		iRet = wmt_core_stp_deinit();
-		if (iRet)
-			WMT_ERR_FUNC("WMT-CORE: wmt_core_stp_deinit() failed.\n");
 		iRet = opfunc_pwr_off(pWmtOp);
 		if (iRet)
 			WMT_ERR_FUNC("WMT-CORE: opfunc_pwr_off fail during pwr_on retry\n");
@@ -1409,81 +1395,6 @@ static INT32 opfunc_func_off(P_WMT_OP pWmtOp)
 	/* check all sub-func and do power off */
 	opfunc_try_pwr_off(pWmtOp);
 	wmt_core_dump_func_state("AF FUNC OFF");
-	return iRet;
-}
-
-static INT32 opfunc_gps_suspend(P_WMT_OP pWmtOp)
-{
-	INT32 iRet = -1;
-	P_WMT_GEN_CONF pWmtGenConf = NULL;
-	MTK_WCN_BOOL suspend = (pWmtOp->au4OpData[0] != 0);
-
-	pWmtGenConf = wmt_conf_get_cfg();
-
-	if (gMtkWmtCtx.eDrvStatus[WMTDRV_TYPE_GPS] != DRV_STS_FUNC_ON) {
-		WMT_WARN_FUNC("WMT-CORE: GPS driver non-FUN_ON in opfunc_gps_suspend\n");
-		return 0;
-	}
-
-	if (MTK_WCN_BOOL_TRUE == suspend) {
-		if (osal_test_bit(WMT_GPS_SUSPEND, &gGpsFmState)) {
-			WMT_WARN_FUNC("WMT-CORE: gps already suspend\n");
-			return 0;
-		}
-	} else {
-		if (!osal_test_bit(WMT_GPS_SUSPEND, &gGpsFmState)) {
-			WMT_WARN_FUNC("WMT-CORE: gps already resume on\n");
-			return 0;
-		}
-	}
-
-	if (MTK_WCN_BOOL_TRUE == suspend) {
-		if (gpWmtFuncOps[WMTDRV_TYPE_GPS] && gpWmtFuncOps[WMTDRV_TYPE_GPS]->func_off) {
-			if (pWmtGenConf != NULL)
-				pWmtGenConf->wmt_gps_suspend_ctrl = 1;
-			iRet = (*(gpWmtFuncOps[WMTDRV_TYPE_GPS]->func_off)) (gMtkWmtCtx.p_ic_ops, wmt_conf_get_cfg());
-			if (pWmtGenConf != NULL)
-				pWmtGenConf->wmt_gps_suspend_ctrl = 0;
-		} else {
-			WMT_WARN_FUNC("WMT-CORE: gps suspend ops not found\n");
-			iRet = -3;
-		}
-	} else {
-		/*enable power off flag, if flag=0, power off connsys will not be executed */
-		mtk_wcn_set_connsys_power_off_flag(MTK_WCN_BOOL_TRUE);
-		/* check if chip power on is needed */
-		if (gMtkWmtCtx.eDrvStatus[WMTDRV_TYPE_WMT] != DRV_STS_FUNC_ON) {
-			iRet = opfunc_pwr_on(pWmtOp);
-			if (iRet) {
-				WMT_ERR_FUNC("WMT-CORE: func(WMTDRV_TYPE_GPS) hw resume fail(%d)\n", iRet);
-				osal_assert(0);
-
-				/* check all sub-func and do power off */
-				return -5;
-			}
-		}
-
-		if (gpWmtFuncOps[WMTDRV_TYPE_GPS] && gpWmtFuncOps[WMTDRV_TYPE_GPS]->func_on) {
-			if (pWmtGenConf != NULL)
-				pWmtGenConf->wmt_gps_suspend_ctrl = 1;
-			iRet = (*(gpWmtFuncOps[WMTDRV_TYPE_GPS]->func_on)) (gMtkWmtCtx.p_ic_ops, wmt_conf_get_cfg());
-			if (pWmtGenConf != NULL)
-				pWmtGenConf->wmt_gps_suspend_ctrl = 0;
-		} else {
-			WMT_WARN_FUNC("WMT-CORE: gps resume ops not found\n");
-			iRet = -7;
-		}
-	}
-
-	if (iRet) {
-		WMT_ERR_FUNC("WMT-CORE: gps %s function failed, ret(%d)\n",
-			((pWmtOp->au4OpData[0] != 0) ? "suspend" : "resume"), iRet);
-		osal_assert(0);
-	}
-
-	if (MTK_WCN_BOOL_FALSE == suspend)
-		opfunc_utc_time_sync(NULL);
-
 	return iRet;
 }
 
@@ -1911,7 +1822,7 @@ static INT32 opfunc_cmd_test(P_WMT_OP pWmtOp)
 		cmdNoPa = pWmtOp->au4OpData[1];
 		pRes = (PUINT8) pWmtOp->au4OpData[2];
 		resBufRoom = pWmtOp->au4OpData[3];
-		if (cmdNoPa <= 0xf) {
+		if ((cmdNoPa >= 0x0) && (cmdNoPa <= 0xf)) {
 			WMT_INFO_FUNC("Send Coexistence Debug command [0x%x]!\n", cmdNoPa);
 			tstCmdSz = osal_sizeof(WMT_COEXDBG_CMD);
 			osal_memcpy(tstCmd, WMT_COEXDBG_CMD, tstCmdSz);
@@ -1919,7 +1830,7 @@ static INT32 opfunc_cmd_test(P_WMT_OP pWmtOp)
 				tstCmd[5] = cmdNoPa;
 
 			/*setup the expected event length */
-			if (cmdNoPa <= 0x4) {
+			if (cmdNoPa >= 0x0 && cmdNoPa <= 0x4) {
 				tstEvtSz = osal_sizeof(WMT_COEXDBG_1_EVT);
 				osal_memcpy(tstEvt, WMT_COEXDBG_1_EVT, tstEvtSz);
 			} else if (cmdNoPa == 0x5) {
@@ -2000,8 +1911,8 @@ static INT32 opfunc_hw_rst(P_WMT_OP pWmtOp)
 {
 
 	INT32 iRet = -1;
-	ULONG ctrlPa1 = 0;
-	ULONG ctrlPa2 = 0;
+	ULONG ctrlPa1;
+	ULONG ctrlPa2;
 
 	wmt_core_dump_func_state("BE HW RST");
     /*-->Reset WMT  data structure*/
@@ -2616,7 +2527,7 @@ static INT32 wmt_core_set_mcu_clk(UINT32 kind)
 	UINT8 evt_buffer[12] = { 0 };
 	MTK_WCN_BOOL fgFail;
 
-	UINT8 WMT_SET_MCU_CLK_CMD[] = { 0x01, 0x0a, 0x04, 0x00, 0x09, 0x01, 0x00, 0x00 };
+	UINT8 WMT_SET_MCU_CLK_CMD[] = { 0x01, 0x0a, 0x04, 0x00, 0x09, 0x03, 0x00, 0x00 };
 	UINT8 WMT_SET_MCU_CLK_EVT[] = { 0x02, 0x0a, 0x01, 0x00, 0x00 };
 
 
@@ -3696,9 +3607,4 @@ static INT32 opfunc_met_ctrl(P_WMT_OP pWmtOp)
 	}
 
 	return 0;
-}
-
-static INT32 opfunc_resume_dump_info(P_WMT_OP pWmtOp)
-{
-	return mtk_consys_resume_dump_info();
 }

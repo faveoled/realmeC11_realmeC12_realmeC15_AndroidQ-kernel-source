@@ -121,7 +121,7 @@ VOID nicpmSetFWOwn(IN P_ADAPTER_T prAdapter, IN BOOLEAN fgEnableGlobalInt)
 		DBGLOG(NIC, INFO, "FW OWN fail\n");
 		return;
 	}
-	kalTakeVcoreAction(VCORE_RESTORE_DEF);
+
 	prAdapter->fgIsFwOwn = TRUE;
 	DBGLOG(NIC, TRACE, "FW OWN\n");
 }
@@ -265,7 +265,7 @@ BOOLEAN nicpmSetDriverOwn(IN P_ADAPTER_T prAdapter)
 		kalUsleep_range(LP_OWN_BACK_LOOP_DELAY_MIN_US, LP_OWN_BACK_LOOP_DELAY_MAX_US);
 		i++;
 	}
-	if (i > 10)
+	if (i > 3)
 		DBGLOG(NIC, INFO, "DRIVER OWN, status=%d count=%d\n", fgStatus, i);
 	else
 		DBGLOG(NIC, TRACE, "DRIVER OWN, status=%d count=%d\n", fgStatus, i);

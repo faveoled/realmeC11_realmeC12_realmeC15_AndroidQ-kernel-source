@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -138,7 +136,6 @@ static struct nla_policy nla_parse_wifi_policy[WIFI_ATTRIBUTE_ROAMING_STATE + 1]
 	[WIFI_ATTRIBUTE_ROAMING_STATE] = {.type = NLA_U32},
 };
 
-#if CFG_SUPPORT_GSCN
 static struct nla_policy nla_parse_gscan_policy[GSCAN_ATTRIBUTE_SIGNIFICANT_CHANGE_FLUSH + 1] = {
 	[GSCAN_ATTRIBUTE_NUM_BUCKETS] = {.type = NLA_U32},
 	[GSCAN_ATTRIBUTE_BASE_PERIOD] = {.type = NLA_U32},
@@ -163,7 +160,6 @@ static struct nla_policy nla_parse_gscan_policy[GSCAN_ATTRIBUTE_SIGNIFICANT_CHAN
 	[GSCAN_ATTRIBUTE_HOTLIST_FLUSH] = {.type = NLA_U8},
 	[GSCAN_ATTRIBUTE_SIGNIFICANT_CHANGE_FLUSH] = {.type = NLA_U8},
 };
-#endif
 
 static struct nla_policy nla_parse_offloading_policy[MKEEP_ALIVE_ATTRIBUTE_PERIOD_MSEC + 1] = {
 	[MKEEP_ALIVE_ATTRIBUTE_ID] = {.type = NLA_U8},
@@ -172,17 +168,6 @@ static struct nla_policy nla_parse_offloading_policy[MKEEP_ALIVE_ATTRIBUTE_PERIO
 	[MKEEP_ALIVE_ATTRIBUTE_SRC_MAC_ADDR] = {.type = NLA_UNSPEC},
 	[MKEEP_ALIVE_ATTRIBUTE_DST_MAC_ADDR] = {.type = NLA_UNSPEC},
 	[MKEEP_ALIVE_ATTRIBUTE_PERIOD_MSEC] = {.type = NLA_U32},
-};
-
-static const struct nla_policy nla_get_acs_policy[
-		WIFI_VENDOR_ATTR_ACS_MAX + 1] = {
-	[WIFI_VENDOR_ATTR_ACS_HW_MODE] = { .type = NLA_U8 },
-	[WIFI_VENDOR_ATTR_ACS_HT_ENABLED] = { .type = NLA_FLAG },
-	[WIFI_VENDOR_ATTR_ACS_HT40_ENABLED] = { .type = NLA_FLAG },
-	[WIFI_VENDOR_ATTR_ACS_VHT_ENABLED] = { .type = NLA_FLAG },
-	[WIFI_VENDOR_ATTR_ACS_CHWIDTH] = { .type = NLA_U16 },
-	[WIFI_VENDOR_ATTR_ACS_CH_LIST] = { .type = NLA_UNSPEC },
-	[WIFI_VENDOR_ATTR_ACS_FREQ_LIST] = { .type = NLA_UNSPEC },
 };
 
 /*******************************************************************************
@@ -368,8 +353,12 @@ int mtk_cfg80211_vendor_config_roaming(struct wiphy *wiphy,
 				 struct wireless_dev *wdev, const void *data, int data_len)
 {
 	P_GLUE_INFO_T prGlueInfo = NULL;
-	UINT_32 u4ResultLen = 0;
-	WLAN_STATUS rStatus;
+	struct nlattr *attrlist;
+	struct AIS_BLACKLIST_ITEM *prBlackList;
+	P_BSS_DESC_T prBssDesc = NULL;
+	UINT_32 len_shift = 0;
+	UINT_32 numOfList[2] = { 0 };
+	int i;
 
 	DBGLOG(REQ, INFO, "Receives roaming blacklist & whitelist with data_len=%d\n", data_len);
 	ASSERT(wiphy);
@@ -389,12 +378,38 @@ int mtk_cfg80211_vendor_config_roaming(struct wiphy *wiphy,
 		return WLAN_STATUS_SUCCESS;
 	}
 
-	rStatus = kalIoctl(prGlueInfo, wlanoidConfigRoaming, (PVOID)data, data_len,
-			   FALSE, FALSE, FALSE, FALSE, &u4ResultLen);
+	attrlist = (struct nlattr *)((UINT_8 *) data);
 
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(REQ, ERROR, "%s config roaming error:%x\n", __func__, rStatus);
-		return -EINVAL;
+	/* get the number of blacklist and copy those mac addresses from HAL */
+	if (attrlist->nla_type == WIFI_ATTRIBUTE_ROAMING_BLACKLIST_NUM) {
+		numOfList[0] = nla_get_u32(attrlist);
+		len_shift += NLA_ALIGN(attrlist->nla_len);
+	}
+	DBGLOG(REQ, INFO, "Get the number of blacklist=%d\n", numOfList[0]);
+
+	if (numOfList[0] >= 0 && numOfList[0] <= MAX_FW_ROAMING_BLACKLIST_SIZE) {
+		/*Refresh all the FWKBlacklist */
+		aisRefreshFWKBlacklist(prGlueInfo->prAdapter);
+
+		/* Start to receive blacklist mac addresses and set to FWK blacklist */
+		attrlist = (struct nlattr *)((UINT_8 *) data + len_shift);
+		for (i = 0; i < numOfList[0]; i++) {
+			if (attrlist->nla_type == WIFI_ATTRIBUTE_ROAMING_BLACKLIST_BSSID) {
+				prBssDesc = scanSearchBssDescByBssid(prGlueInfo->prAdapter, nla_data(attrlist));
+				len_shift += NLA_ALIGN(attrlist->nla_len);
+				attrlist = (struct nlattr *)((UINT_8 *) data + len_shift);
+
+				if (prBssDesc == NULL) {
+					DBGLOG(REQ, ERROR, "Cannot find the blacklist BSS=%pM\n", nla_data(attrlist));
+					continue;
+				}
+
+				prBlackList = aisAddBlacklist(prGlueInfo->prAdapter, prBssDesc);
+				prBlackList->fgIsInFWKBlacklist = TRUE;
+				DBGLOG(REQ, INFO, "Receives roaming blacklist SSID=%s addr=%pM\n",
+							prBlackList->aucSSID, prBlackList->aucBSSID);
+			}
+		}
 	}
 
 	return WLAN_STATUS_SUCCESS;
@@ -507,7 +522,7 @@ int mtk_cfg80211_vendor_set_config(struct wiphy *wiphy, struct wireless_dev *wde
 	kalMemZero(prWifiScanCmd, sizeof(PARAM_WIFI_GSCAN_CMD_PARAMS));
 	kalMemZero(attr, sizeof(struct nlattr *) * (GSCAN_ATTRIBUTE_BUCKET_MAX_PERIOD + 1));
 
-	NLA_PARSE_NESTED(attr, GSCAN_ATTRIBUTE_BUCKET_MAX_PERIOD, (struct nlattr *)(data - NLA_HDRLEN),
+	nla_parse_nested(attr, GSCAN_ATTRIBUTE_BUCKET_MAX_PERIOD, (struct nlattr *)(data - NLA_HDRLEN),
 			nla_parse_gscan_policy);
 	len_basic = 0;
 	for (k = GSCAN_ATTRIBUTE_NUM_BUCKETS; k <= GSCAN_ATTRIBUTE_BUCKET_MAX_PERIOD; k++) {
@@ -533,7 +548,7 @@ int mtk_cfg80211_vendor_set_config(struct wiphy *wiphy, struct wireless_dev *wde
 	DBGLOG(REQ, TRACE, "+++basic attribute size=%d pbucket=%p\r\n", len_basic, pbucket);
 
 	for (i = 0; i < prWifiScanCmd->num_buckets; i++) {
-		if (NLA_PARSE_NESTED(attr, GSCAN_ATTRIBUTE_BUCKET_MAX_PERIOD, (struct nlattr *)pbucket,
+		if (nla_parse_nested(attr, GSCAN_ATTRIBUTE_BUCKET_MAX_PERIOD, (struct nlattr *)pbucket,
 			nla_parse_gscan_policy) < 0)
 			goto nla_put_failure;
 		len_bucket = 0;
@@ -654,7 +669,7 @@ int mtk_cfg80211_vendor_set_scan_config(struct wiphy *wiphy, struct wireless_dev
 	kalMemZero(prWifiScanCmd, sizeof(PARAM_WIFI_GSCAN_CMD_PARAMS));
 	kalMemZero(attr, sizeof(struct nlattr *) * (GSCAN_ATTRIBUTE_NUM_SCANS_TO_CACHE + 1));
 
-	if (NLA_PARSE_NESTED(attr, GSCAN_ATTRIBUTE_NUM_SCANS_TO_CACHE,
+	if (nla_parse_nested(attr, GSCAN_ATTRIBUTE_NUM_SCANS_TO_CACHE,
 		(struct nlattr *)(data - NLA_HDRLEN), nla_parse_gscan_policy) < 0)
 		goto nla_put_failure;
 	for (k = GSCAN_ATTRIBUTE_NUM_AP_PER_SCAN; k <= GSCAN_ATTRIBUTE_NUM_SCANS_TO_CACHE; k++) {
@@ -727,7 +742,7 @@ int mtk_cfg80211_vendor_set_significant_change(struct wiphy *wiphy, struct wirel
 		goto nla_put_failure;
 	kalMemZero(attr, sizeof(struct nlattr *) * (GSCAN_ATTRIBUTE_SIGNIFICANT_CHANGE_FLUSH + 1));
 
-	if (NLA_PARSE_NESTED(attr, GSCAN_ATTRIBUTE_SIGNIFICANT_CHANGE_FLUSH,
+	if (nla_parse_nested(attr, GSCAN_ATTRIBUTE_SIGNIFICANT_CHANGE_FLUSH,
 		(struct nlattr *)(data - NLA_HDRLEN), nla_parse_gscan_policy) < 0)
 		goto nla_put_failure;
 	len_basic = 0;
@@ -766,7 +781,7 @@ int mtk_cfg80211_vendor_set_significant_change(struct wiphy *wiphy, struct wirel
 		paplist = (struct nlattr *)((UINT_8 *) paplist + NLA_HDRLEN);
 
 	for (i = 0; i < prWifiChangeCmd->num_ap; i++) {
-		if (NLA_PARSE_NESTED(attr, GSCAN_ATTRIBUTE_RSSI_HIGH, (struct nlattr *)paplist,
+		if (nla_parse_nested(attr, GSCAN_ATTRIBUTE_RSSI_HIGH, (struct nlattr *)paplist,
 				nla_parse_gscan_policy) < 0)
 			goto nla_put_failure;
 		paplist = (struct nlattr *)((UINT_8 *) paplist + NLA_HDRLEN);
@@ -850,7 +865,7 @@ int mtk_cfg80211_vendor_set_hotlist(struct wiphy *wiphy, struct wireless_dev *wd
 		goto nla_put_failure;
 	kalMemZero(attr, sizeof(struct nlattr *) * (GSCAN_ATTRIBUTE_SIGNIFICANT_CHANGE_FLUSH + 1));
 
-	if (NLA_PARSE_NESTED(attr, GSCAN_ATTRIBUTE_NUM_AP, (struct nlattr *)(data - NLA_HDRLEN),
+	if (nla_parse_nested(attr, GSCAN_ATTRIBUTE_NUM_AP, (struct nlattr *)(data - NLA_HDRLEN),
 				nla_parse_gscan_policy) < 0)
 		goto nla_put_failure;
 	len_basic = 0;
@@ -881,7 +896,7 @@ int mtk_cfg80211_vendor_set_hotlist(struct wiphy *wiphy, struct wireless_dev *wd
 		paplist = (struct nlattr *)((UINT_8 *) paplist + NLA_HDRLEN);
 
 	for (i = 0; i < prWifiHotlistCmd->num_ap; i++) {
-		if (NLA_PARSE_NESTED(attr, GSCAN_ATTRIBUTE_RSSI_HIGH, (struct nlattr *)paplist,
+		if (nla_parse_nested(attr, GSCAN_ATTRIBUTE_RSSI_HIGH, (struct nlattr *)paplist,
 				nla_parse_gscan_policy) < 0)
 			goto nla_put_failure;
 		paplist = (struct nlattr *)((UINT_8 *) paplist + NLA_HDRLEN);
@@ -1297,7 +1312,7 @@ int mtk_cfg80211_vendor_set_rssi_monitoring(struct wiphy *wiphy, struct wireless
 		goto nla_put_failure;
 	kalMemZero(attr, sizeof(struct nlattr *) * (WIFI_ATTRIBUTE_RSSI_MONITOR_START + 1));
 
-	if (NLA_PARSE_NESTED(attr, WIFI_ATTRIBUTE_RSSI_MONITOR_START,
+	if (nla_parse_nested(attr, WIFI_ATTRIBUTE_RSSI_MONITOR_START,
 		(struct nlattr *)(data - NLA_HDRLEN), nla_parse_wifi_policy) < 0) {
 		DBGLOG(REQ, ERROR, "%s nla_parse_nested failed\n", __func__);
 		goto nla_put_failure;
@@ -1362,7 +1377,7 @@ int mtk_cfg80211_vendor_packet_keep_alive_start(struct wiphy *wiphy, struct wire
 	kalMemZero(attr, sizeof(struct nlattr *) * (MKEEP_ALIVE_ATTRIBUTE_PERIOD_MSEC + 1));
 
 	prPkt->enable = TRUE; /*start packet keep alive*/
-	if (NLA_PARSE_NESTED(attr, MKEEP_ALIVE_ATTRIBUTE_PERIOD_MSEC,
+	if (nla_parse_nested(attr, MKEEP_ALIVE_ATTRIBUTE_PERIOD_MSEC,
 		(struct nlattr *)(data - NLA_HDRLEN), nla_parse_offloading_policy) < 0) {
 		DBGLOG(REQ, ERROR, "%s nla_parse_nested failed\n", __func__);
 		goto nla_put_failure;
@@ -1998,232 +2013,3 @@ errHandleLabel:
 	kfree_skb(skb);
 	return -EFAULT;
 }
-
-int mtk_cfg80211_vendor_acs(struct wiphy *wiphy,
-		struct wireless_dev *wdev, const void *data, int data_len)
-{
-	P_GLUE_INFO_T prGlueInfo;
-	struct nlattr *tb[WIFI_VENDOR_ATTR_ACS_MAX + 1];
-	uint32_t rStatus = WLAN_STATUS_SUCCESS;
-	bool ht_enabled, ht40_enabled, vht_enabled;
-	uint8_t ch_width = 0;
-	enum P2P_VENDOR_ACS_HW_MODE hw_mode;
-	uint8_t *ch_list = NULL;
-	uint8_t ch_list_count = 0;
-	uint8_t i;
-	uint32_t msg_size;
-	struct MSG_P2P_ACS_REQUEST *prMsgAcsRequest;
-	P_RF_CHANNEL_INFO_T prRfChannelInfo;
-	struct sk_buff *reply_skb;
-
-	if (!wiphy || !wdev || !data || !data_len) {
-		DBGLOG(REQ, ERROR, "input data null.\n");
-		rStatus = -EINVAL;
-		goto exit;
-	}
-
-	if (wdev->iftype == NL80211_IFTYPE_AP)
-		prGlueInfo = *((P_GLUE_INFO_T *) wiphy_priv(wiphy));
-	else
-		prGlueInfo = (P_GLUE_INFO_T) wiphy_priv(wiphy);
-
-	if (!prGlueInfo) {
-		DBGLOG(REQ, ERROR, "get glue structure fail.\n");
-		rStatus = -EFAULT;
-		goto exit;
-	}
-
-	if (p2pFsmIsAcsProcessing(prGlueInfo->prAdapter)) {
-		DBGLOG(REQ, ERROR, "acs is already in processing.\n");
-		rStatus = -EBUSY;
-		goto exit;
-	}
-
-	if (NLA_PARSE(tb, WIFI_VENDOR_ATTR_ACS_MAX, data, data_len,
-			nla_get_acs_policy)) {
-		DBGLOG(REQ, ERROR, "parse acs attr fail.\n");
-		rStatus = -EINVAL;
-		goto exit;
-	}
-
-	if (!tb[WIFI_VENDOR_ATTR_ACS_HW_MODE]) {
-		DBGLOG(REQ, ERROR, "attr hw_mode failed.\n");
-		rStatus = -EINVAL;
-		goto exit;
-	}
-	hw_mode = nla_get_u8(tb[WIFI_VENDOR_ATTR_ACS_HW_MODE]);
-
-	if (tb[WIFI_VENDOR_ATTR_ACS_HT_ENABLED])
-		ht_enabled =
-			nla_get_flag(tb[WIFI_VENDOR_ATTR_ACS_HT_ENABLED]);
-	else
-		ht_enabled = 0;
-
-	if (tb[WIFI_VENDOR_ATTR_ACS_HT40_ENABLED])
-		ht40_enabled =
-			nla_get_flag(tb[WIFI_VENDOR_ATTR_ACS_HT40_ENABLED]);
-	else
-		ht40_enabled = 0;
-
-	if (tb[WIFI_VENDOR_ATTR_ACS_VHT_ENABLED])
-		vht_enabled =
-			nla_get_flag(tb[WIFI_VENDOR_ATTR_ACS_VHT_ENABLED]);
-	else
-		vht_enabled = 0;
-
-	if (tb[WIFI_VENDOR_ATTR_ACS_CHWIDTH])
-		ch_width = nla_get_u16(tb[WIFI_VENDOR_ATTR_ACS_CHWIDTH]);
-
-	if (tb[WIFI_VENDOR_ATTR_ACS_CH_LIST]) {
-		char *tmp = nla_data(tb[WIFI_VENDOR_ATTR_ACS_CH_LIST]);
-
-		ch_list_count = nla_len(tb[WIFI_VENDOR_ATTR_ACS_CH_LIST]);
-		if (ch_list_count) {
-			ch_list = kalMemAlloc(sizeof(uint8_t) * ch_list_count,
-					VIR_MEM_TYPE);
-			if (ch_list == NULL) {
-				DBGLOG(REQ, ERROR, "allocate ch_list fail.\n");
-				rStatus = -ENOMEM;
-				goto exit;
-			}
-
-			kalMemCopy(ch_list, tmp, ch_list_count);
-		}
-	} else if (tb[WIFI_VENDOR_ATTR_ACS_FREQ_LIST]) {
-		uint32_t *freq =
-			nla_data(tb[WIFI_VENDOR_ATTR_ACS_FREQ_LIST]);
-
-		ch_list_count = nla_len(tb[WIFI_VENDOR_ATTR_ACS_FREQ_LIST]) /
-				sizeof(uint32_t);
-		if (ch_list_count) {
-			ch_list = kalMemAlloc(sizeof(uint8_t) * ch_list_count,
-					VIR_MEM_TYPE);
-			if (ch_list == NULL) {
-				DBGLOG(REQ, ERROR, "allocate ch_list fail.\n");
-				rStatus = -ENOMEM;
-				goto exit;
-			}
-
-			for (i = 0; i < ch_list_count; i++)
-				ch_list[i] =
-					ieee80211_frequency_to_channel(freq[i]);
-		}
-	}
-
-	if (!ch_list_count) {
-		DBGLOG(REQ, ERROR, "channel list count can NOT be 0\n");
-		rStatus = -EINVAL;
-		goto exit;
-	}
-
-	msg_size = sizeof(struct MSG_P2P_ACS_REQUEST) +
-			(ch_list_count * sizeof(RF_CHANNEL_INFO_T));
-
-	prMsgAcsRequest = cnmMemAlloc(prGlueInfo->prAdapter,
-			RAM_TYPE_MSG, msg_size);
-
-	if (prMsgAcsRequest == NULL) {
-		DBGLOG(REQ, ERROR, "allocate msg acs req. fail.\n");
-		rStatus = -ENOMEM;
-		goto exit;
-	}
-
-	kalMemSet(prMsgAcsRequest, 0, msg_size);
-	prMsgAcsRequest->rMsgHdr.eMsgId = MID_MNY_P2P_ACS;
-	prMsgAcsRequest->fgIsHtEnable = ht_enabled;
-	prMsgAcsRequest->fgIsHt40Enable = ht40_enabled;
-	prMsgAcsRequest->fgIsVhtEnable = vht_enabled;
-	switch (ch_width) {
-	case 20:
-		prMsgAcsRequest->eChnlBw = MAX_BW_20MHZ;
-		break;
-	case 40:
-		prMsgAcsRequest->eChnlBw = MAX_BW_40MHZ;
-		break;
-	case 80:
-		prMsgAcsRequest->eChnlBw = MAX_BW_80MHZ;
-		break;
-	case 160:
-		prMsgAcsRequest->eChnlBw = MAX_BW_160MHZ;
-		break;
-	default:
-		DBGLOG(REQ, ERROR, "unsupport width: %d.\n", ch_width);
-		prMsgAcsRequest->eChnlBw = MAX_BW_UNKNOWN;
-		break;
-	}
-	prMsgAcsRequest->eHwMode = hw_mode;
-	prMsgAcsRequest->u4NumChannel = ch_list_count;
-
-	for (i = 0; i < ch_list_count; i++) {
-		/* Translate Freq from MHz to channel number. */
-		prRfChannelInfo =
-			&(prMsgAcsRequest->arChannelListInfo[i]);
-
-		prRfChannelInfo->ucChannelNum = ch_list[i];
-
-		if (prRfChannelInfo->ucChannelNum <= 14)
-			prRfChannelInfo->eBand = BAND_2G4;
-		else
-			prRfChannelInfo->eBand = BAND_5G;
-
-		/* Iteration. */
-		prRfChannelInfo++;
-	}
-
-	mboxSendMsg(prGlueInfo->prAdapter,
-			MBOX_ID_0,
-			(P_MSG_HDR_T) prMsgAcsRequest,
-			MSG_SEND_METHOD_BUF);
-
-exit:
-	if (ch_list)
-		kalMemFree(ch_list, VIR_MEM_TYPE,
-				sizeof(uint8_t) * ch_list_count);
-	if (rStatus == WLAN_STATUS_SUCCESS) {
-		reply_skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
-				NLMSG_HDRLEN);
-		if (reply_skb != NULL)
-			return cfg80211_vendor_cmd_reply(reply_skb);
-	}
-	return rStatus;
-}
-
-int mtk_cfg80211_vendor_get_features(struct wiphy *wiphy,
-		struct wireless_dev *wdev, const void *data, int data_len)
-{
-	struct sk_buff *reply_skb;
-	uint8_t feature_flags[(NUM_VENDOR_FEATURES + 7) / 8] = {0};
-	uint8_t i;
-
-	if (!wiphy || !wdev) {
-		DBGLOG(REQ, ERROR, "input data null.\n");
-		return -EINVAL;
-	}
-
-#if CFG_AUTO_CHANNEL_SEL_SUPPORT
-	feature_flags[(VENDOR_FEATURE_SUPPORT_HW_MODE_ANY / 8)] |=
-			(1 << (VENDOR_FEATURE_SUPPORT_HW_MODE_ANY % 8));
-#endif
-
-	for (i = 0; i < ((NUM_VENDOR_FEATURES + 7) / 8); i++) {
-		DBGLOG(REQ, INFO, "Dump feature flags[%d]=0x%x.\n", i,
-				feature_flags[i]);
-	}
-
-	reply_skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
-			sizeof(feature_flags) + NLMSG_HDRLEN);
-
-	if (!reply_skb)
-		goto nla_put_failure;
-
-	if (nla_put(reply_skb, WIFI_VENDOR_ATTR_FEATURE_FLAGS,
-			sizeof(feature_flags), feature_flags))
-		goto nla_put_failure;
-
-	return cfg80211_vendor_cmd_reply(reply_skb);
-
-nla_put_failure:
-	kfree_skb(reply_skb);
-	return -EINVAL;
-}
-

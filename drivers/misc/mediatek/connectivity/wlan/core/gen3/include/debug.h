@@ -304,7 +304,7 @@ enum DRV_STATUS_T {
 #define UNICODE_TEXT(_msg)  TEXT(_msg)
 #define ASSERT(_exp) \
 	do { \
-		if (!(_exp)) { \
+		if (!(_exp) && !fgIsBusAccessFailed) { \
 			TCHAR rUbuf[256]; \
 			kalBreakPoint(); \
 			_stprintf(rUbuf, TEXT("Assertion failed: %s:%d %s\n"), \
@@ -315,7 +315,7 @@ enum DRV_STATUS_T {
 
 #define ASSERT_REPORT(_exp, _fmt) \
 	do { \
-		if (!(_exp)) { \
+		if (!(_exp) && !fgIsBusAccessFailed) { \
 			TCHAR rUbuf[256]; \
 			kalBreakPoint(); \
 			_stprintf(rUbuf, TEXT("Assertion failed: %s:%d %s\n"), \
@@ -333,7 +333,7 @@ enum DRV_STATUS_T {
 
 #define ASSERT(_exp) \
 	do { \
-		if (!(_exp)) { \
+		if (!(_exp) && !fgIsBusAccessFailed) { \
 			LOG_FUNC("Assertion failed: %s:%d (%s)\n", __FILE__, __LINE__, #_exp); \
 			kalBreakPoint(); \
 		} \
@@ -341,7 +341,7 @@ enum DRV_STATUS_T {
 
 #define ASSERT_REPORT(_exp, _fmt) \
 	do { \
-		if (!(_exp)) { \
+		if (!(_exp) && !fgIsBusAccessFailed) { \
 			LOG_FUNC("Assertion failed: %s:%d (%s)\n", __FILE__, __LINE__, #_exp); \
 			LOG_FUNC(_fmt); \
 			kalBreakPoint(); \
@@ -352,7 +352,7 @@ enum DRV_STATUS_T {
 #define ASSERT_NOMEM()
 #define ASSERT(_exp) \
 	do { \
-		if (!(_exp)) { \
+		if (!(_exp) && !fgIsBusAccessFailed) { \
 			LOG_FUNC("Assertion failed: %s:%d (%s)\n", __FILE__, __LINE__, #_exp); \
 		} \
 	} while (0)
@@ -396,12 +396,6 @@ VOID wlanDbgSetLogLevelImpl(IN P_ADAPTER_T prAdapter, UINT_32 u4Version,
 VOID wlanDbgLevelSync(VOID);
 BOOLEAN wlanDbgGetGlobalLogLevel(UINT_32 u4Module, UINT_32 *pu4Level);
 BOOLEAN wlanDbgSetGlobalLogLevel(UINT_32 u4Module, UINT_32 u4Level);
-
-#if CFG_SUPPORT_MGMT_FRAME_DEBUG
-VOID wlanMgmtFrameDebugReset(VOID);
-VOID wlanMgmtFrameDebugAdd(IN PUINT_8 pucStartAddr, IN UINT_32 u4Length);
-VOID wlanMgmtFrameDebugDump(VOID);
-#endif
 
 VOID glNotifyDrvStatus(enum DRV_STATUS_T eDrvStatus, PVOID pvInfo);
 

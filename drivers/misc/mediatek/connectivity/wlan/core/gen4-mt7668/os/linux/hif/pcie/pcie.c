@@ -249,7 +249,15 @@ static int mtk_pci_suspend(struct pci_dev *pdev, pm_message_t state)
 		return -1;
 	}
 
-	wlanSuspendPmHandle(prGlueInfo);
+	/* 1) wifi cfg "Wow" is true, 2) wow is enable 3) WIfI connected => execute WOW flow */
+	if (prGlueInfo->prAdapter->rWifiVar.ucWow && prGlueInfo->prAdapter->rWowCtrl.fgWowEnable) {
+		if (kalGetMediaStateIndicated(prGlueInfo) == PARAM_MEDIA_STATE_CONNECTED) {
+			DBGLOG(HAL, EVENT, "enter WOW flow\n");
+			ACQUIRE_POWER_CONTROL_FROM_PM(prGlueInfo->prAdapter);
+			kalWowProcess(prGlueInfo, TRUE);
+		}
+		/* else: do nothing, and FW enter LMAC sleep */
+	}
 
 	if (prGlueInfo->prAdapter->fgIsFwOwn == FALSE)
 		RECLAIM_POWER_CONTROL_TO_PM(prGlueInfo->prAdapter, FALSE);
@@ -328,7 +336,10 @@ int mtk_pci_resume(struct pci_dev *pdev)
 
 	kalMsleep(5);
 
-	wlanResumePmHandle(prGlueInfo);
+	if (prGlueInfo->prAdapter->rWifiVar.ucWow) {
+		DBGLOG(HAL, EVENT, "leave WOW flow\n");
+		kalWowProcess(prGlueInfo, FALSE);
+	}
 
 	DBGLOG(HAL, STATE, "mtk_pci_resume done\n");
 

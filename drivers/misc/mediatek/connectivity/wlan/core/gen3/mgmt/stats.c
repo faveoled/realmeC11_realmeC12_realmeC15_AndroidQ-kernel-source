@@ -331,11 +331,6 @@ statsParsePktInfo(P_ADAPTER_T prAdapter, PUINT_8 pucPkt, struct sk_buff *skb, UI
 			/* the number of DHCP packets is seldom so we print log here */
 			PUINT_8 pucUdp = &pucEthBody[20];
 			PUINT_8 pucBootp = &pucUdp[8];
-#if CFG_SUPPORT_REPORT_MISC
-			P_BOOTP_PROTOCOL_T prBootp = NULL;
-			UINT_32 udpLength = 0;
-			UINT_32 i = 0;
-#endif
 			UINT_16 u2UdpDstPort;
 			UINT_16 u2UdpSrcPort;
 			UINT_32 u4TransID;
@@ -346,42 +341,9 @@ statsParsePktInfo(P_ADAPTER_T prAdapter, PUINT_8 pucPkt, struct sk_buff *skb, UI
 			u4TransID = pucBootp[4]<<24  | pucBootp[5]<<16 | pucBootp[6]<<8  | pucBootp[7];
 			switch (eventType) {
 			case EVENT_RX:
-				GLUE_SET_INDEPENDENT_PKT(skb, TRUE);
-				DBGLOG(RX, INFO, "<RX> DHCP: IPID 0x%02x, MsgType 0x%x, TransID 0x%04x\n",
+					GLUE_SET_INDEPENDENT_PKT(skb, TRUE);
+					DBGLOG(RX, INFO, "<RX> DHCP: IPID 0x%02x, MsgType 0x%x, TransID 0x%04x\n",
 								u2IpId, pucBootp[0], u4TransID);
-#if CFG_SUPPORT_REPORT_MISC
-				prBootp = (P_BOOTP_PROTOCOL_T)pucBootp;
-				udpLength = pucUdp[4] << 8 | pucUdp[5];
-				if (udpLength <= 248) {
-					DBGLOG(RX, INFO, "Length of DHCP less than 248!\n");
-					break;
-				}
-				while (i < (udpLength - 248) && i < (NORMAL_DHCP_UDP_LEN - 248)) {
-					/* option end */
-					if (prBootp->aucOptions[i + 4] == 255) {
-						DBGLOG(RX, WARN, "i:%d, udpLength:%d\n", i, udpLength);
-						break;
-					}
-					if (prBootp->aucOptions[i + 4] == 53 &&
-						prBootp->aucOptions[i + 6] == 5 &&
-						prAdapter->rReportMiscSet.eQueryNum == REPORT_DHCP_START) {
-						wlanSendSetQueryCmd(prAdapter,
-								    CMD_ID_GET_REPORT_MISC,
-								    FALSE,
-								    TRUE,
-								    FALSE,
-								    nicCmdEventReportMisc,
-								    NULL,
-								    0,
-								    NULL,
-								    NULL,
-								    0);
-						prAdapter->rReportMiscSet.eQueryNum = REPORT_DHCP_END;
-						break;
-					}
-					i += prBootp->aucOptions[i + 5] + 2;
-				}
-#endif
 				break;
 			case EVENT_TX:
 					DBGLOG(TX, INFO, "<TX> DHCP: IPID 0x%02x, MsgType 0x%x, TransID 0x%04x\n",
@@ -392,8 +354,7 @@ statsParsePktInfo(P_ADAPTER_T prAdapter, PUINT_8 pucPkt, struct sk_buff *skb, UI
 				UINT_16 u2TransId = (pucBootp[0] << 8) | pucBootp[1];
 
 				if (eventType == EVENT_RX) {
-					GLUE_SET_INDEPENDENT_PKT(skb, TRUE);
-					DBGLOG(RX, INFO,
+					DBGLOG(RX, TRACE,
 						"<RX> DNS: IPID 0x%02x, TransID 0x%04x\n", u2IpId, u2TransId);
 				}
 			}
@@ -404,112 +365,51 @@ statsParsePktInfo(P_ADAPTER_T prAdapter, PUINT_8 pucPkt, struct sk_buff *skb, UI
 	}
 	case ETH_P_IPV6:
 	{
-		UINT_8 ucIpv6Proto = pucEthBody[IPV6_HDR_PROTOCOL_OFFSET];
+		UINT_8 ucIpv6Proto = pucEthBody[IPV6_HDR_LEN]; /* IPv6 header without options */
 		UINT_8 ucIpVersion = (pucEthBody[0] & IPVH_VERSION_MASK) >> IPVH_VERSION_OFFSET;
 
 		if (ucIpVersion != IP_VERSION_6)
 			break;
-
 		switch (ucIpv6Proto) {
-		case 0x06:/*tcp*/
+		case 0x85:
 			switch (eventType) {
 			case EVENT_RX:
-				DBGLOG(RX, TRACE, "<RX><IPv6> tcp packet\n");
+				DBGLOG(RX, INFO, "<RX><IPv6> Router Solicitation\n");
 				break;
 			case EVENT_TX:
-				DBGLOG(TX, TRACE, "<TX><IPv6> tcp packet\n");
+				DBGLOG(TX, INFO, "<TX><IPv6> Router Solicitation\n");
 				break;
 			}
 			break;
-		case 0x11:/*UDP*/
+		case 0x86:
 			switch (eventType) {
 			case EVENT_RX:
-				{
-					UINT_16 ucIpv6UDPSrcPort = 0;
-
-					ucIpv6UDPSrcPort = pucEthBody[IPV6_HDR_LEN]; /* IPv6 header without options */
-					ucIpv6UDPSrcPort = ucIpv6UDPSrcPort << 8;
-					ucIpv6UDPSrcPort += pucEthBody[IPV6_HDR_LEN + 1];
-
-					switch (ucIpv6UDPSrcPort) {
-					case 53:/*dns port*/
-						DBGLOG(RX, TRACE, "<RX><IPv6> dns packet\n");
-						GLUE_SET_INDEPENDENT_PKT(skb, TRUE);
-						break;
-					case 547:/*dhcp*/
-					case 546:
-						DBGLOG(RX, INFO, "<RX><IPv6> dhcp packet\n");
-						GLUE_SET_INDEPENDENT_PKT(skb, TRUE);
-						break;
-					case 123:/*ntp port*/
-						DBGLOG(RX, INFO, "<RX><IPv6> ntp packet\n");
-						GLUE_SET_INDEPENDENT_PKT(skb, TRUE);
-						break;
-					default:
-						DBGLOG(RX, TRACE, "<RX><IPv6> other packet srtport=%u\n",
-							ucIpv6UDPSrcPort);
-						break;
-					}
-				}
+				DBGLOG(RX, INFO, "<RX><IPv6> Router Advertisement\n");
 				break;
 			case EVENT_TX:
-				DBGLOG(TX, INFO, "<TX><IPv6> UDP packet\n");
+				DBGLOG(TX, INFO, "<TX><IPv6> Router Advertisement\n");
 				break;
 			}
 			break;
-		case 0x00:/*IPv6  hop-by-hop*/
+		case ICMPV6_TYPE_NEIGHBOR_SOLICITATION:
 			switch (eventType) {
 			case EVENT_RX:
-				{
-					/*need chech detai pakcet type*/
-					/*130 mlti listener query*/
-					/*143 multi listener report v2*/
-					GLUE_SET_INDEPENDENT_PKT(skb, TRUE);
-
-					DBGLOG(RX, INFO, "<RX><IPv6> hop-by-hop packet\n");
-				}
+				DBGLOG_LIMITED(RX, INFO, "<RX><IPv6> Neighbor Solicitation\n");
 				break;
 			case EVENT_TX:
-				DBGLOG(TX, INFO, "<TX><IPv6> hop-by-hop packet\n");
+				DBGLOG_LIMITED(TX, INFO, "<TX><IPv6> Neighbor Solicitation\n");
 				break;
 			}
 			break;
-		case 0x3a:/*ipv6 ICMPV6*/
+		case ICMPV6_TYPE_NEIGHBOR_ADVERTISEMENT:
 			switch (eventType) {
 			case EVENT_RX:
-				{
-					UINT_8 ucICMPv6Type = 0;
-
-					ucICMPv6Type = pucEthBody[IPV6_HDR_LEN]; /* IPv6 header without options */
-					GLUE_SET_INDEPENDENT_PKT(skb, TRUE);
-
-					switch (ucICMPv6Type) {
-					case 0x85: /*ICMPV6_TYPE_ROUTER_SOLICITATION*/
-						DBGLOG_LIMITED(RX, INFO, "<RX><IPv6> ICMPV6 Router Solicitation\n");
-						break;
-					case 0x86: /*ICMPV6_TYPE_ROUTER_ADVERTISEMENT*/
-						DBGLOG_LIMITED(RX, INFO, "<RX><IPv6> ICMPV6 Router Advertisement\n");
-						break;
-					case 0x87: /*ICMPV6_TYPE_NEIGHBOR_SOLICITATION*/
-						DBGLOG_LIMITED(RX, INFO, "<RX><IPv6> ICMPV6 Neighbor Solicitation\n");
-						break;
-					case 0x88: /*ICMPV6_TYPE_NEIGHBOR_ADVERTISEMENT*/
-						DBGLOG_LIMITED(RX, INFO, "<RX><IPv6> ICMPV6 Neighbor Advertisement\n");
-						break;
-					default:
-						DBGLOG_LIMITED(RX, INFO, "<RX><IPv6> ICMPV6 type=%u\n", ucICMPv6Type);
-						break;
-					}
-				}
+				DBGLOG_LIMITED(RX, INFO, "<RX><IPv6> Neighbor Advertisement\n");
 				break;
 			case EVENT_TX:
-				DBGLOG(TX, INFO, "<TX><IPv6> ICMPV6 packet\n");
+				DBGLOG_LIMITED(TX, INFO, "<TX><IPv6> Neighbor Advertisement\n");
 				break;
 			}
-			break;
-		default:
-			if (eventType == EVENT_RX)
-				DBGLOG(RX, INFO, "<RX><IPv6> default protocol=%u\n", ucIpv6Proto);
 			break;
 		}
 		break;
@@ -519,9 +419,6 @@ statsParsePktInfo(P_ADAPTER_T prAdapter, PUINT_8 pucPkt, struct sk_buff *skb, UI
 		PUINT_8 pucEapol = pucEthBody;
 		UINT_8 ucEapolType = pucEapol[1];
 		UINT_8 ucAisBssIndex;
-#if CFG_SUPPORT_REPORT_MISC
-		UINT_16 u2KeyInfo = 0;
-#endif
 
 		switch (ucEapolType) {
 		case 0: /* eap packet */
@@ -560,24 +457,6 @@ statsParsePktInfo(P_ADAPTER_T prAdapter, PUINT_8 pucPkt, struct sk_buff *skb, UI
 			case EVENT_RX:
 				DBGLOG(RX, INFO, "<RX> EAPOL: key, KeyInfo 0x%04x\n",
 						*((PUINT_16)(&pucEapol[5])));
-#if CFG_SUPPORT_REPORT_MISC
-				WLAN_GET_FIELD_BE16(&pucEapol[5], &u2KeyInfo);
-				if ((u2KeyInfo & 0x388) == 0x88) { /* 1/4 key, init report */
-					if (prAdapter->rReportMiscSet.eQueryNum != REPORT_4WAYHS_START) {
-						wlanSendSetQueryCmd(prAdapter, CMD_ID_GET_REPORT_MISC,
-								    FALSE,
-								    TRUE,
-								    FALSE,
-								    nicCmdEventReportMisc,
-								    NULL,
-								    0,
-								    NULL,
-								    NULL,
-								    0);
-						prAdapter->rReportMiscSet.eQueryNum = REPORT_4WAYHS_START;
-					}
-				}
-#endif
 				break;
 			case EVENT_TX:
 				DBGLOG(TX, INFO, "<TX> EAPOL: key, KeyInfo 0x%04x\n",

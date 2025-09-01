@@ -43,7 +43,6 @@
 /* 3 --------------- Constants for Ethernet/802.11 MAC --------------- */
 /* MAC Address */
 #define MAC_ADDR_LEN                            6
-#define MAC_ADDR_NUM_STORE                      2
 #define MAC_OUI_LEN                             3
 
 #define MAC_ADDR_LOCAL_ADMIN                    BIT(1)
@@ -171,8 +170,6 @@
 #define LOOK_AHEAD_LEN                          (ETH_HLEN + IP_HEADER_LEN + SOURCE_PORT_LEN)
 
 #endif
-/* DHCP */
-#define NORMAL_DHCP_UDP_LEN             300
 
 /* Ethernet Frame Field Size, in byte */
 #define ETHER_HEADER_LEN                        14
@@ -525,7 +522,7 @@
 #define AUTH_ALGORITHM_NUM_OPEN_SYSTEM              0	/* Open System */
 #define AUTH_ALGORITHM_NUM_SHARED_KEY               1	/* Shared Key */
 #define AUTH_ALGORITHM_NUM_FAST_BSS_TRANSITION      2	/* Fast BSS Transition */
-#define AUTH_ALGORITHM_NUM_SAE                      3	/* WPA3 - SAE */
+
 /* 7.3.1.2 Authentication Transaction Sequence Number field */
 #define AUTH_TRANSACTION_SEQENCE_NUM_FIELD_LEN      2
 #define AUTH_TRANSACTION_SEQ_1                      1
@@ -2586,11 +2583,8 @@ typedef struct _WAPI_INFO_ELEM_T {
 	UCHAR ucElemId;
 	UCHAR ucLength;
 	UINT_16 u2Version;
-	UINT_16 u2AKMSuiteCount;
-	UINT_32 u4AKMSuite;
-	UINT_16 u2PairSuiteCount;
-	UINT_32 u4PairSuite;
-	UINT_32 u4GroupSuite;
+	UINT_16 u2AuthKeyMgtSuiteCount;
+	UCHAR aucAuthKeyMgtSuite1[4];
 } __KAL_ATTRIB_PACKED__ WAPI_INFO_ELEM_T, *P_WAPI_INFO_ELEM_T;
 
 /* Information Elements from MTK Synergies.*/

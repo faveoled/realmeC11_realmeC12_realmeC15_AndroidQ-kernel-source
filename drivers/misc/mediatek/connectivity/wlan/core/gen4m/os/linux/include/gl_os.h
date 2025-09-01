@@ -92,13 +92,8 @@
 
 #define CFG_TX_STOP_NETIF_QUEUE_THRESHOLD   256	/* packets */
 
-#ifdef CONNAC2X2
-#define CFG_TX_STOP_NETIF_PER_QUEUE_THRESHOLD   1024	/* packets */
-#define CFG_TX_START_NETIF_PER_QUEUE_THRESHOLD  512	/* packets */
-#else
 #define CFG_TX_STOP_NETIF_PER_QUEUE_THRESHOLD   256	/* packets */
 #define CFG_TX_START_NETIF_PER_QUEUE_THRESHOLD  128	/* packets */
-#endif
 
 #define CHIP_NAME    "MT6632"
 
@@ -277,11 +272,6 @@ extern void wifi_fwlog_event_func_register(wifi_fwlog_event_func_cb pfFwlog);
 extern void update_driver_loaded_status(uint8_t loaded);
 #endif
 
-#if defined(CONFIG_UCLAMP_TASK) && defined(CONFIG_UCLAMP_TASK_GROUP)
-/* uclamp control */
-extern int set_task_uclamp(pid_t pid, u32 min);
-#endif
-
 #ifdef CFG_MTK_ANDROID_WMT
 extern void mtk_wmt_set_ext_ldo(uint32_t flag);
 #endif
@@ -425,7 +415,6 @@ struct GL_IO_REQ {
 	uint32_t *pu4QryInfoLen;
 	uint32_t rStatus;
 	uint32_t u4Flag;
-	uint8_t ucBssIndex;
 };
 
 #if CFG_ENABLE_BT_OVER_WIFI
@@ -468,21 +457,7 @@ struct GL_SCAN_CACHE_INFO {
 
 	/* Scan period time */
 	OS_SYSTIME u4LastScanTime;
-
-	/* Bss index */
-	uint8_t ucBssIndex;
 };
-#endif /* CFG_SUPPORT_SCAN_CACHE_RESULT */
-
-#if CFG_SUPPORT_PERF_IND
-	struct GL_PERF_IND_INFO {
-		uint32_t u4CurTxBytes[BSSID_NUM]; /* Byte */
-		uint32_t u4CurRxBytes[BSSID_NUM]; /* Byte */
-		uint16_t u2CurRxRate[BSSID_NUM]; /* Unit 500 Kbps */
-		uint8_t ucCurRxRCPI0[BSSID_NUM];
-		uint8_t ucCurRxRCPI1[BSSID_NUM];
-		uint8_t ucCurRxNss[BSSID_NUM];
-	};
 #endif /* CFG_SUPPORT_SCAN_CACHE_RESULT */
 
 struct FT_IES {
@@ -510,7 +485,6 @@ struct GLUE_INFO {
 
 	/* Device Index(index of arWlanDevInfo[]) */
 	int32_t i4DevIdx;
-	struct napi_struct napi[MAX_BSSID_NUM];
 
 	/* Device statistics */
 	/* struct net_device_stats rNetDevStats; */
@@ -568,9 +542,9 @@ struct GLUE_INFO {
 	struct GL_HIF_INFO rHifInfo;
 
 	/*! \brief wext wpa related information */
-	struct GL_WPA_INFO rWpaInfo[KAL_AIS_NUM];
+	struct GL_WPA_INFO rWpaInfo;
 #if CFG_SUPPORT_REPLAY_DETECTION
-	struct GL_DETECT_REPLAY_INFO prDetRplyInfo[KAL_AIS_NUM];
+	struct GL_DETECT_REPLAY_INFO prDetRplyInfo;
 #endif
 
 	/* Pointer to ADAPTER_T - main data structure of internal protocol
@@ -583,8 +557,7 @@ struct GLUE_INFO {
 #endif				/* WLAN_INCLUDE_PROC */
 
 	/* Indicated media state */
-	enum ENUM_PARAM_MEDIA_STATE
-		eParamMediaStateIndicated[KAL_AIS_NUM];
+	enum ENUM_PARAM_MEDIA_STATE eParamMediaStateIndicated;
 
 	/* Device power state D0~D3 */
 	enum PARAM_DEVICE_POWER_STATE ePowerState;
@@ -647,6 +620,12 @@ struct GLUE_INFO {
 	uint32_t u4ExtCfgLength;	/* 0 means data is NOT valid */
 #endif
 
+#if 1				/* CFG_SUPPORT_WAPI */
+	/* Should be large than the PARAM_WAPI_ASSOC_INFO_T */
+	uint8_t aucWapiAssocInfoIEs[42];
+	uint16_t u2WapiAssocInfoIESz;
+#endif
+
 #if CFG_ENABLE_BT_OVER_WIFI
 	struct GL_BOW_INFO rBowInfo;
 #endif
@@ -659,6 +638,11 @@ struct GLUE_INFO {
 	struct iw_statistics rP2pIwStats;
 #endif
 #endif
+	u_int8_t fgWpsActive;
+	uint8_t aucWSCIE[GLUE_INFO_WSCIE_LENGTH];	/*for probe req */
+	uint16_t u2WSCIELen;
+	uint8_t aucWSCAssocInfoIE[200];	/*for Assoc req */
+	uint16_t u2WSCAssocInfoIELen;
 
 	/* NVRAM availability */
 	u_int8_t fgNvramAvailable;
@@ -669,14 +653,31 @@ struct GLUE_INFO {
 	u_int8_t fgIsMacAddrOverride;
 	uint8_t rMacAddrOverride[PARAM_MAC_ADDR_LEN];
 
+	struct SET_TXPWR_CTRL rTxPwr;
+
 	/* for cfg80211 scan done indication */
 	struct cfg80211_scan_request *prScanRequest;
 
 	/* for cfg80211 scheduled scan */
-	struct PARAM_SCHED_SCAN_REQUEST *prSchedScanRequest;
+	struct cfg80211_sched_scan_request *prSchedScanRequest;
 
 	/* to indicate registered or not */
 	u_int8_t fgIsRegistered;
+
+	/* for cfg80211 connected indication */
+	uint32_t u4RspIeLength;
+	uint8_t aucRspIe[CFG_CFG80211_IE_BUF_LEN];
+
+	uint32_t u4ReqIeLength;
+	uint8_t aucReqIe[CFG_CFG80211_IE_BUF_LEN];
+
+	/*
+	 * Buffer to hold non-wfa vendor specific IEs set
+	 * from wpa_supplicant. This is used in sending
+	 * Association Request in AIS mode.
+	 */
+	uint16_t non_wfa_vendor_ie_len;
+	uint8_t non_wfa_vendor_ie_buf[NON_WFA_VENDOR_IE_MAX_LEN];
 
 #if CFG_SUPPORT_SDIO_READ_WRITE_PATTERN
 	u_int8_t fgEnSdioTestPattern;
@@ -688,6 +689,11 @@ struct GLUE_INFO {
 	u_int8_t fgIsInSuspendMode;
 
 #if CFG_SUPPORT_PASSPOINT
+	uint8_t aucHS20AssocInfoIE[200];	/*for Assoc req */
+	uint16_t u2HS20AssocInfoIELen;
+	uint8_t ucHotspotConfig;
+	u_int8_t fgConnectHS20AP;
+
 	u_int8_t fgIsDad;
 	uint8_t aucDADipv4[4];
 	u_int8_t fgIs6Dad;
@@ -708,8 +714,8 @@ struct GLUE_INFO {
 	struct work_struct monWork;
 #endif
 
-	int32_t i4RssiCache[KAL_AIS_NUM];
-	uint32_t u4LinkSpeedCache[KAL_AIS_NUM];
+	int32_t i4RssiCache;
+	uint32_t u4LinkSpeedCache;
 
 
 	uint32_t u4InfType;
@@ -731,9 +737,6 @@ struct GLUE_INFO {
 #if CFG_SUPPORT_SCAN_CACHE_RESULT
 	struct GL_SCAN_CACHE_INFO scanCache;
 #endif /* CFG_SUPPORT_SCAN_CACHE_RESULT */
-#if CFG_SUPPORT_PERF_IND
-	struct GL_PERF_IND_INFO PerfIndCache;
-#endif
 
 	/* Full2Partial */
 	OS_SYSTIME u4LastFullScanTime;
@@ -758,7 +761,9 @@ struct GLUE_INFO {
 	/* if it's = 0, ignore the black/whitelists settings from FWK */
 	uint32_t u4FWRoamingEnable;
 
-	spinlock_t napi_spinlock;
+	/* 11R */
+	struct FT_IES rFtIeForTx;
+	struct cfg80211_ft_event_params rFtEventParam;
 };
 
 typedef irqreturn_t(*PFN_WLANISR) (int irq, void *dev_id,
@@ -1015,12 +1020,6 @@ struct PACKET_PRIVATE_RX_DATA {
 #define GLUE_GET_PKT_XTIME(_p)    \
 	(GLUE_GET_PKT_PRIVATE_DATA(_p)->u8ArriveTime)
 
-#define GLUE_GET_INDEPENDENT_PKT(_p)    \
-	(GLUE_GET_PKT_PRIVATE_DATA(_p)->fgIsIndependentPkt)
-
-#define GLUE_SET_INDEPENDENT_PKT(_p, _fgIsIndePkt) \
-	(GLUE_GET_PKT_PRIVATE_DATA(_p)->fgIsIndependentPkt = _fgIsIndePkt)
-
 #define GLUE_GET_PKT_PRIVATE_RX_DATA(_p) \
 	((struct PACKET_PRIVATE_RX_DATA *)(&(((struct sk_buff *)(_p))->cb[24])))
 
@@ -1058,8 +1057,6 @@ struct PACKET_PRIVATE_RX_DATA {
 #define GLUE_INC_REF_CNT(_refCount)     atomic_inc((atomic_t *)&(_refCount))
 #define GLUE_DEC_REF_CNT(_refCount)     atomic_dec((atomic_t *)&(_refCount))
 #define GLUE_GET_REF_CNT(_refCount)     atomic_read((atomic_t *)&(_refCount))
-#define GLUE_SET_REF_CNT(_refCount, i)  \
-	atomic_set((atomic_t *)&(_refCount), i)
 
 #define DbgPrint(...)
 
@@ -1204,7 +1201,7 @@ uint32_t wlanConnacDownloadBufferBin(struct ADAPTER
  */
 extern struct net_device *gPrP2pDev[KAL_P2P_NUM];
 extern struct net_device *gPrDev;
-extern struct wireless_dev *gprWdev[KAL_AIS_NUM];
+extern struct wireless_dev *gprWdev;
 
 #ifdef CFG_DRIVER_INF_NAME_CHANGE
 extern char *gprifnameap;
@@ -1241,9 +1238,7 @@ void kalMetInit(IN struct GLUE_INFO *prGlueInfo);
 void wlanUpdateChannelTable(struct GLUE_INFO *prGlueInfo);
 
 #if CFG_SUPPORT_SAP_DFS_CHANNEL
-void wlanUpdateDfsChannelTable(struct GLUE_INFO *prGlueInfo,
-		uint8_t ucRoleIdx, uint8_t ucChannel, uint8_t ucBandWidth,
-		enum ENUM_CHNL_EXT eBssSCO, uint32_t u4CenterFreq);
+void wlanUpdateDfsChannelTable(struct GLUE_INFO *prGlueInfo, uint8_t ucChannel);
 #endif
 
 #if (CFG_MTK_ANDROID_WMT || WLAN_INCLUDE_PROC)
@@ -1263,6 +1258,7 @@ extern void connectivity_arch_setup_dma_ops(
 	bool coherent);
 #endif
 
+
 typedef uint8_t (*file_buf_handler) (void *ctx,
 			const char __user *buf,
 			uint16_t length);
@@ -1270,12 +1266,4 @@ extern void register_file_buf_handler(file_buf_handler handler,
 			void *ctx,
 			uint8_t ucType);
 
-extern const uint8_t *kalFindIeMatchMask(uint8_t eid,
-				const uint8_t *ies, int len,
-				const uint8_t *match,
-				int match_len, int match_offset,
-				const uint8_t *match_mask);
-
-/* extern from wifi wmt cdev wifi */
-extern uint32_t get_low_latency_mode(void);
 #endif /* _GL_OS_H */

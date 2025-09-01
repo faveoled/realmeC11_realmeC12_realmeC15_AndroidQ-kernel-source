@@ -203,7 +203,6 @@ typedef enum _ENUM_DBG_ASSERT_PATH_T {
  * A caller shall not invoke these three macros when DBG=0.
  */
 #define LOG_FUNC                kalPrint
-#define LIMITED_LOG_FUNC        limitedKalPrint
 /* If __FUNCTION__ is already defined by compiler, we just use it. */
 #define DEBUGFUNC(_Func)
 /* Disabled due to AOSP
@@ -217,7 +216,6 @@ typedef enum _ENUM_DBG_ASSERT_PATH_T {
 #define DBGLOG(_Module, _Class, _Fmt)
 #define DBGLOG_MEM8(_Module, _Class, _StartAddr, _Length)
 #define DBGLOG_MEM32(_Module, _Class, _StartAddr, _Length)
-#define LIMITED_LOG_FUNC(_Module, _Class, _StartAddr, _Length)
 #else
 #define DBGLOG(_Module, _Class, _Fmt, ...) \
 	do { \
@@ -246,14 +244,6 @@ typedef enum _ENUM_DBG_ASSERT_PATH_T {
 			dumpMemory32((PUINT_32)(_StartAddr), (UINT_32)(_Length)); \
 		} \
 	}
-#define LIMITED_DBGLOG(_Module, _Class, _Fmt, ...) \
-	do { \
-	if ((aucDebugModule[DBG_##_Module##_IDX] & DBG_CLASS_##_Class) == 0) \
-		break; \
-	LIMITED_LOG_FUNC("[%u]%s:(" #_Module " " #_Class ") " _Fmt,\
-		KAL_GET_CURRENT_THREAD_ID(), \
-		__func__, ##__VA_ARGS__); \
-	} while (0)
 #endif
 #define DISP_STRING(_str)       _str
 #undef ASSERT

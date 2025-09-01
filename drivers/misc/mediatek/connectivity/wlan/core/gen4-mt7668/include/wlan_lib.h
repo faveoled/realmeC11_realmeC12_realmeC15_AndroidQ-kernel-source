@@ -76,9 +76,6 @@
 #include "rlm_domain.h"
 #include "nic_init_cmd_event.h"
 
-#if CFG_SUPPORT_CSI
-struct CSI_DATA_T;
-#endif
 
 /*******************************************************************************
 *                              C O N S T A N T S
@@ -206,10 +203,6 @@ struct CSI_DATA_T;
 #define INVALID_WOW_WAKE_UP_REASON 255
 #endif
 
-#if CFG_SUPPORT_ADVANCE_CONTROL
-#define KEEP_FULL_PWR_TRAFFIC_REPORT_BIT BIT(0)
-#define KEEP_FULL_PWR_NOISE_HISTOGRAM_BIT BIT(1)
-#endif
 
 typedef enum _CMD_VER_T {
 	CMD_VER_1, /* Type[2]+String[32]+Value[32] */
@@ -497,93 +490,6 @@ typedef struct _WOW_CTRL_T {
 	UINT_8 ucReason;
 } WOW_CTRL_T, *P_WOW_CTRL_T;
 
-#define MDNS_NAME_MAX_LEN	100
-#define MDNS_RESPONSE_RECORD_MAX_LEN	500
-#define MDNS_TXT_RR_DATA_MAX_LEN		300
-#define MDNS_SRV_RR_LEN			16
-#define	MDNS_TXT_RR_MAX_LEN		310
-#define MDNS_QUESTION_NAME_MAX_LEN	102
-#define MDNS_SERVICE_NAME_MAX_LEN	102
-#define MDNS_A_RR_LEN		14
-
-struct MDNS_PARAM_T {
-	UINT_8 ucCmd;
-	UINT_32 u4RecordId;
-	UINT_8 ucQueryName[MDNS_NAME_MAX_LEN];
-	UINT_16 u2QueryNameLen;
-	UINT_16 u2QueryType;
-	UINT_16 u2QueryClass;
-	UINT_8 ucResponseRecord[MDNS_RESPONSE_RECORD_MAX_LEN];
-	UINT_16 u2ResponseRecordLen;
-	UINT_8 ucServiceName[MDNS_NAME_MAX_LEN];
-	UINT_16 u2ServiceNameLen;
-	UINT_8 ucServiceType[MDNS_NAME_MAX_LEN];
-	UINT_16 u2ServiceTypeLen;
-	UINT_8 ucDomainName[MDNS_NAME_MAX_LEN];
-	UINT_16 u2DomainNameLen;
-	UINT_8 ucHostName[MDNS_NAME_MAX_LEN];
-	UINT_16 u2HostNameLen;
-	UINT_32 u4Port;
-	UINT_8 ucTxtRecord[MDNS_TXT_RR_DATA_MAX_LEN];
-	UINT_16 u2TxtRecordLen;
-};
-
-struct WLAN_MAC_HEADER_QoS_T {
-	UINT_16 u2FrameCtrl;
-	UINT_16 DurationID;
-	UINT_8 aucAddr1[MAC_ADDR_LEN];
-	UINT_8 aucAddr2[MAC_ADDR_LEN];
-	UINT_8 aucAddr3[MAC_ADDR_LEN];
-	UINT_16 u2SeqCtrl;
-	UINT_16 u2QosCtrl;
-};
-
-#define UDP_HEADER_LENGTH 8
-#define IPV4_HEADER_LENGTH 20
-
-struct MDNS_ANSWER_RR {
-	UINT_8 data[MDNS_RESPONSE_RECORD_MAX_LEN];
-	UINT_16 data_length;
-};
-
-struct MDNS_SRV_RR {
-	UINT_8 data[MDNS_SRV_RR_LEN];
-	UINT_16 data_length;
-};
-
-struct MDNS_TXT_RR {
-	UINT_8 data[MDNS_TXT_RR_MAX_LEN];
-	UINT_16 data_length;
-};
-
-struct MDNS_QUESTION {
-	UINT_8 name[MDNS_QUESTION_NAME_MAX_LEN];
-	UINT_8 name_length;
-	UINT_8 label_count;
-	UINT_16 class;
-	UINT_16 type;
-};
-
-struct MDNS_Template_Record {
-	UINT_32 u4RecordId;
-	struct MDNS_QUESTION mdnsQuestionTemplate;
-	struct MDNS_ANSWER_RR mdnsResponseRecord;
-	UINT_8 ucServiceName[MDNS_SERVICE_NAME_MAX_LEN];
-	UINT_16 ServiceNameLen;
-	struct MDNS_TXT_RR mdnsTxtRecord;
-	struct MDNS_SRV_RR mdnsSrvRecord;
-	BOOLEAN bIsUsed;
-};
-
-struct CMD_MDNS_PARAM_T {
-	UINT_8 ucCmd;
-	UINT_32 u4RecordId;
-	struct WLAN_MAC_HEADER_QoS_T aucMdnsMacHdr;
-	UINT_8 aucMdnsIPHdr[IPV4_HEADER_LENGTH];
-	UINT_8 aucMdnsUdpHdr[UDP_HEADER_LENGTH];
-	UINT_8 mdnsARecord[MDNS_A_RR_LEN];
-	struct MDNS_Template_Record mdnsQueryRespTemplate;
-};
 #endif
 
 typedef enum _ENUM_NVRAM_MTK_FEATURE_T {
@@ -1166,8 +1072,6 @@ WLAN_STATUS wlanSendDummyCmd(IN P_ADAPTER_T prAdapter, IN BOOLEAN fgIsReqTxRsrc)
 
 WLAN_STATUS wlanSendNicPowerCtrlCmd(IN P_ADAPTER_T prAdapter, IN UINT_8 ucPowerMode);
 
-WLAN_STATUS wlanKeepFullPwr(IN P_ADAPTER_T prAdapter, IN BOOLEAN fgEnable);
-
 BOOLEAN wlanIsHandlerAllowedInRFTest(IN PFN_OID_HANDLER_FUNC pfnOidHandler, IN BOOLEAN fgSetInfo);
 
 WLAN_STATUS wlanProcessQueuedSwRfb(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfbListHead);
@@ -1272,10 +1176,6 @@ VOID wlanDefTxPowerCfg(IN P_ADAPTER_T prAdapter);
 UINT_8 wlanGetEcoVersion(IN P_ADAPTER_T prAdapter);
 
 /*----------------------------------------------------------------------------*/
-/* get Rom version                     */
-/*----------------------------------------------------------------------------*/
-uint8_t wlanGetRomVersion(IN P_ADAPTER_T prAdapter);
-/*----------------------------------------------------------------------------*/
 /* set preferred band configuration corresponding to network type             */
 /*----------------------------------------------------------------------------*/
 VOID wlanSetPreferBandByNetwork(IN P_ADAPTER_T prAdapter, IN ENUM_BAND_T eBand, IN UINT_8 ucBssIndex);
@@ -1308,11 +1208,6 @@ VOID wlanDumpBssStatistics(IN P_ADAPTER_T prAdapter, UINT_8 ucBssIndex);
 WLAN_STATUS
 wlanoidQueryStaStatistics(IN P_ADAPTER_T prAdapter,
 			  IN PVOID pvQueryBuffer, IN UINT_32 u4QueryBufferLen, OUT PUINT_32 pu4QueryInfoLen);
-
-WLAN_STATUS
-_wlanoidQueryStaStatistics(IN P_ADAPTER_T prAdapter,
-			  IN PVOID pvQueryBuffer, IN UINT_32 u4QueryBufferLen,
-			  OUT PUINT_32 pu4QueryInfoLen, IN BOOLEAN fgIsOid);
 
 /*----------------------------------------------------------------------------*/
 /* query NIC resource information from chip and reset Tx resource for normal operation        */
@@ -1437,8 +1332,6 @@ WLAN_STATUS wlan1xTxDone(IN P_ADAPTER_T prAdapter, IN P_MSDU_INFO_T prMsduInfo,
 
 WLAN_STATUS wlanDownloadFW(IN P_ADAPTER_T prAdapter);
 
-WLAN_STATUS wlanWakeUpWiFi(IN P_ADAPTER_T prAdapter);
-
 WLAN_STATUS wlanDownloadPatch(IN P_ADAPTER_T prAdapter);
 
 WLAN_STATUS wlanGetPatchInfo(IN P_ADAPTER_T prAdapter);
@@ -1453,7 +1346,7 @@ WLAN_STATUS wlanAccessRegister(IN P_ADAPTER_T prAdapter,
 WLAN_STATUS wlanAccessRegisterStatus(IN P_ADAPTER_T prAdapter, IN UINT_8 ucCmdSeqNum,
 			IN UINT_8 ucSetQuery, IN PVOID prEvent, IN UINT_32 u4EventLen);
 
-WLAN_STATUS wlanSetChipEcoInfo(IN P_ADAPTER_T prAdapter);
+VOID wlanSetChipEcoInfo(IN P_ADAPTER_T prAdapter);
 
 VOID wlanNotifyFwSuspend(P_GLUE_INFO_T prGlueInfo, struct net_device *prDev, BOOLEAN fgSuspend);
 
@@ -1477,32 +1370,7 @@ INT_32 wlanGetFileContent(P_ADAPTER_T prAdapter,
 WLAN_STATUS wlanUpdateExtInfo(IN P_ADAPTER_T prAdapter);
 #endif
 
-#if CFG_SUPPORT_CSI
-bool wlanPushCSIData(P_ADAPTER_T prAdapter, struct CSI_DATA_T *prCSIData);
-bool wlanPopCSIData(P_ADAPTER_T prAdapter, struct CSI_DATA_T *prCSIData);
-VOID
-wlanApplyCSIToneMask(
-	UINT_8 ucRxMode,
-	UINT_8 ucCBW,
-	UINT_8 ucDBW,
-	UINT_8 ucPrimaryChIdx,
-	INT_16 *ai2IData,
-	INT_16 *ai2QData);
-
-VOID
-wlanShiftCSI(
-	UINT_8 ucRxMode,
-	UINT_8 ucCBW,
-	UINT_8 ucDBW,
-	UINT_8 ucPrimaryChIdx,
-	INT_16 *ai2IData,
-	INT_16 *ai2QData,
-	INT_16 *ai2ShiftIData,
-	INT_16 *ai2ShiftQData);
-#endif
-
-int wlanSuspendRekeyOffload(P_GLUE_INFO_T prGlueInfo, IN UINT_8 ucRekeyMode);
+int wlanSuspendRekeyOffload(P_GLUE_INFO_T prGlueInfo, IN UINT_8 ucRekeyDisable);
 VOID wlanSuspendPmHandle(P_GLUE_INFO_T prGlueInfo);
 VOID wlanResumePmHandle(P_GLUE_INFO_T prGlueInfo);
 
-void disconnect_sta(P_ADAPTER_T prAdapter, P_STA_RECORD_T prStaRec);

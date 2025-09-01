@@ -218,6 +218,8 @@ static const struct iw_priv_args rIwPrivTable[] = {
 		1, 0, "set_band"},
 	{PRIV_CMD_BAND_CONFIG, 0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED |
 		1, "get_band"},
+
+	{PRIV_CMD_SET_TX_POWER, IW_PRIV_TYPE_INT | 4, 0, "set_txpower"},
 	{PRIV_CMD_GET_CH_LIST, 0, IW_PRIV_TYPE_INT | 50, "get_ch_list"},
 	{
 		PRIV_CMD_DUMP_MEM, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
@@ -255,202 +257,19 @@ static const iw_handler rIwPrivHandler[] = {
 	[IOC_AP_SET_CFG - SIOCIWFIRSTPRIV] = priv_set_ap,
 	[IOC_AP_STA_DISASSOC - SIOCIWFIRSTPRIV] = priv_set_ap,
 #if CFG_SUPPORT_QA_TOOL
-	[IOCTL_QA_TOOL_DAEMON - SIOCIWFIRSTPRIV] = priv_qa_agent,
 	[IOCTL_IWPRIV_ATE - SIOCIWFIRSTPRIV] = priv_ate_set
 #endif
 };
 
-/* standard ioctls */
-static int std_get_name(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_set_freq(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_get_freq(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_set_mode(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_get_mode(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_set_ap(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_get_ap(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_get_rate(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_set_rts(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_get_rts(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_get_frag(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_set_txpow(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_get_txpow(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_set_power(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_get_power(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_get_range(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_set_priv(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_get_priv(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_set_mlme(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_set_scan(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_get_scan(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_set_essid(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_get_essid(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_set_encode(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_get_encode(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_set_auth(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-#if (WIRELESS_EXT > 17)
-static int std_set_genie(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-#endif
-
-static int std_set_encode_ext(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static int std_set_pmska(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra);
-
-static const iw_handler mtk_std_handler[] = {
-	IW_HANDLER(SIOCGIWNAME, std_get_name),    /* factory mode used */
-	IW_HANDLER(SIOCSIWFREQ, std_set_freq),
-	IW_HANDLER(SIOCGIWFREQ, std_get_freq),    /* factory mode used */
-	IW_HANDLER(SIOCSIWMODE, std_set_mode),    /* factory mode used */
-	IW_HANDLER(SIOCGIWMODE, std_get_mode),    /* factory mode used */
-	IW_HANDLER(SIOCGIWRANGE, std_get_range),  /* factory mode used */
-	IW_HANDLER(SIOCSIWPRIV, std_set_priv),
-	IW_HANDLER(SIOCGIWPRIV, std_get_priv),
-	IW_HANDLER(SIOCSIWAP, std_set_ap),
-	IW_HANDLER(SIOCGIWAP, std_get_ap),        /* factory mode used */
-	IW_HANDLER(SIOCSIWMLME, std_set_mlme),
-	IW_HANDLER(SIOCSIWSCAN, std_set_scan),    /* factory mode used */
-	IW_HANDLER(SIOCGIWSCAN, std_get_scan),    /* factory mode used */
-	IW_HANDLER(SIOCSIWESSID, std_set_essid),  /* factory mode used */
-	IW_HANDLER(SIOCGIWESSID, std_get_essid),  /* factory mode used */
-	IW_HANDLER(SIOCGIWRATE, std_get_rate),    /* factory mode used */
-	IW_HANDLER(SIOCSIWRTS, std_set_rts),
-	IW_HANDLER(SIOCGIWRTS, std_get_rts),      /* factory mode used */
-	IW_HANDLER(SIOCGIWFRAG,  std_get_frag),   /* factory mode used */
-	IW_HANDLER(SIOCSIWTXPOW, std_set_txpow),
-	IW_HANDLER(SIOCGIWTXPOW, std_get_txpow),  /* factory mode used */
-	IW_HANDLER(SIOCSIWENCODE, std_set_encode),
-	IW_HANDLER(SIOCGIWENCODE, std_get_encode),/* factory mode used */
-	IW_HANDLER(SIOCSIWPOWER, std_set_power),
-	IW_HANDLER(SIOCGIWPOWER, std_get_power),  /* factory mode used */
-	IW_HANDLER(SIOCSIWAUTH,  std_set_auth),
-#if (WIRELESS_EXT > 17)
-	IW_HANDLER(SIOCSIWGENIE,  std_set_genie),
-#endif
-	IW_HANDLER(SIOCSIWENCODEEXT, std_set_encode_ext),
-	IW_HANDLER(SIOCSIWPMKSA, std_set_pmska),
-};
-
 const struct iw_handler_def wext_handler_def = {
+	.num_standard = 0,
 	.num_private = (__u16) sizeof(rIwPrivHandler) / sizeof(iw_handler),
 	.num_private_args = (__u16) sizeof(rIwPrivTable) /
 						sizeof(struct iw_priv_args),
+	.standard = (iw_handler *) NULL,
 	.private = rIwPrivHandler,
 	.private_args = rIwPrivTable,
 	.get_wireless_stats = wext_get_wireless_stats,
-	.num_standard = (__u16) sizeof(mtk_std_handler) / sizeof(iw_handler),
-	.standard = (iw_handler *) mtk_std_handler,
 };
 
 /*******************************************************************************
@@ -468,7 +287,7 @@ const struct iw_handler_def wext_handler_def = {
  *******************************************************************************
  */
 static void wext_support_ioctl_SIOCSIWGENIE(
-	IN struct net_device  *prDev, IN char *prExtraBuf,
+	IN struct GLUE_INFO *prGlueInfo, IN char *prExtraBuf,
 	IN uint32_t u4ExtraSize);
 
 static void
@@ -969,6 +788,49 @@ u_int8_t wextSrchDesiredOsenIE(IN uint8_t *pucIEStart,
 
 /*----------------------------------------------------------------------------*/
 /*!
+ * \brief Find the desired interworking Information Element according to
+ *	  desiredElemID.
+ *
+ * \param[in] pucIEStart IE starting address.
+ * \param[in] i4TotalIeLen Total length of all the IE.
+ * \param[in] ucDesiredElemId Desired element ID.
+ * \param[out] ppucDesiredIE Pointer to the desired IE.
+ *
+ * \retval TRUE Find the desired IE.
+ * \retval FALSE Desired IE not found.
+ *
+ * \note
+ */
+/*----------------------------------------------------------------------------*/
+u_int8_t wextSrchDesiredInterworkingIE(IN uint8_t
+				       *pucIEStart, IN int32_t i4TotalIeLen,
+				       OUT uint8_t **ppucDesiredIE)
+{
+	int32_t i4InfoElemLen;
+
+	ASSERT(pucIEStart);
+	ASSERT(ppucDesiredIE);
+
+	while (i4TotalIeLen >= 2) {
+		i4InfoElemLen = (int32_t) pucIEStart[1] + 2;
+
+		if (pucIEStart[0] == ELEM_ID_INTERWORKING
+		    && i4InfoElemLen <= i4TotalIeLen) {
+			*ppucDesiredIE = &pucIEStart[0];
+			return TRUE;
+		}
+
+		/* check desired EID */
+		/* Select next information element. */
+		i4TotalIeLen -= i4InfoElemLen;
+		pucIEStart += i4InfoElemLen;
+	}
+
+	return FALSE;
+} /* wextSrchDesiredInterworkingIE */
+
+/*----------------------------------------------------------------------------*/
+/*!
  * \brief Find the desired Adv Protocol Information Element according to
  *	  desiredElemID.
  *
@@ -1010,7 +872,126 @@ u_int8_t wextSrchDesiredAdvProtocolIE(IN uint8_t
 	return FALSE;
 }				/* wextSrchDesiredAdvProtocolIE */
 
+/*----------------------------------------------------------------------------*/
+/*!
+ * \brief Find the desired Roaming Consortium Information Element according to
+ *	  desiredElemID.
+ *
+ * \param[in] pucIEStart IE starting address.
+ * \param[in] i4TotalIeLen Total length of all the IE.
+ * \param[in] ucDesiredElemId Desired element ID.
+ * \param[out] ppucDesiredIE Pointer to the desired IE.
+ *
+ * \retval TRUE Find the desired IE.
+ * \retval FALSE Desired IE not found.
+ *
+ * \note
+ */
+/*----------------------------------------------------------------------------*/
+u_int8_t wextSrchDesiredRoamingConsortiumIE(
+	IN uint8_t *pucIEStart, IN int32_t i4TotalIeLen,
+	OUT uint8_t **ppucDesiredIE)
+{
+	int32_t i4InfoElemLen;
+
+	ASSERT(pucIEStart);
+	ASSERT(ppucDesiredIE);
+
+	while (i4TotalIeLen >= 2) {
+		i4InfoElemLen = (int32_t) pucIEStart[1] + 2;
+
+		if (pucIEStart[0] == ELEM_ID_ROAMING_CONSORTIUM
+		    && i4InfoElemLen <= i4TotalIeLen) {
+			*ppucDesiredIE = &pucIEStart[0];
+			return TRUE;
+		}
+
+		/* check desired EID */
+		/* Select next information element. */
+		i4TotalIeLen -= i4InfoElemLen;
+		pucIEStart += i4InfoElemLen;
+	}
+
+	return FALSE;
+}				/* wextSrchDesiredRoamingConsortiumIE */
+
 #endif /* CFG_SUPPORT_PASSPOINT */
+
+u_int8_t wextSrchOkcAndPMKID(IN uint8_t *pucIEStart,
+			     IN int32_t i4TotalIeLen, OUT uint8_t **ppucPMKID,
+			     OUT uint8_t *okc)
+{
+	int32_t i4InfoElemLen;
+	uint8_t ucDone = 0;
+
+	ASSERT(pucIEStart);
+	ASSERT(ppucPMKID);
+	ASSERT(okc);
+	*okc = 0;
+	*ppucPMKID = NULL;
+	while (i4TotalIeLen >= 2) {
+		i4InfoElemLen = (int32_t) pucIEStart[1] + 2;
+		if (i4InfoElemLen > i4TotalIeLen)
+			break;
+		if (pucIEStart[0] == ELEM_ID_VENDOR) {
+			if (pucIEStart[1] != 4 || pucIEStart[2] != 0
+			    || pucIEStart[3] != 0x8 || pucIEStart[4] != 0x22)
+				goto check_next;
+			*okc = pucIEStart[5];
+			ucDone |= 1;
+		} else if (pucIEStart[0] == ELEM_ID_RSN) {
+			/*
+			 * RSN IE:
+			 * EID(1), Len(1), Version(2), GrpCipher(4),
+			 * PairCipherCnt(2), PairCipherList(PairCipherCnt * 4),
+			 * AKMCnt(2), AkmList(4*AkmCnt), RSNCap(2), PMKIDCnt(2),
+			 * PMKIDList(16*PMKIDCnt), GrpMgtCipher(4)
+			 */
+			uint16_t u2CipherCnt = 0;
+			uint16_t u2AkmCnt = 0;
+			int32_t i4LenToCheck = 8;
+
+			/* if no Pairwise Cipher Count field, bypass */
+			if (i4InfoElemLen < i4LenToCheck + 2)
+				goto check_next;
+			u2CipherCnt = *(uint16_t *)&pucIEStart[i4LenToCheck];
+			i4LenToCheck +=
+				2; /* include length of Pairwise Cipher Count
+				    * field
+				    */
+			i4LenToCheck += u2CipherCnt *
+					4; /* include cipher list field */
+			/* if no AKM Count, bypass */
+			if (i4InfoElemLen < i4LenToCheck + 2)
+				goto check_next;
+			u2AkmCnt = *(uint16_t *)&pucIEStart[i4LenToCheck];
+			i4LenToCheck += 2; /* include length of AKM Count */
+			i4LenToCheck += u2AkmCnt * 4 +
+					2; /* include akm list field */
+			/*
+			 * if IE length is
+			 *	10 + u2CipherCnt * 4 + 2 + u2AkmCnt * 4 + 2 + 6,
+			 * means PMKID count field is zero, and Group Mgmt
+			 * Cipher may be exist
+			 */
+			if (i4InfoElemLen <= i4LenToCheck + 6)
+				goto check_next;
+			*ppucPMKID = pucIEStart +
+				     i4LenToCheck; /* return PMKID field and
+						    * started at PMKID count
+						    */
+			ucDone |= 2;
+		}
+		if (ucDone == 3)
+			return TRUE;
+		/* check desired EID */
+		/* Select next information element. */
+check_next:
+		i4TotalIeLen -= i4InfoElemLen;
+		pucIEStart += i4InfoElemLen;
+	}
+	return FALSE;
+}
 
 #if CFG_SUPPORT_WPS
 /*----------------------------------------------------------------------------*/
@@ -1271,12 +1252,11 @@ wext_set_mode(IN struct net_device *prNetDev,
 	      IN struct iw_request_info *prIwReqInfo,
 	      IN unsigned int *pu4Mode, IN char *pcExtra)
 {
-	struct PARAM_OP_MODE rOpMode;
+	enum ENUM_PARAM_OP_MODE eOpMode;
+
 	struct GLUE_INFO *prGlueInfo = NULL;
 	uint32_t rStatus = WLAN_STATUS_SUCCESS;
 	uint32_t u4BufLen = 0;
-	struct GL_WPA_INFO *prWpaInfo;
-	uint8_t ucBssIndex = AIS_DEFAULT_INDEX;
 
 	ASSERT(prNetDev);
 	ASSERT(pu4Mode);
@@ -1286,15 +1266,15 @@ wext_set_mode(IN struct net_device *prNetDev,
 
 	switch (*pu4Mode) {
 	case IW_MODE_AUTO:
-		rOpMode.eOpMode = NET_TYPE_AUTO_SWITCH;
+		eOpMode = NET_TYPE_AUTO_SWITCH;
 		break;
 
 	case IW_MODE_ADHOC:
-		rOpMode.eOpMode = NET_TYPE_IBSS;
+		eOpMode = NET_TYPE_IBSS;
 		break;
 
 	case IW_MODE_INFRA:
-		rOpMode.eOpMode = NET_TYPE_INFRA;
+		eOpMode = NET_TYPE_INFRA;
 		break;
 
 	default:
@@ -1304,25 +1284,21 @@ wext_set_mode(IN struct net_device *prNetDev,
 	}
 
 	/* printk("%s(): Set Mode = %d\n", __FUNCTION__, *pu4Mode); */
-	rOpMode.ucBssIdx = ucBssIndex;
-	rStatus = kalIoctl(prGlueInfo, wlanoidSetInfrastructureMode,
-		(void *)&rOpMode, sizeof(struct PARAM_OP_MODE),
-		FALSE, FALSE, TRUE, &u4BufLen);
+
+	rStatus = kalIoctl(prGlueInfo, wlanoidSetInfrastructureMode, &eOpMode,
+			   sizeof(eOpMode), FALSE, FALSE, TRUE, &u4BufLen);
 
 	/* after set operation mode, key table are cleared */
 
-	prWpaInfo = aisGetWpaInfo(prGlueInfo->prAdapter,
-		ucBssIndex);
-
 	/* reset wpa info */
-	prWpaInfo->u4WpaVersion =
+	prGlueInfo->rWpaInfo.u4WpaVersion =
 		IW_AUTH_WPA_VERSION_DISABLED;
-	prWpaInfo->u4KeyMgmt = 0;
-	prWpaInfo->u4CipherGroup = IW_AUTH_CIPHER_NONE;
-	prWpaInfo->u4CipherPairwise = IW_AUTH_CIPHER_NONE;
-	prWpaInfo->u4AuthAlg = IW_AUTH_ALG_OPEN_SYSTEM;
+	prGlueInfo->rWpaInfo.u4KeyMgmt = 0;
+	prGlueInfo->rWpaInfo.u4CipherGroup = IW_AUTH_CIPHER_NONE;
+	prGlueInfo->rWpaInfo.u4CipherPairwise = IW_AUTH_CIPHER_NONE;
+	prGlueInfo->rWpaInfo.u4AuthAlg = IW_AUTH_ALG_OPEN_SYSTEM;
 #if CFG_SUPPORT_802_11W
-	prWpaInfo->u4Mfp = IW_AUTH_MFP_DISABLED;
+	prGlueInfo->rWpaInfo.u4Mfp = IW_AUTH_MFP_DISABLED;
 #endif
 
 	return 0;
@@ -1582,7 +1558,6 @@ wext_get_ap(IN struct net_device *prNetDev,
 	struct GLUE_INFO *prGlueInfo = NULL;
 	uint32_t rStatus = WLAN_STATUS_SUCCESS;
 	uint32_t u4BufLen = 0;
-	uint8_t ucBssIndex = AIS_DEFAULT_INDEX;
 
 	ASSERT(prNetDev);
 	ASSERT(prAddr);
@@ -1594,8 +1569,7 @@ wext_get_ap(IN struct net_device *prNetDev,
 	/* return -ENOTCONN; */
 	/* } */
 
-	if (kalGetMediaStateIndicated(prGlueInfo,
-		ucBssIndex) ==
+	if (prGlueInfo->eParamMediaStateIndicated ==
 	    PARAM_MEDIA_STATE_DISCONNECTED) {
 		memset(prAddr, 0, sizeof(struct sockaddr));
 		return 0;
@@ -2215,8 +2189,6 @@ wext_set_essid(IN struct net_device *prNetDev,
 	struct GLUE_INFO *prGlueInfo = NULL;
 	uint32_t rStatus = WLAN_STATUS_SUCCESS;
 	uint32_t u4BufLen = 0;
-	struct GL_WPA_INFO *prWpaInfo;
-	uint8_t ucBssIndex = AIS_DEFAULT_INDEX;
 
 	ASSERT(prNetDev);
 	ASSERT(prEssid);
@@ -2228,13 +2200,10 @@ wext_set_essid(IN struct net_device *prNetDev,
 	if (prEssid->length > IW_ESSID_MAX_SIZE)
 		return -E2BIG;
 
-	prWpaInfo = aisGetWpaInfo(prGlueInfo->prAdapter,
-		ucBssIndex);
-
 	/* set auth mode */
-	if (prWpaInfo->u4WpaVersion ==
+	if (prGlueInfo->rWpaInfo.u4WpaVersion ==
 	    IW_AUTH_WPA_VERSION_DISABLED) {
-		eAuthMode = (prWpaInfo->u4AuthAlg ==
+		eAuthMode = (prGlueInfo->rWpaInfo.u4AuthAlg ==
 			     IW_AUTH_ALG_OPEN_SYSTEM) ?
 			    AUTH_MODE_OPEN : AUTH_MODE_AUTO_SWITCH;
 		/* printk(KERN_INFO
@@ -2243,10 +2212,10 @@ wext_set_essid(IN struct net_device *prNetDev,
 		 */
 	} else {
 		/* set auth mode */
-		switch (prWpaInfo->u4KeyMgmt) {
+		switch (prGlueInfo->rWpaInfo.u4KeyMgmt) {
 		case IW_AUTH_KEY_MGMT_802_1X:
 			eAuthMode =
-				(prWpaInfo->u4WpaVersion ==
+				(prGlueInfo->rWpaInfo.u4WpaVersion ==
 				 IW_AUTH_WPA_VERSION_WPA) ?
 				AUTH_MODE_WPA : AUTH_MODE_WPA2;
 			/* printk("IW_AUTH_KEY_MGMT_802_1X->AUTH_MODE_WPA%s\n",
@@ -2255,7 +2224,7 @@ wext_set_essid(IN struct net_device *prNetDev,
 			break;
 		case IW_AUTH_KEY_MGMT_PSK:
 			eAuthMode =
-				(prWpaInfo->u4WpaVersion ==
+				(prGlueInfo->rWpaInfo.u4WpaVersion ==
 				 IW_AUTH_WPA_VERSION_WPA) ?
 				AUTH_MODE_WPA_PSK : AUTH_MODE_WPA2_PSK;
 			/* printk("IW_AUTH_KEY_MGMT_PSK->AUTH_MODE_WPA%sPSK\n",
@@ -2288,7 +2257,7 @@ wext_set_essid(IN struct net_device *prNetDev,
 		default:
 			/* printk(KERN_INFO DRV_NAME
 			 * "strange IW_AUTH_KEY_MGMT : %d set auto switch\n",
-			 * prWpaInfo->u4KeyMgmt);
+			 * prGlueInfo->rWpaInfo.u4KeyMgmt);
 			 */
 			eAuthMode = AUTH_MODE_AUTO_SWITCH;
 			break;
@@ -2299,8 +2268,8 @@ wext_set_essid(IN struct net_device *prNetDev,
 			   sizeof(eAuthMode), FALSE, FALSE, FALSE, &u4BufLen);
 
 	/* set encryption status */
-	cipher = prWpaInfo->u4CipherGroup |
-		 prWpaInfo->u4CipherPairwise;
+	cipher = prGlueInfo->rWpaInfo.u4CipherGroup |
+		 prGlueInfo->rWpaInfo.u4CipherPairwise;
 	if (cipher & IW_AUTH_CIPHER_CCMP) {
 		/* printk("IW_AUTH_CIPHER_CCMP->ENUM_ENCRYPTION3_ENABLED\n"); */
 		eEncStatus = ENUM_ENCRYPTION3_ENABLED;
@@ -2313,7 +2282,7 @@ wext_set_essid(IN struct net_device *prNetDev,
 		eEncStatus = ENUM_ENCRYPTION1_ENABLED;
 	} else if (cipher & IW_AUTH_CIPHER_NONE) {
 		/* printk("IW_AUTH_CIPHER_NONE->ENUM_ENCRYPTION_DISABLED\n"); */
-		if (prWpaInfo->fgPrivacyInvoke)
+		if (prGlueInfo->rWpaInfo.fgPrivacyInvoke)
 			eEncStatus = ENUM_ENCRYPTION1_ENABLED;
 		else
 			eEncStatus = ENUM_ENCRYPTION_DISABLED;
@@ -2344,6 +2313,7 @@ wext_set_essid(IN struct net_device *prNetDev,
 	 *  rNewSsid.aucSsid[rNewSsid.u4SsidLen] = '\0';
 	 *  printk("set ssid(%u): %s\n", rNewSsid.u4SsidLen, rNewSsid.aucSsid);
 	 */
+
 	if (kalIoctl(prGlueInfo,
 		     wlanoidSetSsid,
 		     (void *)&rNewSsid, sizeof(struct PARAM_SSID), FALSE, FALSE,
@@ -2401,6 +2371,7 @@ wext_get_essid(IN struct net_device *prNetDev,
 
 	if (!prSsid)
 		return -ENOMEM;
+
 	rStatus = kalIoctl(prGlueInfo, wlanoidQuerySsid, prSsid,
 			   sizeof(struct PARAM_SSID),
 			   TRUE, FALSE, FALSE, &u4BufLen);
@@ -2550,8 +2521,6 @@ wext_get_rate(IN struct net_device *prNetDev,
 	uint32_t rStatus = WLAN_STATUS_SUCCESS;
 	uint32_t u4BufLen = 0;
 	uint32_t u4Rate = 0;
-	uint8_t ucBssIndex;
-	struct PARAM_LINK_SPEED_EX rLinkSpeed;
 
 	ASSERT(prNetDev);
 	ASSERT(prRate);
@@ -2562,16 +2531,12 @@ wext_get_rate(IN struct net_device *prNetDev,
 	if (!netif_carrier_ok(prNetDev))
 		return -ENOTCONN;
 
-	ucBssIndex = wlanGetBssIdx(prNetDev);
-	rStatus = kalIoctlByBssIdx(prGlueInfo, wlanoidQueryLinkSpeed,
-			   &rLinkSpeed, sizeof(rLinkSpeed),
-			   TRUE, FALSE, FALSE, &u4BufLen, ucBssIndex);
+	rStatus = kalIoctl(prGlueInfo, wlanoidQueryLinkSpeed,
+			   &u4Rate, sizeof(u4Rate),
+			   TRUE, FALSE, FALSE, &u4BufLen);
 
 	if (rStatus != WLAN_STATUS_SUCCESS)
 		return -EFAULT;
-
-	if (ucBssIndex < BSSID_NUM)
-		u4Rate = rLinkSpeed.rLq[ucBssIndex].u2LinkSpeed;
 
 	prRate->value = u4Rate *
 			100;	/* u4Rate is in unit of 100bps */
@@ -2902,8 +2867,6 @@ wext_set_encode(IN struct net_device *prNetDev,
 	struct GLUE_INFO *prGlueInfo = NULL;
 	uint32_t rStatus = WLAN_STATUS_SUCCESS;
 	uint32_t u4BufLen = 0;
-	struct GL_WPA_INFO *prWpaInfo;
-	uint8_t ucBssIndex = AIS_DEFAULT_INDEX;
 
 	ASSERT(prNetDev);
 	ASSERT(prEnc);
@@ -2912,18 +2875,15 @@ wext_set_encode(IN struct net_device *prNetDev,
 		return -EINVAL;
 	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
 
-	prWpaInfo = aisGetWpaInfo(prGlueInfo->prAdapter,
-		ucBssIndex);
-
 	/* reset to default mode */
-	prWpaInfo->u4WpaVersion =
+	prGlueInfo->rWpaInfo.u4WpaVersion =
 		IW_AUTH_WPA_VERSION_DISABLED;
-	prWpaInfo->u4KeyMgmt = 0;
-	prWpaInfo->u4CipherPairwise = IW_AUTH_CIPHER_NONE;
-	prWpaInfo->u4CipherGroup = IW_AUTH_CIPHER_NONE;
-	prWpaInfo->u4AuthAlg = IW_AUTH_ALG_OPEN_SYSTEM;
+	prGlueInfo->rWpaInfo.u4KeyMgmt = 0;
+	prGlueInfo->rWpaInfo.u4CipherPairwise = IW_AUTH_CIPHER_NONE;
+	prGlueInfo->rWpaInfo.u4CipherGroup = IW_AUTH_CIPHER_NONE;
+	prGlueInfo->rWpaInfo.u4AuthAlg = IW_AUTH_ALG_OPEN_SYSTEM;
 #if CFG_SUPPORT_802_11W
-	prWpaInfo->u4Mfp = IW_AUTH_MFP_DISABLED;
+	prGlueInfo->rWpaInfo.u4Mfp = IW_AUTH_MFP_DISABLED;
 #endif
 
 	/* iwconfig wlan0 key off */
@@ -2974,7 +2934,7 @@ wext_set_encode(IN struct net_device *prNetDev,
 		}
 
 		/* change to auto switch */
-		prWpaInfo->u4AuthAlg = IW_AUTH_ALG_SHARED_KEY |
+		prGlueInfo->rWpaInfo.u4AuthAlg = IW_AUTH_ALG_SHARED_KEY |
 						 IW_AUTH_ALG_OPEN_SYSTEM;
 		eAuthMode = AUTH_MODE_AUTO_SWITCH;
 
@@ -2989,9 +2949,9 @@ wext_set_encode(IN struct net_device *prNetDev,
 			return -EFAULT;
 		}
 
-		prWpaInfo->u4CipherPairwise =
+		prGlueInfo->rWpaInfo.u4CipherPairwise =
 			IW_AUTH_CIPHER_WEP104 | IW_AUTH_CIPHER_WEP40;
-		prWpaInfo->u4CipherGroup = IW_AUTH_CIPHER_WEP104 |
+		prGlueInfo->rWpaInfo.u4CipherGroup = IW_AUTH_CIPHER_WEP104 |
 						     IW_AUTH_CIPHER_WEP40;
 
 		eEncStatus = ENUM_WEP_ENABLED;
@@ -3052,6 +3012,8 @@ wext_set_power(IN struct net_device *prNetDev,
 	if (!prGlueInfo)
 		return -EFAULT;
 
+	if (!prGlueInfo->prAdapter->prAisBssInfo)
+		return -EFAULT;
 	/* printk(KERN_INFO
 	 *	  "wext_set_power value(%d) disabled(%d) flag(0x%x)\n",
 	 *	  prPower->value, prPower->disabled, prPower->flags);
@@ -3080,7 +3042,8 @@ wext_set_power(IN struct net_device *prNetDev,
 	}
 
 	rPowerMode.ePowerMode = ePowerMode;
-	rPowerMode.ucBssIdx = wlanGetBssIdx(prNetDev);
+	rPowerMode.ucBssIdx =
+		prGlueInfo->prAdapter->prAisBssInfo->ucBssIndex;
 
 	rStatus = kalIoctl(prGlueInfo,
 			   wlanoidSet802dot11PowerSaveProfile,
@@ -3203,9 +3166,6 @@ wext_set_auth(IN struct net_device *prNetDev,
 	      IN struct iw_param *prAuth, IN char *pcExtra)
 {
 	struct GLUE_INFO *prGlueInfo = NULL;
-	struct GL_WPA_INFO *prWpaInfo;
-	struct CONNECTION_SETTINGS *prConnSettings;
-	uint8_t ucBssIndex = AIS_DEFAULT_INDEX;
 
 	ASSERT(prNetDev);
 	ASSERT(prAuth);
@@ -3213,43 +3173,37 @@ wext_set_auth(IN struct net_device *prNetDev,
 		return -EINVAL;
 	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
 
-	prWpaInfo = aisGetWpaInfo(prGlueInfo->prAdapter,
-		ucBssIndex);
-	prConnSettings = aisGetConnSettings(prGlueInfo->prAdapter,
-		ucBssIndex);
-
 	/* Save information to glue info and process later when ssid is set. */
 	switch (prAuth->flags & IW_AUTH_INDEX) {
 	case IW_AUTH_WPA_VERSION:
 #if CFG_SUPPORT_WAPI
-		if (aisGetWapiMode(prGlueInfo->prAdapter,
-			ucBssIndex)) {
-			prWpaInfo->u4WpaVersion =
+		if (wlanQueryWapiMode(prGlueInfo->prAdapter)) {
+			prGlueInfo->rWpaInfo.u4WpaVersion =
 						IW_AUTH_WPA_VERSION_DISABLED;
-			prWpaInfo->u4AuthAlg =
+			prGlueInfo->rWpaInfo.u4AuthAlg =
 						IW_AUTH_ALG_OPEN_SYSTEM;
 		} else {
-			prWpaInfo->u4WpaVersion = prAuth->value;
+			prGlueInfo->rWpaInfo.u4WpaVersion = prAuth->value;
 		}
 #else
-		prWpaInfo->u4WpaVersion = prAuth->value;
+		prGlueInfo->rWpaInfo.u4WpaVersion = prAuth->value;
 #endif
 		break;
 
 	case IW_AUTH_CIPHER_PAIRWISE:
-		prWpaInfo->u4CipherPairwise = prAuth->value;
+		prGlueInfo->rWpaInfo.u4CipherPairwise = prAuth->value;
 		break;
 
 	case IW_AUTH_CIPHER_GROUP:
-		prWpaInfo->u4CipherGroup = prAuth->value;
+		prGlueInfo->rWpaInfo.u4CipherGroup = prAuth->value;
 		break;
 
 	case IW_AUTH_KEY_MGMT:
-		prWpaInfo->u4KeyMgmt = prAuth->value;
+		prGlueInfo->rWpaInfo.u4KeyMgmt = prAuth->value;
 #if CFG_SUPPORT_WAPI
-		if (prWpaInfo->u4KeyMgmt ==
+		if (prGlueInfo->rWpaInfo.u4KeyMgmt ==
 		    IW_AUTH_KEY_MGMT_WAPI_PSK ||
-		    prWpaInfo->u4KeyMgmt ==
+		    prGlueInfo->rWpaInfo.u4KeyMgmt ==
 		    IW_AUTH_KEY_MGMT_WAPI_CERT) {
 			uint32_t u4BufLen;
 			uint32_t rStatus;
@@ -3261,23 +3215,23 @@ wext_set_auth(IN struct net_device *prNetDev,
 			       prAuth->value);
 		}
 #endif
-		if (prWpaInfo->u4KeyMgmt == IW_AUTH_KEY_MGMT_WPS)
-			prConnSettings->fgWpsActive = TRUE;
+		if (prGlueInfo->rWpaInfo.u4KeyMgmt == IW_AUTH_KEY_MGMT_WPS)
+			prGlueInfo->fgWpsActive = TRUE;
 		else
-			prConnSettings->fgWpsActive = FALSE;
+			prGlueInfo->fgWpsActive = FALSE;
 		break;
 
 	case IW_AUTH_80211_AUTH_ALG:
-		prWpaInfo->u4AuthAlg = prAuth->value;
+		prGlueInfo->rWpaInfo.u4AuthAlg = prAuth->value;
 		break;
 
 	case IW_AUTH_PRIVACY_INVOKED:
-		prWpaInfo->fgPrivacyInvoke = prAuth->value;
+		prGlueInfo->rWpaInfo.fgPrivacyInvoke = prAuth->value;
 		break;
 #if CFG_SUPPORT_802_11W
 	case IW_AUTH_MFP:
 		/* printk("wext_set_auth IW_AUTH_MFP=%d\n", prAuth->value); */
-		prWpaInfo->u4Mfp = prAuth->value;
+		prGlueInfo->rWpaInfo.u4Mfp = prAuth->value;
 		break;
 #endif
 #if CFG_SUPPORT_WAPI
@@ -3353,8 +3307,6 @@ wext_set_encode_ext(IN struct net_device *prNetDev,
 	struct GLUE_INFO *prGlueInfo = NULL;
 	uint32_t rStatus = WLAN_STATUS_SUCCESS;
 	uint32_t u4BufLen = 0;
-	struct GL_WPA_INFO *prWpaInfo;
-	uint8_t ucBssIndex = AIS_DEFAULT_INDEX;
 
 	ASSERT(prNetDev);
 	ASSERT(prEnc);
@@ -3367,9 +3319,6 @@ wext_set_encode_ext(IN struct net_device *prNetDev,
 	}
 
 	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	prWpaInfo = aisGetWpaInfo(prGlueInfo->prAdapter,
-		ucBssIndex);
 
 	memset(keyStructBuf, 0, sizeof(keyStructBuf));
 
@@ -3426,7 +3375,7 @@ wext_set_encode_ext(IN struct net_device *prNetDev,
 
 		memcpy(prWpiKey->aucWPICK, &prIWEncExt->key[16], 16);
 		prWpiKey->u4LenWPICK = 16;
-		prWpiKey->ucBssIdx = ucBssIndex;
+
 		rStatus = kalIoctl(prGlueInfo, wlanoidSetWapiKey, prWpiKey,
 				   sizeof(struct PARAM_WPI_KEY),
 				   FALSE, FALSE, TRUE, &u4BufLen);
@@ -3451,7 +3400,7 @@ wext_set_encode_ext(IN struct net_device *prNetDev,
 			 *	   MACSTR "]\n", prRemoveKey->KeyIndex,
 			 *	   MAC2STR(prRemoveKey->BSSID));
 			 */
-			prRemoveKey->ucBssIdx = ucBssIndex;
+
 			rStatus = kalIoctl(prGlueInfo, wlanoidSetRemoveKey,
 					   prRemoveKey, prRemoveKey->u4Length,
 					   FALSE, FALSE, TRUE, &u4BufLen);
@@ -3509,7 +3458,7 @@ wext_set_encode_ext(IN struct net_device *prNetDev,
 				}
 
 				/* change to auto switch */
-				prWpaInfo->u4AuthAlg =
+				prGlueInfo->rWpaInfo.u4AuthAlg =
 							IW_AUTH_ALG_SHARED_KEY |
 							IW_AUTH_ALG_OPEN_SYSTEM;
 				eAuthMode = AUTH_MODE_AUTO_SWITCH;
@@ -3528,10 +3477,10 @@ wext_set_encode_ext(IN struct net_device *prNetDev,
 					return -EFAULT;
 				}
 
-				prWpaInfo->u4CipherPairwise =
+				prGlueInfo->rWpaInfo.u4CipherPairwise =
 							IW_AUTH_CIPHER_WEP104 |
 							IW_AUTH_CIPHER_WEP40;
-				prWpaInfo->u4CipherGroup =
+				prGlueInfo->rWpaInfo.u4CipherGroup =
 							IW_AUTH_CIPHER_WEP104 |
 							IW_AUTH_CIPHER_WEP40;
 
@@ -3628,7 +3577,7 @@ wext_set_encode_ext(IN struct net_device *prNetDev,
 		prKey->u4KeyLength = prIWEncExt->key_len;
 		prKey->u4Length = ((unsigned long) &(((struct PARAM_KEY *)
 				0)->aucKeyMaterial)) + prKey->u4KeyLength;
-		prKey->ucBssIdx = ucBssIndex;
+
 		rStatus = kalIoctl(prGlueInfo, wlanoidSetAddKey, prKey,
 				   prKey->u4Length,
 				   FALSE, FALSE, TRUE, &u4BufLen);
@@ -3727,6 +3676,7 @@ int wext_get_priv(IN struct net_device *prNetDev,
 	return 0;
 }				/* wext_get_priv */
 
+
 /*----------------------------------------------------------------------------*/
 /*!
  * \brief ioctl() (Linux Wireless Extensions) routines
@@ -3756,7 +3706,6 @@ int wext_support_ioctl(IN struct net_device *prDev,
 	/* prDev is verified in the caller function wlanDoIOCTL() */
 
 	/* printk("%d CMD:0x%x\n", jiffies_to_msecs(jiffies), i4Cmd); */
-	DBGLOG(REQ, INFO, "CMD:0x%x\n", i4Cmd);
 
 	/* Prepare the call */
 	rIwReqInfo.cmd = (__u16) i4Cmd;
@@ -4148,6 +4097,9 @@ int wext_support_ioctl(IN struct net_device *prDev,
 #if WIRELESS_EXT > 17
 	case SIOCSIWGENIE:	/* 0x8B30, set gen ie */
 		if (iwr->u.data.pointer) {
+			struct GLUE_INFO *prGlueInfo = *((struct GLUE_INFO **)
+							 netdev_priv(prDev));
+
 			u4ExtraSize = iwr->u.data.length;
 			if (1 /* wlanQueryWapiMode(prGlueInfo->prAdapter) */) {
 				/* Fixed length structure */
@@ -4171,7 +4123,7 @@ int wext_support_ioctl(IN struct net_device *prDev,
 						ret = -EFAULT;
 					else
 						wext_support_ioctl_SIOCSIWGENIE(
-							prDev, prExtraBuf,
+							prGlueInfo, prExtraBuf,
 							u4ExtraSize);
 					kalMemFree(prExtraBuf, VIR_MEM_TYPE,
 						   u4ExtraSize);
@@ -4316,23 +4268,35 @@ int wext_support_ioctl(IN struct net_device *prDev,
 }				/* wext_support_ioctl */
 
 static void wext_support_ioctl_SIOCSIWGENIE(
-	IN struct net_device *prDev, IN char *prExtraBuf,
+	IN struct GLUE_INFO *prGlueInfo, IN char *prExtraBuf,
 	IN uint32_t u4ExtraSize)
 {
-	struct GLUE_INFO *prGlueInfo = *((struct GLUE_INFO **)
-		netdev_priv(prDev));
 	uint32_t rStatus;
 	uint32_t u4BufLen;
-
 #if CFG_SUPPORT_WAPI
 	rStatus = kalIoctl(prGlueInfo, wlanoidSetWapiAssocInfo, prExtraBuf,
 			   u4ExtraSize, FALSE, FALSE, TRUE, &u4BufLen);
 	if (rStatus != WLAN_STATUS_SUCCESS) {
-		/* do nothing */
-		/* printk(KERN_INFO
-		 *	  "[WSC] set WSC assoc info error:%x\n",
-		 *	  rStatus);
-		 */
+#endif
+#if CFG_SUPPORT_WPS2
+		uint8_t *prDesiredIE = NULL;
+
+		if (wextSrchDesiredWPSIE(prExtraBuf, u4ExtraSize, 0xDD,
+					 (uint8_t **) &prDesiredIE)) {
+			rStatus =
+				kalIoctl(prGlueInfo, wlanoidSetWSCAssocInfo,
+					 prDesiredIE, IE_SIZE(prDesiredIE),
+					 FALSE, FALSE, TRUE, &u4BufLen);
+			if (rStatus != WLAN_STATUS_SUCCESS) {
+				/* do nothing */
+				/* printk(KERN_INFO
+				 *	  "[WSC] set WSC assoc info error:%x\n",
+				 *	  rStatus);
+				 */
+			}
+		}
+#endif
+#if CFG_SUPPORT_WAPI
 	}
 #endif
 
@@ -4346,30 +4310,57 @@ wext_support_ioctl_SIOCSIWPMKSA_Action(IN struct net_device
 					 netdev_priv(prDev));
 	uint32_t rStatus;
 	uint32_t u4BufLen;
-	struct PARAM_PMKID pmkid;
-	uint8_t ucBssIndex = AIS_DEFAULT_INDEX;
-
-	pmkid.ucBssIdx = ucBssIndex;
+	struct PARAM_PMKID *prPmkid;
 
 	switch (ioMode) {
 	case IW_PMKSA_ADD:
-		kalMemCopy(pmkid.arBSSID,
-			((struct iw_pmksa *)prExtraBuf)->bssid.sa_data,
-			PARAM_MAC_ADDR_LEN);
-		kalMemCopy(pmkid.arPMKID,
-			((struct iw_pmksa *)prExtraBuf)->pmkid, IW_PMKID_LEN);
+		prPmkid = (struct PARAM_PMKID *) kalMemAlloc(8 + sizeof(
+					struct PARAM_BSSID_INFO), VIR_MEM_TYPE);
+		if (!prPmkid) {
+			DBGLOG(INIT, INFO,
+			       "Can not alloc memory for IW_PMKSA_ADD\n");
+			*ret = -ENOMEM;
+			break;
+		}
 
-		rStatus = kalIoctl(prGlueInfo, wlanoidSetPmkid, &pmkid,
+		prPmkid->u4Length = 8 + sizeof(struct PARAM_BSSID_INFO);
+		prPmkid->u4BSSIDInfoCount = 1;
+		kalMemCopy(prPmkid->arBSSIDInfo->arBSSID,
+			   ((struct iw_pmksa *)prExtraBuf)->bssid.sa_data,
+			   6);
+		kalMemCopy(prPmkid->arBSSIDInfo->arPMKID,
+			   ((struct iw_pmksa *)prExtraBuf)->pmkid,
+			   IW_PMKID_LEN);
+
+		rStatus = kalIoctl(prGlueInfo, wlanoidSetPmkid, prPmkid,
 				   sizeof(struct PARAM_PMKID),
 				   FALSE, FALSE, TRUE, &u4BufLen);
 		if (rStatus != WLAN_STATUS_SUCCESS)
 			DBGLOG(INIT, INFO, "add pmkid error:%x\n", rStatus);
+
+		kalMemFree(prPmkid, VIR_MEM_TYPE,
+			   8 + sizeof(struct PARAM_BSSID_INFO));
 		break;
 	case IW_PMKSA_FLUSH:
-		rStatus = kalIoctl(prGlueInfo, wlanoidFlushPmkid, NULL, 0,
+		prPmkid = (struct PARAM_PMKID *) kalMemAlloc(8,
+				VIR_MEM_TYPE);
+		if (!prPmkid) {
+			DBGLOG(INIT, INFO,
+			       "Can not alloc memory for IW_PMKSA_FLUSH\n");
+			*ret = -ENOMEM;
+			break;
+		}
+
+		prPmkid->u4Length = 8;
+		prPmkid->u4BSSIDInfoCount = 0;
+
+		rStatus = kalIoctl(prGlueInfo, wlanoidSetPmkid, prPmkid,
+				   sizeof(struct PARAM_PMKID),
 				   FALSE, FALSE, TRUE, &u4BufLen);
 		if (rStatus != WLAN_STATUS_SUCCESS)
 			DBGLOG(INIT, INFO, "flush pmkid error:%x\n", rStatus);
+
+		kalMemFree(prPmkid, VIR_MEM_TYPE, 8);
 		break;
 	default:
 		break;
@@ -4395,8 +4386,7 @@ wext_support_ioctl_SIOCSIWPMKSA_Action(IN struct net_device
 void
 wext_indicate_wext_event(IN struct GLUE_INFO *prGlueInfo,
 			 IN unsigned int u4Cmd, IN unsigned char *pucData,
-			 IN unsigned int u4dataLen,
-			 IN uint8_t ucBssIndex)
+			 IN unsigned int u4dataLen)
 {
 	union iwreq_data wrqu;
 	unsigned char *pucExtraInfo = NULL;
@@ -4407,18 +4397,8 @@ wext_indicate_wext_event(IN struct GLUE_INFO *prGlueInfo,
 #if WIRELESS_EXT < 18
 	int i;
 #endif
-	struct GL_WPA_INFO *prWpaInfo;
-	struct net_device *prDevHandler;
 
 	memset(&wrqu, 0, sizeof(wrqu));
-
-	DBGLOG(REQ, LOUD, "ucBssIndex = %d\n", ucBssIndex);
-
-	prWpaInfo = aisGetWpaInfo(prGlueInfo->prAdapter,
-		ucBssIndex);
-
-	prDevHandler =
-		wlanGetNetDev(prGlueInfo, ucBssIndex);
 
 	switch (u4Cmd) {
 	case SIOCGIWTXPOW:
@@ -4531,9 +4511,9 @@ wext_indicate_wext_event(IN struct GLUE_INFO *prGlueInfo,
 		break;
 
 	case IWEVPMKIDCAND:
-		if (prWpaInfo->u4WpaVersion ==
+		if (prGlueInfo->rWpaInfo.u4WpaVersion ==
 		    IW_AUTH_WPA_VERSION_WPA2 &&
-		    prWpaInfo->u4KeyMgmt == IW_AUTH_KEY_MGMT_802_1X) {
+		    prGlueInfo->rWpaInfo.u4KeyMgmt == IW_AUTH_KEY_MGMT_802_1X) {
 
 			/* only used in WPA2 */
 #if WIRELESS_EXT >= 18
@@ -4582,7 +4562,7 @@ wext_indicate_wext_event(IN struct GLUE_INFO *prGlueInfo,
 	}
 
 	/* Send event to user space */
-	wireless_send_event(prDevHandler, u4Cmd, &wrqu,
+	wireless_send_event(prGlueInfo->prDevHandler, u4Cmd, &wrqu,
 			    pucExtraInfo);
 
 skip_indicate_event:
@@ -4613,8 +4593,6 @@ struct iw_statistics *wext_get_wireless_stats(
 	struct iw_statistics *pStats = NULL;
 	int32_t i4Rssi;
 	uint32_t bufLen = 0;
-	uint8_t ucBssIndex;
-	struct PARAM_LINK_SPEED_EX rLinkSpeed;
 
 	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prDev));
 	ASSERT(prGlueInfo);
@@ -4628,350 +4606,13 @@ struct iw_statistics *wext_get_wireless_stats(
 		goto stat_out;
 	}
 
-	ucBssIndex = wlanGetBssIdx(prDev);
-	rStatus = kalIoctlByBssIdx(prGlueInfo, wlanoidQueryRssi, &rLinkSpeed,
-			   sizeof(rLinkSpeed), TRUE, TRUE, TRUE, &bufLen,
-			   ucBssIndex);
-
-	if (ucBssIndex < BSSID_NUM)
-		i4Rssi = rLinkSpeed.rLq[ucBssIndex].cRssi;
+	rStatus = kalIoctl(prGlueInfo, wlanoidQueryRssi, &i4Rssi,
+			   sizeof(i4Rssi), TRUE, TRUE, TRUE, &bufLen);
 
 stat_out:
 	return pStats;
 }				/* wlan_get_wireless_stats */
 
-
-/* Standard call implementations */
-static int std_get_name(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-    //#ifdef ODM_WT_EDIT
-    //Fanghua.Zhu@ODM_WT.BSP.CONN.WIFI.BugID2628224, 2019/12/18, Modify for reduce reduce wifi kernel log print.
-    //DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-    //#endif /* ODM_WT_EDIT */
-	return wext_get_name(prDev, NULL, (char *)(&(prData->name)),
-				    sizeof(prData->name), NULL);
-}
-
-static int std_set_freq(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_set_freq(prDev, NULL, &(prData->freq), NULL);
-}
-
-static int std_get_freq(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_get_freq(prDev, NULL, &(prData->freq), NULL);
-}
-
-static int std_set_mode(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_set_mode(prDev, NULL, &prData->mode, NULL);
-}
-
-static int std_get_mode(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_get_mode(prDev, NULL, &prData->mode, NULL);
-}
-
-static int std_set_ap(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	int ret = 0;
-
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-
-	if (prData->ap_addr.sa_data[0] == 0 &&
-		    prData->ap_addr.sa_data[1] == 0 &&
-		    prData->ap_addr.sa_data[2] == 0 &&
-		    prData->ap_addr.sa_data[3] == 0 &&
-		    prData->ap_addr.sa_data[4] == 0
-		    && prData->ap_addr.sa_data[5] == 0) {
-			/* WPA Supplicant will set 000000000000 in
-			 * wpa_driver_wext_deinit(), do nothing here or
-			 * disassoc again?
-			 */
-		ret = 0;
-	} else {
-		ret = wext_set_ap(prDev, NULL, &(prData->ap_addr), NULL);
-	}
-	return ret;
-}
-
-static int std_get_ap(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_get_ap(prDev, NULL, &(prData->ap_addr), NULL);
-}
-
-static int std_get_rate(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_get_rate(prDev, NULL, &prData->bitrate, NULL);
-}
-
-static int std_set_rts(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_set_rts(prDev, NULL, &(prData->rts), NULL);
-}
-
-static int std_get_rts(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_get_rts(prDev, NULL, &prData->rts, NULL);
-}
-
-static int std_get_frag(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_get_frag(prDev, NULL, &prData->frag, NULL);
-}
-
-static int std_set_txpow(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_set_txpow(prDev, NULL, &(prData->txpower), NULL);
-}
-
-static int std_get_txpow(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_get_txpow(prDev, NULL, &prData->txpower, NULL);
-}
-
-static int std_set_power(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_set_power(prDev, NULL, &prData->power, NULL);
-}
-
-static int std_get_power(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_get_power(prDev, NULL, &prData->power, NULL);
-}
-
-static int std_get_range(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_get_range(prDev, NULL, &(prData->data),
-				pcExtra);
-}
-
-static int std_set_priv(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_set_country(prDev, &(prData->data));
-}
-
-static int std_get_priv(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_get_priv(prDev, &(prData->data));
-}
-
-static int std_set_scan(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_set_scan(prDev, NULL, NULL, NULL);
-}
-
-static int std_set_mlme(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_set_mlme(prDev, NULL, &(prData->data), pcExtra);
-}
-
-static int std_get_scan(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_get_scan(prDev, NULL, &(prData->data), pcExtra);
-}
-
-static int std_set_essid(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_set_essid(prDev, NULL, &(prData->essid), pcExtra);
-}
-
-static int std_get_essid(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_get_essid(prDev, NULL, &(prData->essid), pcExtra);
-}
-
-static int std_set_encode(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_set_encode(prDev, NULL,
-			  &(prData->encoding),
-			  pcExtra);
-}
-
-static int std_get_encode(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_get_encode(prDev, NULL, &(prData->encoding), NULL);
-}
-
-static int std_set_auth(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_set_auth(prDev, NULL, &(prData->param), NULL);
-}
-
-#if WIRELESS_EXT > 17
-static int std_set_genie(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	uint32_t u4ExtraSize = prData->data.length;
-	struct GLUE_INFO *prGlueInfo = NULL;
-
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-
-#if CFG_SUPPORT_WAPI
-	/* The max wapi ie buffer */
-	if (u4ExtraSize > 42)
-		return -EINVAL;
-#endif
-
-	if (prData->data.pointer) {
-		u4ExtraSize = prData->data.length;
-		prGlueInfo = *((struct GLUE_INFO **)
-						 netdev_priv(prDev));
-		wext_support_ioctl_SIOCSIWGENIE(
-			prDev, pcExtra,
-			u4ExtraSize);
-	}
-
-	return 0;
-}
-#endif /* end of WIRELESS_EXT */
-
-static int std_set_encode_ext(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-	return wext_set_encode_ext(prDev, NULL, &(prData->encoding),
-						  pcExtra);
-}
-
-static int std_set_pmska(struct net_device *prDev,
-		struct iw_request_info *rIwReqInfo,
-		union iwreq_data *prData,
-		char *pcExtra)
-{
-	int ret = 0;
-
-	DBGLOG(INIT, INFO, " mtk std ioctl is called.\n");
-
-	switch (((struct iw_pmksa *)pcExtra)->cmd) {
-	case IW_PMKSA_ADD:
-		wext_support_ioctl_SIOCSIWPMKSA_Action(
-				prDev, pcExtra,
-				IW_PMKSA_ADD, &ret);
-		break;
-	case IW_PMKSA_REMOVE:
-		break;
-	case IW_PMKSA_FLUSH:
-		wext_support_ioctl_SIOCSIWPMKSA_Action(
-				prDev, pcExtra,
-				IW_PMKSA_FLUSH, &ret);
-		break;
-	default:
-		DBGLOG(INIT, INFO,
-			"UNKNOWN iw_pmksa command:%d\n",
-			((struct iw_pmksa *)pcExtra)
-			->cmd);
-		ret = -EFAULT;
-		break;
-	}
-	return ret;
-}
 
 
 #endif /* WIRELESS_EXT */

@@ -199,12 +199,13 @@ u_int8_t secRxPortControlCheck(IN struct ADAPTER *prAdapter,
 			       IN struct SW_RFB *prSWRfb);
 
 void secSetCipherSuite(IN struct ADAPTER *prAdapter,
-		       IN uint32_t u4CipherSuitesFlags,
-		       IN uint8_t ucBssIndex);
+		       IN uint32_t u4CipherSuitesFlags);
 
 u_int8_t secIsProtectedFrame(IN struct ADAPTER *prAdapter,
 			     IN struct MSDU_INFO *prMsdu,
 			     IN struct STA_RECORD *prStaRec);
+
+void secClearPmkid(IN struct ADAPTER *prAdapter);
 
 u_int8_t secRsnKeyHandshakeEnabled(IN struct ADAPTER
 				   *prAdapter);
@@ -216,8 +217,7 @@ uint8_t secGetBmcWlanIndex(IN struct ADAPTER *prAdapter,
 u_int8_t secTransmitKeyExist(IN struct ADAPTER *prAdapter,
 			     IN struct STA_RECORD *prSta);
 
-u_int8_t secEnabledInAis(IN struct ADAPTER *prAdapter,
-		IN uint8_t ucBssIndex);
+u_int8_t secEnabledInAis(IN struct ADAPTER *prAdapter);
 
 u_int8_t secPrivacySeekForEntry(IN struct ADAPTER
 				*prAdapter, IN struct STA_RECORD *prSta);
@@ -242,9 +242,6 @@ uint8_t secGetStaIdxByWlanIdx(IN struct ADAPTER *prAdapter,
 
 uint8_t secGetBssIdxByWlanIdx(IN struct ADAPTER *prAdapter,
 			      IN uint8_t ucWlanIdx);
-
-uint8_t secGetBssIdxByRfb(IN struct ADAPTER *prAdapter,
-	IN struct SW_RFB *prSwRfb);
 
 uint8_t secLookupStaRecIndexFromTA(struct ADAPTER
 				   *prAdapter, uint8_t *pucMacAddress);
@@ -274,15 +271,7 @@ void secPostUpdateAddr(IN struct ADAPTER *prAdapter,
 enum ENUM_EAPOL_KEY_TYPE_T secGetEapolKeyType(
 	uint8_t *pucPacket);
 
-void secHandleRxEapolPacket(IN struct ADAPTER *prAdapter,
-		IN struct SW_RFB *prRetSwRfb,
-		IN struct STA_RECORD *prStaRec);
-
 uint8_t secGetDHCPType(uint8_t *pucPkt);
-
-void secHandleNoWtbl(IN struct ADAPTER *prAdapter,
-	IN struct SW_RFB *prSwRfb);
-
 /*******************************************************************************
  *                              F U N C T I O N S
  *******************************************************************************

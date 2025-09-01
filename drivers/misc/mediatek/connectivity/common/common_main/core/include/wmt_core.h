@@ -181,8 +181,6 @@ typedef enum _ENUM_WMT_OPID_T {
 	WMT_OPID_TRY_PWR_OFF = 35,
 	WMT_OPID_BLANK_STATUS_CTRL = 36,
 	WMT_OPID_MET_CTRL = 37,
-	WMT_OPID_GPS_SUSPEND = 38,
-	WMT_OPID_RESUME_DUMP_INFO = 39,
 	WMT_OPID_MAX
 } ENUM_WMT_OPID_T, *P_ENUM_WMT_OPID_T;
 
@@ -250,8 +248,6 @@ typedef struct _WMT_GEN_CONF {
 	/*GPS LNA setting */
 	UINT8 wmt_gps_lna_pin;
 	UINT8 wmt_gps_lna_enable;
-	/*GPS HW suspend setting */
-	UINT8 wmt_gps_suspend_ctrl;
 	/*Power on sequence */
 	UINT8 pwr_on_rtc_slot;
 	UINT8 pwr_on_ldo_slot;
@@ -274,7 +270,8 @@ typedef struct _WMT_GEN_CONF {
 	UINT32 coex_wmt_ext_elna_gain_p1_D1;
 	UINT32 coex_wmt_ext_elna_gain_p1_D2;
 	UINT32 coex_wmt_ext_elna_gain_p1_D3;
-	PINT8 coex_wmt_antsel_invert_support;
+	PINT8  coex_wmt_antsel_invert_support;
+	UINT8  coex_wmt_ext_epa_mode;
 
 	struct WMT_BYTE_ARRAY *coex_wmt_epa_elna;
 
@@ -293,10 +290,6 @@ typedef struct _WMT_GEN_CONF {
 	UINT8 coex_config_addjust_ble_scan_time_ratio_bt_slot;
 	UINT8 coex_config_addjust_ble_scan_time_ratio_wifi_slot;
 
-	/* wifi ant swap feature */
-	UINT8 wifi_ant_swap_mode;
-	UINT8 wifi_main_ant_polarity;
-	UINT8 wifi_ant_swap_ant_sel_gpio;
 } WMT_GEN_CONF, *P_WMT_GEN_CONF;
 
 typedef enum _ENUM_DRV_STS_ {
@@ -537,8 +530,6 @@ VOID wmt_core_set_blank_status(UINT32 on_off_flag);
 extern UINT32 wmt_core_get_blank_status(VOID);
 
 INT32 wmt_blank_status_ctrl(UINT32 on_off_flag);
-
-void wmt_send_bt_tssi_cmd(void);
 
 /*******************************************************************************
 *                              F U N C T I O N S

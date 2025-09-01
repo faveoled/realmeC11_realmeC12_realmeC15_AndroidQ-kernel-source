@@ -634,81 +634,46 @@ VOID nicCmdEventQueryStatistics(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prCmdI
 	P_EVENT_STATISTICS prEventStatistics;
 	P_GLUE_INFO_T prGlueInfo;
 	UINT_32 u4QueryInfoLen;
-#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
-	/* link quality monitor */
-	struct WIFI_LINK_QUALITY_INFO *prLinkQualityInfo;
-#endif
 
 	ASSERT(prAdapter);
 	ASSERT(prCmdInfo);
 
 	prEventStatistics = (P_EVENT_STATISTICS) pucEventBuf;
 
-	prGlueInfo = prAdapter->prGlueInfo;
+	if (prCmdInfo->fgIsOid) {
+		prGlueInfo = prAdapter->prGlueInfo;
 
-	u4QueryInfoLen = sizeof(PARAM_802_11_STATISTICS_STRUCT_T);
-	prStatistics = (P_PARAM_802_11_STATISTICS_STRUCT_T) prCmdInfo->pvInformationBuffer;
+		u4QueryInfoLen = sizeof(PARAM_802_11_STATISTICS_STRUCT_T);
+		prStatistics = (P_PARAM_802_11_STATISTICS_STRUCT_T) prCmdInfo->pvInformationBuffer;
 
-	prStatistics->u4Length = sizeof(PARAM_802_11_STATISTICS_STRUCT_T);
-	prStatistics->rTransmittedFragmentCount = prEventStatistics->rTransmittedFragmentCount;
-	prStatistics->rMulticastTransmittedFrameCount = prEventStatistics->rMulticastTransmittedFrameCount;
-	prStatistics->rFailedCount = prEventStatistics->rFailedCount;
-	prStatistics->rRetryCount = prEventStatistics->rRetryCount;
-	prStatistics->rMultipleRetryCount = prEventStatistics->rMultipleRetryCount;
-	prStatistics->rRTSSuccessCount = prEventStatistics->rRTSSuccessCount;
-	prStatistics->rRTSFailureCount = prEventStatistics->rRTSFailureCount;
-	prStatistics->rACKFailureCount = prEventStatistics->rACKFailureCount;
-	prStatistics->rFrameDuplicateCount = prEventStatistics->rFrameDuplicateCount;
-	prStatistics->rReceivedFragmentCount = prEventStatistics->rReceivedFragmentCount;
-	prStatistics->rMulticastReceivedFrameCount = prEventStatistics->rMulticastReceivedFrameCount;
-	prStatistics->rFCSErrorCount = prEventStatistics->rFCSErrorCount;
-	prStatistics->rTKIPLocalMICFailures.QuadPart = 0;
-	prStatistics->rTKIPICVErrors.QuadPart = 0;
-	prStatistics->rTKIPCounterMeasuresInvoked.QuadPart = 0;
-	prStatistics->rTKIPReplays.QuadPart = 0;
-	prStatistics->rCCMPFormatErrors.QuadPart = 0;
-	prStatistics->rCCMPReplays.QuadPart = 0;
-	prStatistics->rCCMPDecryptErrors.QuadPart = 0;
-	prStatistics->rFourWayHandshakeFailures.QuadPart = 0;
-	prStatistics->rWEPUndecryptableCount.QuadPart = 0;
-	prStatistics->rWEPICVErrorCount.QuadPart = 0;
-	prStatistics->rDecryptSuccessCount.QuadPart = 0;
-	prStatistics->rDecryptFailureCount.QuadPart = 0;
-#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
-	prStatistics->rMdrdyCnt = prEventStatistics->rMdrdyCnt;
-	prStatistics->rChnlIdleCnt = prEventStatistics->rChnlIdleCnt;
+		prStatistics->u4Length = sizeof(PARAM_802_11_STATISTICS_STRUCT_T);
+		prStatistics->rTransmittedFragmentCount = prEventStatistics->rTransmittedFragmentCount;
+		prStatistics->rMulticastTransmittedFrameCount = prEventStatistics->rMulticastTransmittedFrameCount;
+		prStatistics->rFailedCount = prEventStatistics->rFailedCount;
+		prStatistics->rRetryCount = prEventStatistics->rRetryCount;
+		prStatistics->rMultipleRetryCount = prEventStatistics->rMultipleRetryCount;
+		prStatistics->rRTSSuccessCount = prEventStatistics->rRTSSuccessCount;
+		prStatistics->rRTSFailureCount = prEventStatistics->rRTSFailureCount;
+		prStatistics->rACKFailureCount = prEventStatistics->rACKFailureCount;
+		prStatistics->rFrameDuplicateCount = prEventStatistics->rFrameDuplicateCount;
+		prStatistics->rReceivedFragmentCount = prEventStatistics->rReceivedFragmentCount;
+		prStatistics->rMulticastReceivedFrameCount = prEventStatistics->rMulticastReceivedFrameCount;
+		prStatistics->rFCSErrorCount = prEventStatistics->rFCSErrorCount;
+		prStatistics->rTKIPLocalMICFailures.QuadPart = 0;
+		prStatistics->rTKIPICVErrors.QuadPart = 0;
+		prStatistics->rTKIPCounterMeasuresInvoked.QuadPart = 0;
+		prStatistics->rTKIPReplays.QuadPart = 0;
+		prStatistics->rCCMPFormatErrors.QuadPart = 0;
+		prStatistics->rCCMPReplays.QuadPart = 0;
+		prStatistics->rCCMPDecryptErrors.QuadPart = 0;
+		prStatistics->rFourWayHandshakeFailures.QuadPart = 0;
+		prStatistics->rWEPUndecryptableCount.QuadPart = 0;
+		prStatistics->rWEPICVErrorCount.QuadPart = 0;
+		prStatistics->rDecryptSuccessCount.QuadPart = 0;
+		prStatistics->rDecryptFailureCount.QuadPart = 0;
 
-	/* link quality monitor */
-	prLinkQualityInfo =
-		&(prAdapter->rLinkQualityInfo);
-
-	prLinkQualityInfo->u8TxRetryCount =
-		prStatistics->rRetryCount.QuadPart;
-
-	prLinkQualityInfo->u8TxRtsFailCount =
-		prStatistics->rRTSFailureCount.QuadPart;
-	prLinkQualityInfo->u8TxAckFailCount =
-		prStatistics->rACKFailureCount.QuadPart;
-	prLinkQualityInfo->u8TxFailCount = prLinkQualityInfo->u8TxRtsFailCount
-									 + prLinkQualityInfo->u8TxAckFailCount;
-	prLinkQualityInfo->u8TxTotalCount =
-		prStatistics->rTransmittedFragmentCount.QuadPart;
-
-	prLinkQualityInfo->u8RxTotalCount =
-		prStatistics->rReceivedFragmentCount.QuadPart;
-	/* FW report is diff, driver count total */
-	prLinkQualityInfo->u8RxErrCount +=
-		prStatistics->rFCSErrorCount.QuadPart;
-	prLinkQualityInfo->u8MdrdyCount =
-		prStatistics->rMdrdyCnt.QuadPart;
-	prLinkQualityInfo->u8IdleSlotCount =
-		prStatistics->rChnlIdleCnt.QuadPart;
-
-	wlanFinishCollectingLinkQuality(prGlueInfo);
-#endif
-	if (prCmdInfo->fgIsOid)
 		kalOidComplete(prGlueInfo, prCmdInfo->fgSetQuery, u4QueryInfoLen, WLAN_STATUS_SUCCESS);
-
+	}
 }
 
 VOID nicCmdEventEnterRfTest(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prCmdInfo, IN PUINT_8 pucEventBuf)
@@ -722,8 +687,6 @@ VOID nicCmdEventEnterRfTest(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prCmdInfo,
 	ASSERT(prAdapter);
 	ASSERT(prCmdInfo);
 
-	kalTakeVcoreAction(VCORE_ADD_HIGHER_REQ);
-	kalMayChangeVcore();
 	/* [driver-land] */
 	/* prAdapter->fgTestMode = TRUE; */
 	if (prAdapter->fgTestMode)
@@ -812,8 +775,6 @@ VOID nicCmdEventLeaveRfTest(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prCmdInfo,
 	ASSERT(prAdapter);
 	ASSERT(prCmdInfo);
 
-	kalTakeVcoreAction(VCORE_RESTORE_DEF);
-	kalTakeVcoreAction(VCORE_DEC_HIGHER_REQ);
 	/* 1. Disable Interrupt */
 	HAL_INTR_DISABLE(prAdapter);
 
@@ -1478,16 +1439,6 @@ UINT_32 TsfRawData2IqFmt(P_EVENT_DUMP_MEM_T prEventDumpMem)
 	pucDataRAWWF0 = kmalloc(150, GFP_KERNEL);
 	pucDataRAWWF1 = kmalloc(150, GFP_KERNEL);
 
-	if ((!pucDataWF0) || (!pucDataWF1) ||
-	    (!pucDataRAWWF0) || (!pucDataRAWWF1)) {
-		DBGLOG(INIT, ERROR, "kmalloc failed.\n");
-		kfree(pucDataWF0);
-		kfree(pucDataWF1);
-		kfree(pucDataRAWWF0);
-		kfree(pucDataRAWWF1);
-		return -1;
-	}
-
 	fgAppend = TRUE;
 
 	DBGLOG(RFTEST, INFO, "TsfRawData2IqFmt : prEventDumpMem->u4RemainLength = %u\n",
@@ -1553,7 +1504,7 @@ UINT_32 TsfRawData2IqFmt(P_EVENT_DUMP_MEM_T prEventDumpMem)
 			u4RemainByte = 0;
 			u4CpyLen = 0;
 		} else {
-			u4CpyLen = (u4RemainByte >= u4FmtLen) ? u4FmtLen : u4RemainByte;
+			u4CpyLen = (u4RemainByte - u4FmtLen >= 0) ? u4FmtLen : u4RemainByte;
 		}
 
 		DBGLOG(RFTEST, TRACE, "TsfRawData2IqFmt : u4CpyLen = %u\n", u4CpyLen);
@@ -1947,10 +1898,6 @@ VOID nicCmdEventQueryStaStatistics(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prC
 	P_PARAM_GET_STA_STATISTICS prStaStatistics;
 	ENUM_WMM_ACI_T eAci;
 	P_STA_RECORD_T prStaRec;
-#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
-	/* link quality monitor */
-	struct WIFI_LINK_QUALITY_INFO *prLinkQualityInfo;
-#endif
 
 	ASSERT(prAdapter);
 	ASSERT(prCmdInfo);
@@ -1971,9 +1918,6 @@ VOID nicCmdEventQueryStaStatistics(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prC
 
 		prStaStatistics->u4TxFailCount = prEvent->u4TxFailCount;
 		prStaStatistics->u4TxLifeTimeoutCount = prEvent->u4TxLifeTimeoutCount;
-
-		prStaStatistics->u4TransmitCount = prEvent->u4TransmitCount;
-		prStaStatistics->u4TransmitFailCount = prEvent->u4TransmitFailCount;
 
 		prStaRec = cnmGetStaRecByIndex(prAdapter, prEvent->ucStaRecIdx);
 
@@ -2036,11 +1980,6 @@ VOID nicCmdEventQueryStaStatistics(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prC
 			       prStaStatistics->u4TxAverageAirTime, prStaStatistics->u4TxTotalCount);
 		}
 #endif
-#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
-		/* link quality monitor */
-		prLinkQualityInfo = &(prAdapter->rLinkQualityInfo);
-		prLinkQualityInfo->u4CurTxRate = prEvent->u2LinkSpeed * 5;
-#endif
 	}
 
 	if (prCmdInfo->fgIsOid)
@@ -2048,7 +1987,7 @@ VOID nicCmdEventQueryStaStatistics(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prC
 
 }
 
-/*the same as gen4m*/
+#if CFG_AUTO_CHANNEL_SEL_SUPPORT
 /*----------------------------------------------------------------------------*/
 /*!
 * @brief This function is called when event for query LTE safe channels
@@ -2063,10 +2002,11 @@ VOID nicCmdEventQueryStaStatistics(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prC
 /*----------------------------------------------------------------------------*/
 VOID nicCmdEventQueryLteSafeChn(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prCmdInfo, IN PUINT_8 pucEventBuf)
 {
+	UINT_32 u4QueryInfoLen;
 	P_EVENT_LTE_SAFE_CHN_T prEvent;
+	P_GLUE_INFO_T prGlueInfo;
 	P_PARAM_GET_CHN_INFO prLteSafeChnInfo;
 	UINT_8 ucIdx = 0;
-	P_P2P_ROLE_FSM_INFO_T prP2pRoleFsmInfo;
 
 	if ((prAdapter == NULL)
 		|| (prCmdInfo == NULL)
@@ -2076,49 +2016,29 @@ VOID nicCmdEventQueryLteSafeChn(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prCmdI
 		return;
 	}
 
+	if (prCmdInfo->fgIsOid) {
+		prGlueInfo = prAdapter->prGlueInfo;
 		prEvent = (P_EVENT_LTE_SAFE_CHN_T) pucEventBuf;	/* FW responsed data */
 
 		prLteSafeChnInfo = (P_PARAM_GET_CHN_INFO) prCmdInfo->pvInformationBuffer;
-		if (prLteSafeChnInfo->ucRoleIndex >= BSS_P2P_NUM) {
-			ASSERT(FALSE);
-			return;
-		}
 
-		prP2pRoleFsmInfo = P2P_ROLE_INDEX_2_ROLE_FSM_INFO(prAdapter,
-			prLteSafeChnInfo->ucRoleIndex);
-		if (prP2pRoleFsmInfo == NULL) {
-			DBGLOG(P2P, ERROR,
-				"Corresponding P2P Role FSM empty: %d.\n",
-				prLteSafeChnInfo->ucRoleIndex);
-			return;
-		}
+		u4QueryInfoLen = sizeof(PARAM_GET_CHN_INFO);
 
 		/* Statistics from FW is valid */
 		if (prEvent->u4Flags & BIT(0)) {
-			P_CMD_LTE_SAFE_CHN_INFO_T prLteSafeChnList;
-
-			prLteSafeChnList = &prLteSafeChnInfo->rLteSafeChnList;
 			for (ucIdx = 0; ucIdx < 5; ucIdx++) {
-				prLteSafeChnList->au4SafeChannelBitmask[ucIdx]
-					= prEvent->rLteSafeChn.
-						au4SafeChannelBitmask[ucIdx];
+				prLteSafeChnInfo->rLteSafeChnList.au4SafeChannelBitmask[ucIdx] =
+					prEvent->rLteSafeChn.au4SafeChannelBitmask[ucIdx];
 
-				DBGLOG(NIC, INFO,
-					"[ACS]LTE safe channels[%d]=0x%08x\n",
-					ucIdx,
-					prLteSafeChnList->au4SafeChannelBitmask[ucIdx]);
+				DBGLOG(P2P, INFO,
+				       "[ACS]LTE safe channels[%d]=0x%08x\n", ucIdx,
+				       prLteSafeChnInfo->rLteSafeChnList.au4SafeChannelBitmask[ucIdx]);
 			}
-
-		} else {
-			DBGLOG(NIC, ERROR, "FW's event is NOT valid.\n");
 		}
-
-		p2pFunProcessAcsReport(prAdapter,
-						prLteSafeChnInfo->ucRoleIndex,
-						prLteSafeChnInfo,
-						&(prP2pRoleFsmInfo->rAcsReqInfo));
+		kalOidComplete(prGlueInfo, prCmdInfo->fgSetQuery, u4QueryInfoLen, WLAN_STATUS_SUCCESS);
+	}
 }
-
+#endif
 
 #ifdef FW_CFG_SUPPORT
 VOID nicCmdEventQueryCfgRead(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prCmdInfo, IN PUINT_8 pucEventBuf)
@@ -2204,66 +2124,5 @@ VOID nicOidCmdTimeoutSetAddKey(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prCmdIn
 	DBGLOG(NIC, WARN, "Wlan setaddkey timeout.\n");
 	if (prCmdInfo->fgIsOid)
 		kalOidComplete(prAdapter->prGlueInfo, prCmdInfo->fgSetQuery, 0, WLAN_STATUS_FAILURE);
-}
-#endif
-
-#if CFG_SUPPORT_REPORT_MISC
-VOID nicCmdEventReportMisc(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prCmdInfo, IN PUINT_8 pucEventBuf)
-{
-	ASSERT(prAdapter);
-
-	if (pucEventBuf) {
-		UINT_64 now = 0;
-		struct EVENT_REPORT_MISC *prEvent = (struct EVENT_REPORT_MISC *)pucEventBuf;
-		struct EVENT_REPORT_MISC *prReportMisc = &prAdapter->rReportMiscSet.reportMisc;
-		char *periodStr = NULL;
-
-		switch (prAdapter->rReportMiscSet.eQueryNum) {
-		case REPORT_AUTHASSOC_START:
-		case REPORT_4WAYHS_START:
-		case REPORT_DHCP_START:
-			prReportMisc->ucFwVerMajor = prEvent->ucFwVerMajor;
-			prReportMisc->ucFwVerMinor = prEvent->ucFwVerMinor;
-			prReportMisc->u2FwVerBeta = prEvent->u2FwVerBeta;
-			prReportMisc->u4MdrdyCnt = prEvent->u4RxMpduCnt;
-			prReportMisc->u4ChannelIdleCnt = prEvent->u4ChannelIdleCnt;
-			prAdapter->rReportMiscSet.u8Ts = sched_clock();
-			break;
-		case REPORT_AUTHASSOC_END:
-			periodStr = "auth to assoc";
-			goto REPORT_MISC;
-		case REPORT_4WAYHS_END:
-			periodStr = "4-way flow";
-			if (prEvent->cRssi)
-				prAdapter->rReportMiscSet.i4Rssi = prEvent->cRssi;
-			goto REPORT_MISC;
-		case REPORT_DHCP_END:
-			periodStr = "dhcp flow";
-			if (prEvent->cRssi)
-				prAdapter->rReportMiscSet.i4Rssi = prEvent->cRssi;
-			/* don't break here */
-REPORT_MISC:
-			now = sched_clock();
-			DBGLOG(NIC, TRACE, "Ver=0x%x.%x.%04x,Time=%llu,Period=%s,MDRDY=%u,SLOTID=%u,MPDU=%u,RSSI=%d\n",
-				prReportMisc->ucFwVerMajor,
-				prReportMisc->ucFwVerMinor,
-				prReportMisc->u2FwVerBeta,
-				now - prAdapter->rReportMiscSet.u8Ts,
-				periodStr,
-				prEvent->u4MdrdyCnt - prReportMisc->u4MdrdyCnt,
-				prEvent->u4ChannelIdleCnt - prReportMisc->u4ChannelIdleCnt,
-				prEvent->u4RxMpduCnt - prReportMisc->u4RxMpduCnt,
-				prAdapter->rReportMiscSet.i4Rssi);
-			prAdapter->rReportMiscSet.eQueryNum = 0;
-			break;
-		default:
-			DBGLOG(NIC, WARN, "Report Misc Error, prAdapter->rReportMiscSet.eQueryNum: %d\n",
-			       prAdapter->rReportMiscSet.eQueryNum);
-			break;
-
-		}
-	}
-	if (prCmdInfo->fgIsOid)
-		kalOidComplete(prAdapter->prGlueInfo, prCmdInfo->u4InformationBufferLength, 0, WLAN_STATUS_SUCCESS);
 }
 #endif

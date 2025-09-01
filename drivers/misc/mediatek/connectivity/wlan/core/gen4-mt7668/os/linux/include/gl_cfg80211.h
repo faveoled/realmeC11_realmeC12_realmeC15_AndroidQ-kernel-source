@@ -162,17 +162,9 @@ typedef enum _ENUM_TESTMODE_STA_STATISTICS_ATTR {
 ********************************************************************************
 */
 /* cfg80211 hooks */
-#if KERNEL_VERSION(4, 12, 0) <= CFG80211_VERSION_CODE
-int
-mtk_cfg80211_change_iface(struct wiphy *wiphy,
-			  struct net_device *ndev,
-			  enum nl80211_iftype type,
-			  struct vif_params *params);
-#else
 int
 mtk_cfg80211_change_iface(struct wiphy *wiphy,
 			  struct net_device *ndev, enum nl80211_iftype type, u32 *flags, struct vif_params *params);
-#endif
 
 int
 mtk_cfg80211_add_key(struct wiphy *wiphy,
@@ -203,19 +195,9 @@ mtk_cfg80211_get_link_statistics(struct wiphy *wiphy, struct net_device *ndev, u
 
 int mtk_cfg80211_scan(struct wiphy *wiphy, struct cfg80211_scan_request *request);
 
-#if CFG_SUPPORT_CFG80211_AUTH
-int mtk_cfg80211_auth(struct wiphy *wiphy, struct net_device *ndev,
-			struct cfg80211_auth_request *req);
-#endif
-
 int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cfg80211_connect_params *sme);
 
 int mtk_cfg80211_disconnect(struct wiphy *wiphy, struct net_device *ndev, u16 reason_code);
-
-#if CFG_SUPPORT_CFG80211_AUTH
-int mtk_cfg80211_deauth(struct wiphy *wiphy, struct net_device *ndev,
-			struct cfg80211_deauth_request *req);
-#endif
 
 int mtk_cfg80211_join_ibss(struct wiphy *wiphy, struct net_device *ndev, struct cfg80211_ibss_params *params);
 
@@ -341,7 +323,6 @@ void mtk_reg_notify(IN struct wiphy *pWiphy, IN struct regulatory_request *pRequ
 void cfg80211_regd_set_wiphy(IN struct wiphy *pWiphy);
 
 int mtk_cfg80211_suspend(struct wiphy *wiphy, struct cfg80211_wowlan *wow);
-int cfg80211_get_non_wfa_vendor_ie(P_GLUE_INFO_T prGlueInfo, u8 *ies, int len);
 
 /*******************************************************************************
 *                              F U N C T I O N S

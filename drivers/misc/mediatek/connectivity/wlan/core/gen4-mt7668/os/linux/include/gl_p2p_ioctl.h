@@ -369,11 +369,7 @@ extern const UINT_32 mtk_cipher_suites[5];
 
 #if (CFG_ENABLE_WIFI_DIRECT_CFG_80211 != 0)
 
-#if KERNEL_VERSION(4, 12, 0) <= CFG80211_VERSION_CODE
-struct wireless_dev *mtk_p2p_cfg80211_add_iface(struct wiphy *wiphy,
-			const char *name, unsigned char name_assign_type,
-			enum nl80211_iftype type, struct vif_params *params);
-#elif KERNEL_VERSION(4, 1, 0) <= CFG80211_VERSION_CODE
+#if KERNEL_VERSION(4, 1, 0) <= CFG80211_VERSION_CODE
 struct wireless_dev *mtk_p2p_cfg80211_add_iface(struct wiphy *wiphy,
 						const char *name, unsigned char name_assign_type,
 						enum nl80211_iftype type, u32 *flags, struct vif_params *params);
@@ -383,18 +379,10 @@ struct wireless_dev *mtk_p2p_cfg80211_add_iface(struct wiphy *wiphy,
 						enum nl80211_iftype type, u32 *flags, struct vif_params *params);
 #endif
 
-#if KERNEL_VERSION(4, 12, 0) <= CFG80211_VERSION_CODE
-int
-mtk_p2p_cfg80211_change_iface(IN struct wiphy *wiphy,
-			      IN struct net_device *ndev,
-			      IN enum nl80211_iftype type,
-			      IN struct vif_params *params);
-#else
 int
 mtk_p2p_cfg80211_change_iface(struct wiphy *wiphy,
 			      struct net_device *ndev,
 			      enum nl80211_iftype type, u32 *flags, struct vif_params *params);
-#endif
 
 int mtk_p2p_cfg80211_del_iface(struct wiphy *wiphy, struct wireless_dev *wdev);
 
@@ -535,11 +523,6 @@ int mtk_p2p_cfg80211_testmode_hotspot_block_list_cmd(IN struct wiphy *wiphy, IN 
 
 #if CFG_AUTO_CHANNEL_SEL_SUPPORT
 int mtk_p2p_cfg80211_testmode_get_best_channel(IN struct wiphy *wiphy, IN void *data, IN int len);
-#endif
-
-#if GO_STA_SCC
-int mtk_p2p_cfg80211_go_channel_switch(IN struct wiphy *wiphy,
-		IN struct wireless_dev *wdev, IN void *data, IN int len);
 #endif
 
 #else

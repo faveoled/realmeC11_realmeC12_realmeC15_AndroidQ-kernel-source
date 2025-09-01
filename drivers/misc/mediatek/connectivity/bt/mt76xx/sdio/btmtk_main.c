@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016 MediaTek Inc.
+ *  Copyright (c) 2016,2017 MediaTek Inc.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -16,11 +16,6 @@
 #include <linux/of.h>
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
-#if (KERNEL_VERSION(4, 14, 0) > LINUX_VERSION_CODE)
-#include <linux/sched.h>
-#else
-#include <uapi/linux/sched/types.h>
-#endif
 
 #include "btmtk_drv.h"
 #include "btmtk_sdio.h"
@@ -53,7 +48,7 @@ int btmtk_enable_hs(struct btmtk_private *priv)
 			adapter->hs_state,
 			msecs_to_jiffies(WAIT_UNTIL_HS_STATE_CHANGED));
 	if (ret < 0) {
-		pr_info("event_hs_wait_q terminated (%d): %d,%d,%d\n",
+		pr_err("event_hs_wait_q terminated (%d): %d,%d,%d\n",
 			ret, adapter->hs_state, adapter->ps_state,
 			adapter->wakeup_tries);
 
@@ -73,25 +68,22 @@ static int btmtk_tx_pkt(struct btmtk_private *priv, struct sk_buff *skb)
 	u32 sdio_header_len = 0;
 
 	if (!skb) {
-		pr_info("%s skb is NULL return -EINVAL\n", __func__);
+		pr_warn("%s skb is NULL return -EINVAL\n", __func__);
 		return -EINVAL;
 	}
 
 	pr_debug("%s skb->len %d\n", __func__, skb->len);
 
 	if (!skb->data) {
-		pr_info("%s skb->data is NULL return -EINVAL\n", __func__);
+		pr_warn("%s skb->data is NULL return -EINVAL\n", __func__);
 		return -EINVAL;
 	}
 
 	if (!skb->len || ((skb->len + BTM_HEADER_LEN) > BTM_UPLD_SIZE)) {
-		pr_info("Tx Error: Bad skb length %d : %d\n",
+		pr_warn("Tx Error: Bad skb length %d : %d\n",
 						skb->len, BTM_UPLD_SIZE);
 		return -EINVAL;
 	}
-
-	if (priv->hci_snoop_save)
-		priv->hci_snoop_save(bt_cb(skb)->pkt_type, skb->data, skb->len);
 
 	sdio_header_len = skb->len + BTM_HEADER_LEN;
 	memset(txbuf, 0, MTK_TXDATA_SIZE);
@@ -114,14 +106,13 @@ static void btmtk_init_adapter(struct btmtk_private *priv)
 
 	skb_queue_head_init(&priv->adapter->tx_queue);
 	skb_queue_head_init(&priv->adapter->fops_queue);
-	skb_queue_head_init(&priv->adapter->fwlog_fops_queue);
 	priv->adapter->ps_state = PS_AWAKE;
 
 	buf_size = ALIGN_SZ(SDIO_BLOCK_SIZE, BTSDIO_DMA_ALIGN);
 	priv->adapter->hw_regs_buf = kzalloc(buf_size, GFP_KERNEL);
 	if (!priv->adapter->hw_regs_buf) {
 		priv->adapter->hw_regs = NULL;
-		pr_info("Unable to allocate buffer for hw_regs.\n");
+		pr_err("Unable to allocate buffer for hw_regs.\n");
 	} else {
 		priv->adapter->hw_regs =
 			(u8 *)ALIGN_ADDR(priv->adapter->hw_regs_buf,
@@ -154,19 +145,11 @@ static int btmtk_service_main_thread(void *data)
 	struct btmtk_thread *thread = data;
 	struct btmtk_private *priv = thread->priv;
 	struct btmtk_adapter *adapter = NULL;
-	struct btmtk_sdio_card *card = NULL;
-#if (KERNEL_VERSION(4, 14, 0) > LINUX_VERSION_CODE)
 	wait_queue_t wait;
-#else
-	struct wait_queue_entry wait;
-#endif
 	struct sk_buff *skb;
 	int ret = 0;
 	int i = 0;
 	ulong flags;
-	struct sched_param param = { .sched_priority = 90 };/*RR 90 is the same as audio*/
-
-	sched_setscheduler(current, SCHED_RR, &param);
 
 	pr_notice("main_thread begin 50\n");
 	/* mdelay(50); */
@@ -185,7 +168,7 @@ static int btmtk_service_main_thread(void *data)
 		usleep_range(10*1000, 15*1000);
 
 		if (i == 1000) {
-			pr_info("%s probe_ready %d i = %d try too many times return\n",
+			pr_warn("%s probe_ready %d i = %d try too many times return\n",
 				__func__, probe_ready, i);
 			return 0;
 		}
@@ -194,33 +177,24 @@ static int btmtk_service_main_thread(void *data)
 	if (priv->adapter)
 		adapter = priv->adapter;
 	else {
-		pr_info("%s priv->adapter is NULL return\n", __func__);
+		pr_err("%s priv->adapter is NULL return\n", __func__);
 		return 0;
 	}
 
-	if (priv->btmtk_dev.card)
-		card = priv->btmtk_dev.card;
-	else {
-		pr_info("%s priv->btmtk_dev.card is NULL return\n", __func__);
-		return 0;
-	}
-
-	thread->thread_status = 1;
 	init_waitqueue_entry(&wait, current);
 	for (;;) {
 		add_wait_queue(&thread->wait_q, &wait);
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (kthread_should_stop()) {
-			pr_info("main_thread: break from main thread\n");
+			pr_warn("main_thread: break from main thread\n");
 			break;
 		}
 
-		if ((adapter->wakeup_tries ||
+		if (adapter->wakeup_tries ||
 				((!adapter->int_count) &&
 				(!priv->btmtk_dev.tx_dnld_rdy ||
-				skb_queue_empty(&adapter->tx_queue)))) &&
-				(!priv->btmtk_dev.reset_dongle)) {
-			pr_debug("%s main_thread is sleeping...\n", __func__);
+				skb_queue_empty(&adapter->tx_queue)))) {
+			pr_debug("main_thread is sleeping...\n");
 			schedule();
 		}
 
@@ -229,38 +203,14 @@ static int btmtk_service_main_thread(void *data)
 		remove_wait_queue(&thread->wait_q, &wait);
 
 		if (kthread_should_stop()) {
-			pr_info("%s break after wake up\n", __func__);
+			pr_warn("main_thread: break after wake up\n");
 			break;
 		}
 
-		if (priv->btmtk_dev.reset_dongle) {
-			ret = priv->hw_sdio_reset_dongle();
-			if (is_mt7663(card)) {
-				if (ret) {
-					pr_info(L0_RESET_TAG "%s hw reset dongle error <%d>\n",
-						__func__, ret);
-				} else {
-					pr_info(L0_RESET_TAG "%s hw reset dongle done\n",
-						__func__);
-					break;
-				}
-			} else {
-				if (ret) {
-					pr_info("%s btmtk_sdio_reset_dongle return %d, error\n",
-						__func__, ret);
-					break;
-				}
-			}
-		}
-
-		if (priv->btmtk_dev.reset_progress)
-			continue;
-
 		ret = priv->hw_set_own_back(DRIVER_OWN);
 		if (ret) {
-			pr_info("%s set driver own return fail\n", __func__);
-			priv->start_reset_dongle_progress();
-			continue;
+			pr_err("%s set driver own return fail\n", __func__);
+			break;
 		}
 
 		spin_lock_irqsave(&priv->driver_lock, flags);
@@ -268,10 +218,7 @@ static int btmtk_service_main_thread(void *data)
 			pr_debug("%s go int\n", __func__);
 			adapter->int_count = 0;
 			spin_unlock_irqrestore(&priv->driver_lock, flags);
-			if (priv->hw_process_int_status(priv)) {
-				priv->start_reset_dongle_progress();
-				continue;
-			}
+			priv->hw_process_int_status(priv);
 		} else if (adapter->ps_state == PS_SLEEP &&
 					!skb_queue_empty(&adapter->tx_queue)) {
 			pr_debug("%s go vender, todo\n", __func__);
@@ -304,35 +251,26 @@ static int btmtk_service_main_thread(void *data)
 			else
 				btmtk_print_buffer_conent(skb->data, 16);
 
-			ret = btmtk_tx_pkt(priv, skb);
-			if (ret && (ret != (-EINVAL))) {
-				pr_info("%s tx pkt return fail %d\n", __func__, ret);
-				priv->start_reset_dongle_progress();
-				continue;
-			}
+			btmtk_tx_pkt(priv, skb);
 
-			pr_debug("%s after btmtk_tx_pkt kfree_skb\n",
-				__func__);
-			kfree_skb(skb);
+			if (skb) {
+				pr_debug("%s after btmtk_tx_pkt kfree_skb\n",
+					__func__);
+				kfree_skb(skb);
+			}
 		}
 
 
 		if (skb_queue_empty(&adapter->tx_queue)) {
 			ret = priv->hw_set_own_back(FW_OWN);
 			if (ret) {
-				pr_info("%s set fw own return fail\n",
+				pr_err("%s set fw own return fail\n",
 					__func__);
-				priv->start_reset_dongle_progress();
-				continue;
+				break;
 			}
 		}
 	}
 	pr_info("%s  end\n", __func__);
-	thread->thread_status = 0;
-
-	if (is_mt7663(card) && priv->btmtk_dev.reset_dongle)
-		btmtk_remove_card(priv);
-
 	return 0;
 }
 
@@ -382,11 +320,8 @@ int btmtk_remove_card(struct btmtk_private *priv)
 	pr_info("%s begin\n", __func__);
 
 	pr_info("%s stop main_thread\n", __func__);
-	if (!IS_ERR(priv->main_thread.task) && (priv->main_thread.thread_status)) {
+	if (!PTR_ERR(priv->main_thread.task))
 		kthread_stop(priv->main_thread.task);
-		wake_up_interruptible(&priv->main_thread.wait_q);
-		pr_info("%s wake_up_interruptible main_thread done\n", __func__);
-	}
 	pr_info("%s stop main_thread done\n", __func__);
 #ifdef CONFIG_DEBUG_FS
 	/*btmtk_debugfs_remove(hdev);*/

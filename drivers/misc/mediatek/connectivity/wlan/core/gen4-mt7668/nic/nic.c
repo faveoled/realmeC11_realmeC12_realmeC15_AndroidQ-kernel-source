@@ -133,19 +133,14 @@ ECO_INFO_T g_eco_info = {0xFF};
  */
 #define LOCAL_NIC_ALLOCATE_MEMORY(pucMem, u4Size, eMemType, pucComment) \
 	{ \
-		DBGLOG(INIT, INFO, \
-			"Allocating %u bytes for %s.\n", \
-			u4Size, (char *)pucComment); \
+		DBGLOG(INIT, INFO, "Allocating %ld bytes for %s.\n", u4Size, pucComment); \
 		pucMem = (PUINT_8)kalMemAlloc(u4Size, eMemType); \
 		if (pucMem == (PUINT_8)NULL) { \
-			DBGLOG(INIT, ERROR, \
-				"Could not allocate %u bytes for %s.\n", \
-				u4Size, (char *)pucComment); \
+			DBGLOG(INIT, ERROR, "Could not allocate %ld bytes for %s.\n", u4Size, pucComment); \
 			break; \
 		} \
 		ASSERT(((ULONG)pucMem % 4) == 0); \
-		DBGLOG(INIT, INFO, "Virtual Address = 0x%p for %s.\n", \
-				(void *)pucMem, (char *)pucComment); \
+		DBGLOG(INIT, INFO, "Virtual Address = 0x%p for %s.\n", (ULONG)pucMem, pucComment); \
 	}
 
 /*******************************************************************************
@@ -196,12 +191,8 @@ WLAN_STATUS nicAllocateAdapterMemory(IN P_ADAPTER_T prAdapter)
 		/* Allocate memory for the CMD_INFO_T and its MGMT memory pool. */
 		prAdapter->u4MgtBufCachedSize = MGT_BUFFER_SIZE;
 
-#ifdef CFG_PREALLOC_MEMORY
-		prAdapter->pucMgtBufCached = preallocGetMem(MEM_ID_NIC_ADAPTER);
-#else
 		LOCAL_NIC_ALLOCATE_MEMORY(prAdapter->pucMgtBufCached,
 					  prAdapter->u4MgtBufCachedSize, PHY_MEM_TYPE, "COMMON MGMT MEMORY POOL");
-#endif
 
 		/* 4 <2> Memory for RX Descriptor */
 		/* Initialize the number of rx buffers we will have in our queue. */
@@ -224,16 +215,10 @@ WLAN_STATUS nicAllocateAdapterMemory(IN P_ADAPTER_T prAdapter)
 		prAdapter->u4CoalescingBufCachedSize = halGetValidCoalescingBufSize(prAdapter);
 
 		/* Allocate memory for the common coalescing buffer. */
-#ifdef CFG_PREALLOC_MEMORY
-		prAdapter->pucCoalescingBufCached =
-			preallocGetMem(MEM_ID_IO_BUFFER);
-#else
 		prAdapter->pucCoalescingBufCached = kalAllocateIOBuffer(prAdapter->u4CoalescingBufCachedSize);
-#endif
 
 		if (prAdapter->pucCoalescingBufCached == NULL) {
-			DBGLOG(INIT, ERROR,
-				"Could not allocate %u bytes for coalescing buffer.\n",
+			DBGLOG(INIT, ERROR, "Could not allocate %ld bytes for coalescing buffer.\n",
 				prAdapter->u4CoalescingBufCachedSize);
 			break;
 		}
@@ -278,9 +263,7 @@ VOID nicReleaseAdapterMemory(IN P_ADAPTER_T prAdapter)
 
 	/* 4 <4> Memory for Common Coalescing Buffer */
 	if (prAdapter->pucCoalescingBufCached) {
-#ifndef CFG_PREALLOC_MEMORY
 		kalReleaseIOBuffer((PVOID) prAdapter->pucCoalescingBufCached, prAdapter->u4CoalescingBufCachedSize);
-#endif
 		prAdapter->pucCoalescingBufCached = (PUINT_8) NULL;
 	}
 
@@ -296,9 +279,7 @@ VOID nicReleaseAdapterMemory(IN P_ADAPTER_T prAdapter)
 	}
 	/* 4 <1> Memory for Management Memory Pool */
 	if (prAdapter->pucMgtBufCached) {
-#ifndef CFG_PREALLOC_MEMORY
 		kalMemFree((PVOID) prAdapter->pucMgtBufCached, PHY_MEM_TYPE, prAdapter->u4MgtBufCachedSize);
-#endif
 		prAdapter->pucMgtBufCached = (PUINT_8) NULL;
 	}
 
@@ -529,7 +510,7 @@ WLAN_STATUS nicProcessIST_impl(IN P_ADAPTER_T prAdapter, IN UINT_32 u4IntStatus)
 				apfnEventFuncTable[prIntEventMap->u4Event] (prAdapter);
 			} else {
 				DBGLOG(INTR, WARN,
-				       "Empty INTR handler! ISAR bit#: %u, event:%u, func: 0x%p\n",
+				       "Empty INTR handler! ISAR bit#: %ld, event:%lu, func: 0x%x\n",
 				       prIntEventMap->u4Int, prIntEventMap->u4Event,
 				       apfnEventFuncTable[prIntEventMap->u4Event]);
 
@@ -607,12 +588,6 @@ WLAN_STATUS nicInitializeAdapter(IN P_ADAPTER_T prAdapter)
 	prAdapter->fgIsIntEnableWithLPOwnSet = FALSE;
 	prAdapter->fgIsReadRevID = FALSE;
 
-#if (CFG_EFUSE_BUFFER_MODE_DELAY_CAL == 1)
-	prAdapter->fgIsBufferBinExtract = FALSE;
-
-	prAdapter->u4EfuseMacAddrOffset = DEFAULT_EFUSE_MACADDR_OFFSET;
-#endif
-
 	do {
 		if (!nicVerifyChipID(prAdapter)) {
 			u4Status = WLAN_STATUS_FAILURE;
@@ -664,10 +639,10 @@ void nicRestoreSpiDefMode(IN P_ADAPTER_T prAdapter)
 /*----------------------------------------------------------------------------*/
 VOID nicProcessAbnormalInterrupt(IN P_ADAPTER_T prAdapter)
 {
-	UINT_32 u4Value = 0;
+	UINT_32 u4Value;
 
 	HAL_MCR_RD(prAdapter, MCR_WASR, &u4Value);
-	DBGLOG(REQ, WARN, "MCR_WASR: 0x%x\n", u4Value);
+	DBGLOG(REQ, WARN, "MCR_WASR: 0x%lx\n", u4Value);
 #if CFG_CHIP_RESET_SUPPORT
 	glResetTrigger(prAdapter);
 #endif
@@ -1305,6 +1280,9 @@ WLAN_STATUS nicActivateNetwork(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBssIndex)
 	prBssInfo->ucBMCWlanIndex =
 	    secPrivacySeekForBcEntry(prAdapter, prBssInfo->ucBssIndex,
 				     prBssInfo->aucOwnMacAddr, STA_REC_INDEX_NOT_FOUND, CIPHER_SUITE_NONE, 0xFF);
+
+	prBssInfo->ucBMCWlanIndexSUsed[0] = TRUE;
+
 	rCmdActivateCtrl.ucBMCWlanIndex = prBssInfo->ucBMCWlanIndex;
 
 	kalMemZero(&rCmdActivateCtrl.ucReserved, sizeof(rCmdActivateCtrl.ucReserved));
@@ -1471,17 +1449,7 @@ WLAN_STATUS nicUpdateBss(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBssIndex)
 	else {
 #if CFG_ENABLE_WIFI_DIRECT
 		if (prAdapter->fgIsP2PRegistered) {
-#if CFG_SUPPORT_SUITB
-			if (kalP2PGetGcmp256Cipher(prAdapter->prGlueInfo,
-				(UINT_8) prBssInfo->u4PrivateData)) {
-				rCmdSetBssInfo.ucAuthMode =
-					(UINT_8) AUTH_MODE_WPA2_PSK;
-				rCmdSetBssInfo.ucEncStatus =
-					(UINT_8) ENUM_ENCRYPTION4_ENABLED;
-			} else
-#endif
-			if (kalP2PGetCcmpCipher(prAdapter->prGlueInfo,
-				(UINT_8) prBssInfo->u4PrivateData)) {
+			if (kalP2PGetCcmpCipher(prAdapter->prGlueInfo, (UINT_8) prBssInfo->u4PrivateData)) {
 				rCmdSetBssInfo.ucAuthMode = (UINT_8) AUTH_MODE_WPA2_PSK;
 				rCmdSetBssInfo.ucEncStatus = (UINT_8) ENUM_ENCRYPTION3_ENABLED;
 			} else if (kalP2PGetTkipCipher(prAdapter->prGlueInfo, (UINT_8) prBssInfo->u4PrivateData)) {
@@ -1956,7 +1924,7 @@ nicUpdateBeaconIETemplate(IN P_ADAPTER_T prAdapter,
 	} else if (eIeUpdMethod == IE_UPD_METHOD_DELETE_ALL) {
 		u2CmdBufLen = OFFSET_OF(CMD_BEACON_TEMPLATE_UPDATE, u2IELen);
 	} else {
-		DBGLOG(INIT, ERROR, "Unknown IeUpdMethod.\n");
+		ASSERT(0);
 		return WLAN_STATUS_FAILURE;
 	}
 
@@ -2062,11 +2030,9 @@ WLAN_STATUS nicQmUpdateWmmParms(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBssIndex)
 
 	DBGLOG(QM, INFO, "Update WMM parameters for BSS[%u]\n", ucBssIndex);
 
-	DBGLOG(QM, EVENT, "sizeof(AC_QUE_PARMS_T): %zu\n",
-			sizeof(AC_QUE_PARMS_T));
-	DBGLOG(QM, EVENT, "sizeof(CMD_UPDATE_WMM_PARMS): %zu\n",
-			sizeof(CMD_UPDATE_WMM_PARMS_T));
-	DBGLOG(QM, EVENT, "sizeof(WIFI_CMD_T): %zu\n", sizeof(WIFI_CMD_T));
+	DBGLOG(QM, EVENT, "sizeof(AC_QUE_PARMS_T): %d\n", sizeof(AC_QUE_PARMS_T));
+	DBGLOG(QM, EVENT, "sizeof(CMD_UPDATE_WMM_PARMS): %d\n", sizeof(CMD_UPDATE_WMM_PARMS_T));
+	DBGLOG(QM, EVENT, "sizeof(WIFI_CMD_T): %d\n", sizeof(WIFI_CMD_T));
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
 	rCmdUpdateWmmParms.ucBssIndex = (UINT_8) ucBssIndex;
@@ -3220,11 +3186,7 @@ nicRlmArUpdateParms(IN P_ADAPTER_T prAdapter,
 	ucArPerH = (UINT_8) (((u4ArSysParam1 >> 16) & BITS(0, 7)));
 	ucArPerL = (UINT_8) (((u4ArSysParam1 >> 24) & BITS(0, 7)));
 
-	DBGLOG(INIT, INFO, "ArParam %u %u %u %u\n",
-			u4ArSysParam0,
-			u4ArSysParam1,
-			u4ArSysParam2,
-			u4ArSysParam3);
+	DBGLOG(INIT, INFO, "ArParam %ld %ld %ld %ld\n", u4ArSysParam0, u4ArSysParam1, u4ArSysParam2, u4ArSysParam3);
 	DBGLOG(INIT, INFO, "ArVer %u AbwVer %u AgiVer %u\n", ucArVer, ucAbwVer, ucAgiVer);
 	DBGLOG(INIT, INFO, "HtMask %x LegacyMask %x\n", u2HtClrMask, u2LegacyClrMask);
 	DBGLOG(INIT, INFO,

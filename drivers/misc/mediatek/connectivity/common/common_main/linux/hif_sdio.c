@@ -238,7 +238,7 @@ MODULE_DESCRIPTION("MediaTek MT6620 HIF SDIO Driver");
 
 MODULE_DEVICE_TABLE(sdio, mtk_sdio_id_tbl);
 
-INT32 gHifSdioDbgLvl = HIF_SDIO_LOG_INFO;
+UINT32 gHifSdioDbgLvl = HIF_SDIO_LOG_INFO;
 
 /*******************************************************************************
 *                              F U N C T I O N S
@@ -325,7 +325,7 @@ static _osal_inline_ struct sdio_func *hif_sdio_ctx_to_func(MTK_WCN_HIF_SDIO_CLT
 
 	/* 4 <1> check if ctx is valid, registered, and probed */
 	probe_index = CLTCTX_IDX(ctx);
-	if (unlikely(!CLTCTX_UIDX_VALID(probe_index))) {	/* invalid index in CLTCTX */
+	if (unlikely(!CLTCTX_IDX_VALID(probe_index))) {	/* invalid index in CLTCTX */
 		HIF_SDIO_WARN_FUNC("invalid ctx(0x%x)\n", ctx);
 		return NULL;
 	}
@@ -346,8 +346,8 @@ static _osal_inline_ INT32 hif_sdio_deep_sleep_info_dmp(MTK_WCN_HIF_SDIO_DS_INFO
 	UINT32 ctl_info_array_size = ARRAY_SIZE(p_ds_info->clt_info);
 
 	mutex_lock(&p_ds_info->lock);
-	HIF_SDIO_DBG_FUNC("p_ds_info: %p, chipid:0x%x, reg_offset:0x%x, value:0x%x\n",
-			p_ds_info, p_ds_info->chip_id, p_ds_info->reg_offset, p_ds_info->value);
+	HIF_SDIO_DBG_FUNC("p_ds_info: 0x%08x, chipid:0x%x, reg_offset:0x%x, value:0x%x\n",
+			   p_ds_info, p_ds_info->chip_id, p_ds_info->reg_offset, p_ds_info->value);
 
 	for (i = 0; i < ctl_info_array_size; i++) {
 		ctl_info = &p_ds_info->clt_info[i];
@@ -1312,7 +1312,7 @@ VOID mtk_wcn_hif_sdio_set_drvdata(MTK_WCN_HIF_SDIO_CLTCTX ctx, PVOID private_dat
 {
 	UINT8 probed_idx = CLTCTX_IDX(ctx);
 
-	if (unlikely(!CLTCTX_UIDX_VALID(probed_idx))) {	/* invalid index in CLTCTX */
+	if (unlikely(!CLTCTX_IDX_VALID(probed_idx))) {	/* invalid index in CLTCTX */
 		HIF_SDIO_WARN_FUNC("invalid idx in ctx(0x%x), private_data_p not stored!\n", ctx);
 	} else {
 		/* store client driver's private data to dev driver */
@@ -1336,7 +1336,7 @@ PVOID mtk_wcn_hif_sdio_get_drvdata(MTK_WCN_HIF_SDIO_CLTCTX ctx)
 	UINT8 probed_idx = CLTCTX_IDX(ctx);
 
 	/* get client driver's private data to dev driver */
-	if (likely(CLTCTX_UIDX_VALID(probed_idx)))
+	if (likely(CLTCTX_IDX_VALID(probed_idx)))
 		return g_hif_sdio_probed_func_list[probed_idx].private_data_p;
 	/* invalid index in CLTCTX */
 	HIF_SDIO_WARN_FUNC("invalid idx in ctx(0x%x), return null!\n", ctx);
@@ -2045,7 +2045,6 @@ static VOID hif_sdio_irq(struct sdio_func *func)
 {
 	INT32 probed_list_index = -1;
 	INT32 registed_list_index = -1;
-	INT32 ret;
 
 	HIF_SDIO_DBG_FUNC("start!\n");
 
@@ -2091,9 +2090,7 @@ static VOID hif_sdio_irq(struct sdio_func *func)
 		HIF_SDIO_WARN_FUNC("release irq (func:0x%p) v(0x%x) d(0x%x) n(0x%x)\n",
 				   func, func->vendor, func->device, func->num);
 		mtk_wcn_hif_sdio_irq_flag_set(0);
-		ret = sdio_release_irq(func);
-		if (ret)
-			HIF_SDIO_WARN_FUNC("sdio_release_irq() fail(%d)\n", ret);
+		sdio_release_irq(func);
 	}
 	osal_ftrace_print("%s|E\n", __func__);
 }
@@ -2760,11 +2757,11 @@ VOID mtk_wcn_hif_sdio_enable_irq(MTK_WCN_HIF_SDIO_CLTCTX ctx, MTK_WCN_BOOL enabl
 {
 	UINT8 probed_idx = CLTCTX_IDX(ctx);
 
-	if (unlikely(!CLTCTX_UIDX_VALID(probed_idx))) {	/* invalid index in CLTCTX */
+	if (unlikely(!CLTCTX_IDX_VALID(probed_idx))) {	/* invalid index in CLTCTX */
 		HIF_SDIO_WARN_FUNC("invalid idx in ctx(0x%x), sdio_irq no change\n", ctx);
 		return;
 	}
-	if (unlikely(!CLTCTX_UIDX_VALID(probed_idx))) {	/* invalid index in CLTCTX */
+	if (unlikely(!CLTCTX_IDX_VALID(probed_idx))) {	/* invalid index in CLTCTX */
 		HIF_SDIO_WARN_FUNC("invalid ctx(0x%x)\n", ctx);
 		return;
 	}

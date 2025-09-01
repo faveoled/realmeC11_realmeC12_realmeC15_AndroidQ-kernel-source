@@ -105,8 +105,6 @@
 #define CIPHER_SUITE_WPI                8
 #define CIPHER_SUITE_CCMP_W_CCX         9
 #define CIPHER_SUITE_GCMP               10
-#define CIPHER_SUITE_GCMP_128           11
-#define CIPHER_SUITE_GCMP_256           12
 
 /* Todo:: Move to register */
 #if defined(MT6630)

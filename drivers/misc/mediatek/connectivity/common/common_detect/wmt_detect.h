@@ -50,7 +50,7 @@
 #define WMT_DETECT_LOG_WARN    1
 #define WMT_DETECT_LOG_ERR     0
 
-extern int gWmtDetectDbgLvl;
+extern unsigned int gWmtDetectDbgLvl;
 
 #define WMT_DETECT_PR_LOUD(fmt, arg...) \
 do { \
@@ -88,7 +88,6 @@ do { \
 #define COMBO_IOCTL_EXT_CHIP_PWR_ON   _IOR(WMT_DETECT_IOC_MAGIC, 6, int)
 #define COMBO_IOCTL_EXT_CHIP_PWR_OFF  _IOR(WMT_DETECT_IOC_MAGIC, 7, int)
 #define COMBO_IOCTL_DO_SDIO_AUDOK     _IOR(WMT_DETECT_IOC_MAGIC, 8, int)
-#define COMBO_IOCTL_SET_WMT_CFG_VER   _IOR(WMT_DETECT_IOC_MAGIC, 9, int)
 
 typedef enum _ENUM_WMT_CHIP_TYPE_T {
 	WMT_CHIP_TYPE_COMBO,
@@ -116,5 +115,4 @@ extern unsigned int mtk_uart_pdn_enable(char *port, int enable);
 #endif
 extern int wmt_detect_set_chip_type(int chip_id);
 extern ENUM_WMT_CHIP_TYPE wmt_detect_get_chip_type(void);
-extern int wmt_detect_get_wmt_cfg_ver(void);
 #endif

@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -60,7 +58,6 @@ typedef enum _ENUM_AA_STATE_T {
 	SAA_STATE_WAIT_AUTH2,
 	SAA_STATE_SEND_AUTH3,
 	SAA_STATE_WAIT_AUTH4,
-	SAA_STATE_EXTERNAL_AUTH,
 	SAA_STATE_SEND_ASSOC1,
 	SAA_STATE_WAIT_ASSOC2,
 	AAA_STATE_SEND_AUTH2,
@@ -127,9 +124,6 @@ VOID saaSendDisconnectMsgHandler(IN P_ADAPTER_T prAdapter, IN P_STA_RECORD_T prS
 				IN P_BSS_INFO_T prAisBssInfo, IN ENUM_AA_FRM_TYPE_T eFrmType);
 
 VOID saaFsmRunEventFTContinue(IN P_ADAPTER_T prAdapter, IN P_MSG_HDR_T prMsgHdr);
-
-void saaFsmRunEventExternalAuthDone(IN P_ADAPTER_T prAdapter,
-				    IN P_MSG_HDR_T prMsgHdr);
 /*----------------------------------------------------------------------------*/
 /* Routines in aaa_fsm.c                                                      */
 /*----------------------------------------------------------------------------*/

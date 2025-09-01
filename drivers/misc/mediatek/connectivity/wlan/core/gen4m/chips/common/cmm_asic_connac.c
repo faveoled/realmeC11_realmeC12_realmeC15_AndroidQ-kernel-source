@@ -239,7 +239,7 @@ uint32_t asicGetChipID(struct ADAPTER *prAdapter)
 		   ((prChipInfo->u4ChipIpVersion & 0x000F0000) >>  0) |
 		   ((prChipInfo->u4ChipIpVersion & 0x00000F00) <<  4) |
 		   ((prChipInfo->u4ChipIpVersion & 0x0000000F) <<  8) |
-		   (prChipInfo->u2ADieChipVersion & 0xFF);
+		   CONNAC_CHIP_ADIE_INFO;
 
 	log_dbg(HAL, INFO, "ChipID = [0x%08x]\n", u4ChipID);
 	return u4ChipID;
@@ -445,19 +445,13 @@ void fillTxDescTxByteCountWithCR4(IN struct ADAPTER
 #if defined(_HIF_PCIE) || defined(_HIF_AXI)
 void asicPcieDmaShdlInit(IN struct ADAPTER *prAdapter)
 {
-	uint32_t u4BaseAddr, u4MacVal = 0;
+	uint32_t u4BaseAddr, u4MacVal;
 	struct mt66xx_chip_info *prChipInfo;
-	struct BUS_INFO *prBusInfo;
-	uint32_t u4FreePageCnt = 0;
-	int32_t iGroup0PLESize, iGroup1PLESize;
-	struct WIFI_VAR *prWifiVar;
 
 	ASSERT(prAdapter);
 
 	prChipInfo = prAdapter->chip_info;
-	prBusInfo = prChipInfo->bus_info;
 	u4BaseAddr = prChipInfo->u4HifDmaShdlBaseAddr;
-	prWifiVar = &prAdapter->rWifiVar;
 
 	HAL_MCR_RD(prAdapter,
 		   CONN_HIF_DMASHDL_PACKET_MAX_SIZE(u4BaseAddr), &u4MacVal);
@@ -483,54 +477,17 @@ void asicPcieDmaShdlInit(IN struct ADAPTER *prAdapter)
 	 CONN_HIF_DMASHDL_TOP_REFILL_CONTROL_GROUP13_REFILL_DISABLE_MASK |
 	 CONN_HIF_DMASHDL_TOP_REFILL_CONTROL_GROUP14_REFILL_DISABLE_MASK |
 	 CONN_HIF_DMASHDL_TOP_REFILL_CONTROL_GROUP15_REFILL_DISABLE_MASK);
-	/* Always use group 1 if we support 2 Data TxRing */
-	if (prBusInfo->tx_ring0_data_idx != prBusInfo->tx_ring1_data_idx) {
-		u4MacVal &=
-	~CONN_HIF_DMASHDL_TOP_REFILL_CONTROL_GROUP1_REFILL_DISABLE_MASK;
-	}
 	HAL_MCR_WR(prAdapter,
 		   CONN_HIF_DMASHDL_REFILL_CONTROL(u4BaseAddr), u4MacVal);
 
-	/* Always use group 1 if we support 2 TxRing for data */
-	if (prBusInfo->tx_ring0_data_idx != prBusInfo->tx_ring1_data_idx) {
-		/* HW has no gruantee to switch Quota at runtime */
-		/* Just separate equally. */
-		HAL_MCR_RD(prAdapter,
-			CONN_HIF_DMASHDL_STATUS_RD(u4BaseAddr), &u4FreePageCnt);
-		u4FreePageCnt = (u4FreePageCnt & DMASHDL_FREE_PG_CNT_MASK)
-			>> DMASHDL_FREE_PG_CNT_OFFSET;
-
-		if (prWifiVar->iGroup0PLESize > 0 &&
-			prWifiVar->iGroup1PLESize > 0) {
-			iGroup0PLESize = prWifiVar->iGroup0PLESize;
-			iGroup1PLESize = prWifiVar->iGroup1PLESize;
-		} else {
-			iGroup0PLESize = u4FreePageCnt/2;
-			iGroup1PLESize = u4FreePageCnt/2;
-		}
-
-		u4MacVal = DMASHDL_MIN_QUOTA_NUM(0x3);
-		u4MacVal |= DMASHDL_MAX_QUOTA_NUM(iGroup0PLESize);
-		HAL_MCR_WR(prAdapter,
-			CONN_HIF_DMASHDL_GROUP0_CTRL(u4BaseAddr), u4MacVal);
-		u4MacVal = DMASHDL_MIN_QUOTA_NUM(0x3);
-		u4MacVal |= DMASHDL_MAX_QUOTA_NUM(iGroup1PLESize);
-		HAL_MCR_WR(prAdapter,
-			CONN_HIF_DMASHDL_GROUP1_CTRL(u4BaseAddr), u4MacVal);
-		/* Wmm1: group 1, others group 0 */
-		HAL_MCR_WR(prAdapter,
-			CONN_HIF_DMASHDL_Q_MAP0(u4BaseAddr), 0x11110000);
-	} else {
-		u4MacVal = DMASHDL_MIN_QUOTA_NUM(0x3);
-		u4MacVal |= DMASHDL_MAX_QUOTA_NUM(0xFFF);
-		HAL_MCR_WR(prAdapter,
-			CONN_HIF_DMASHDL_GROUP0_CTRL(u4BaseAddr), u4MacVal);
-		u4MacVal = 0;
-		HAL_MCR_WR(prAdapter,
-			CONN_HIF_DMASHDL_GROUP1_CTRL(u4BaseAddr), u4MacVal);
-	}
+	u4MacVal = DMASHDL_MIN_QUOTA_NUM(0x3);
+	u4MacVal |= DMASHDL_MAX_QUOTA_NUM(0xfff);
+	HAL_MCR_WR(prAdapter,
+		   CONN_HIF_DMASHDL_GROUP0_CTRL(u4BaseAddr), u4MacVal);
 
 	u4MacVal = 0;
+	HAL_MCR_WR(prAdapter,
+		   CONN_HIF_DMASHDL_GROUP1_CTRL(u4BaseAddr), u4MacVal);
 	HAL_MCR_WR(prAdapter,
 		   CONN_HIF_DMASHDL_GROUP2_CTRL(u4BaseAddr), u4MacVal);
 	HAL_MCR_WR(prAdapter,
@@ -586,7 +543,7 @@ void asicPdmaConfig(struct GLUE_INFO *prGlueInfo, u_int8_t fgEnable)
 			prGlueInfo->prAdapter->chip_info->bus_info;
 	union WPDMA_GLO_CFG_STRUCT GloCfg;
 	union WPDMA_INT_MASK IntMask;
-	uint32_t u4Val = 0;
+	uint32_t u4Val;
 
 	kalDevRegRead(prGlueInfo, WPDMA_GLO_CFG, &GloCfg.word);
 	kalDevRegRead(prGlueInfo, WPDMA_INT_MSK, &IntMask.word);
@@ -607,8 +564,7 @@ void asicPdmaConfig(struct GLUE_INFO *prGlueInfo, u_int8_t fgEnable)
 		IntMask.field.tx_done =
 			BIT(prBusInfo->tx_ring_fwdl_idx) |
 			BIT(prBusInfo->tx_ring_cmd_idx) |
-			BIT(prBusInfo->tx_ring0_data_idx) |
-			BIT(prBusInfo->tx_ring1_data_idx);
+			BIT(prBusInfo->tx_ring_data_idx);
 		IntMask.field_conn.tx_coherent = 0;
 		IntMask.field_conn.rx_coherent = 0;
 		IntMask.field_conn.tx_dly_int = 0;
@@ -636,86 +592,8 @@ void asicPdmaConfig(struct GLUE_INFO *prGlueInfo, u_int8_t fgEnable)
 	/* Set PDMA APSRC_ACK CR */
 	kalDevRegRead(prGlueInfo, WPDMA_APSRC_ACK_LOCK_SLPPROT, &u4Val);
 	kalDevRegWrite(prGlueInfo, WPDMA_APSRC_ACK_LOCK_SLPPROT,
-		u4Val | BIT(4));
+		       u4Val | BIT(4));
 }
-
-/*----------------------------------------------------------------------------*/
-/*!
- * @brief This function is used to update DmaSchdl max quota.
- *
- * @param prAdapter
- * @param u2Port, the TxRing number
- * @param u4MaxQuota, the desired max quota for the TxRing.
- *
- * @return (none)
- */
-/*----------------------------------------------------------------------------*/
-uint32_t asicUpdatTxRingMaxQuota(IN struct ADAPTER *prAdapter,
-	IN uint16_t u2Port, IN uint32_t u4MaxQuota)
-{
-	struct GLUE_INFO *prGlueInfo;
-	uint32_t u4BaseAddr, u4GroupIdx;
-	uint32_t u4MacVal = 0, u4SrcCnt, u4RsvCnt, u4TxRingBitmap = 0;
-
-	ASSERT(prAdapter);
-	if (u4MaxQuota >
-		(DMASHDL_MAX_QUOTA_MASK >> DMASHDL_MAX_QUOTA_OFFSET))
-		return WLAN_STATUS_NOT_ACCEPTED;
-
-	prGlueInfo = prAdapter->prGlueInfo;
-	u4BaseAddr = prAdapter->chip_info->u4HifDmaShdlBaseAddr;
-
-	/* The mapping must be equal to CONN_HIF_DMASHDL_Q_MAP0
-	 * in asicPcieDmaShdlInit.
-	 */
-	switch (u2Port) {
-	case TX_RING_DATA0_IDX_0:
-		u4GroupIdx = 0;
-		break;
-	case TX_RING_DATA1_IDX_1:
-		u4GroupIdx = 1;
-		break;
-	default:
-		return WLAN_STATUS_NOT_ACCEPTED;
-	}
-
-	/* Step 1. Pause the TxRing */
-	kalDevRegRead(prGlueInfo, WPDMA_PAUSE_TX_Q, &u4TxRingBitmap);
-	kalDevRegWrite(prGlueInfo, WPDMA_PAUSE_TX_Q,
-		u4TxRingBitmap |
-		(BIT(u2Port) << WPDMA_PAUSE_TX_Q_RINGIDX_OFFSET));
-
-	/* Step 2. Check MaxQuota >= rsv_cnt + src_cnt */
-	HAL_MCR_RD(prAdapter,
-		CONN_HIF_DMASHDL_STATUS_RD_GP0(u4BaseAddr) + 4*u4GroupIdx,
-		&u4MacVal);
-	u4SrcCnt = (u4MacVal & DMASHDL_SRC_CNT_MASK) >> DMASHDL_SRC_CNT_OFFSET;
-	u4RsvCnt = (u4MacVal & DMASHDL_RSV_CNT_MASK) >> DMASHDL_RSV_CNT_OFFSET;
-
-	/* BE CAREFUL! Caller must call this function again until
-	 * WLAN_STATUS_SUCCESS or unlock the TxRing by itself.
-	 */
-	if (u4MaxQuota < u4SrcCnt+u4RsvCnt)
-		return WLAN_STATUS_PENDING;
-
-	/* Step 3. Update MaxQuota */
-	HAL_MCR_RD(prAdapter,
-			CONN_HIF_DMASHDL_GROUP0_CTRL(u4BaseAddr) + 4*u4GroupIdx,
-			&u4MacVal);
-	u4MacVal &= ~(DMASHDL_MAX_QUOTA_NUM(0xFFF));
-	u4MacVal |= DMASHDL_MAX_QUOTA_NUM(u4MaxQuota);
-	HAL_MCR_WR(prAdapter,
-		CONN_HIF_DMASHDL_GROUP0_CTRL(u4BaseAddr) + 4*u4GroupIdx,
-		u4MacVal);
-
-	/* Step 4. Unlock the TxRing */
-	kalDevRegWrite(prGlueInfo, WPDMA_PAUSE_TX_Q,
-		u4TxRingBitmap &
-		(~(BIT(u2Port) << WPDMA_PAUSE_TX_Q_RINGIDX_OFFSET)));
-
-	return WLAN_STATUS_SUCCESS;
-}
-
 
 void asicEnableInterrupt(IN struct ADAPTER *prAdapter)
 {
@@ -740,7 +618,7 @@ void asicDisableInterrupt(IN struct ADAPTER *prAdapter)
 void asicLowPowerOwnRead(IN struct ADAPTER *prAdapter,
 			 OUT u_int8_t *pfgResult)
 {
-	uint32_t u4RegValue = 0;
+	uint32_t u4RegValue;
 
 	HAL_MCR_RD(prAdapter, CONN_HIF_ON_LPCTL, &u4RegValue);
 	*pfgResult = (u4RegValue & PCIE_LPCR_HOST_SET_OWN) == 0 ?
@@ -750,7 +628,7 @@ void asicLowPowerOwnRead(IN struct ADAPTER *prAdapter,
 void asicLowPowerOwnSet(IN struct ADAPTER *prAdapter,
 			OUT u_int8_t *pfgResult)
 {
-	uint32_t u4RegValue = 0;
+	uint32_t u4RegValue;
 
 	HAL_MCR_WR(prAdapter, CONN_HIF_ON_LPCTL,
 		   PCIE_LPCR_HOST_SET_OWN);
@@ -761,7 +639,7 @@ void asicLowPowerOwnSet(IN struct ADAPTER *prAdapter,
 void asicLowPowerOwnClear(IN struct ADAPTER *prAdapter,
 			  OUT u_int8_t *pfgResult)
 {
-	uint32_t u4RegValue = 0;
+	uint32_t u4RegValue;
 
 	HAL_MCR_WR(prAdapter, CONN_HIF_ON_LPCTL,
 		   PCIE_LPCR_HOST_CLR_OWN);
@@ -807,7 +685,7 @@ bool asicIsValidRegAccess(IN struct ADAPTER *prAdapter, IN uint32_t u4Register)
 void asicGetMailboxStatus(IN struct ADAPTER *prAdapter,
 			  OUT uint32_t *pu4Val)
 {
-	uint32_t u4RegValue = 0;
+	uint32_t u4RegValue;
 
 	HAL_MCR_RD(prAdapter,
 		   CONN_MCU_CONFG_ON_HOST_MAILBOX_WF_ADDR, &u4RegValue);
@@ -822,11 +700,9 @@ void asicSetDummyReg(struct GLUE_INFO *prGlueInfo)
 void asicCheckDummyReg(struct GLUE_INFO *prGlueInfo)
 {
 	struct GL_HIF_INFO *prHifInfo;
-	struct ADAPTER *prAdapter;
 	uint32_t u4Value = 0;
 	uint32_t u4Idx;
 
-	prAdapter = prGlueInfo->prAdapter;
 	prHifInfo = &prGlueInfo->rHifInfo;
 	kalDevRegRead(prGlueInfo, CONN_DUMMY_CR, &u4Value);
 	DBGLOG(HAL, TRACE, "Check sleep mode DummyReg[0x%x]\n", u4Value);
@@ -835,12 +711,8 @@ void asicCheckDummyReg(struct GLUE_INFO *prGlueInfo)
 
 	for (u4Idx = 0; u4Idx < NUM_OF_TX_RING; u4Idx++)
 		prHifInfo->TxRing[u4Idx].TxSwUsedIdx = 0;
-	DBGLOG(HAL, TRACE, "Weakup from sleep mode\n");
+	DBGLOG(HAL, INFO, "Weakup from sleep mode\n");
 
-	if (halWpdmaGetRxDmaDoneCnt(prGlueInfo, RX_RING_EVT_IDX_1)) {
-		DBGLOG(HAL, INFO, "Force to read RX event\n");
-		prAdapter->u4NoMoreRfb |= BIT(RX_RING_EVT_IDX_1);
-	}
 	/* Write sleep mode magic num to dummy reg */
 	asicSetDummyReg(prGlueInfo);
 }

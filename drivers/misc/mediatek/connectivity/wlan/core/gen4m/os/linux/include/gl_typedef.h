@@ -147,7 +147,6 @@ typedef int32_t(*probe_card) (void *pvData,
 			      void *pvDriverData);
 typedef void(*remove_card) (void);
 
-
 /*******************************************************************************
  *                            P U B L I C   D A T A
  *******************************************************************************
@@ -259,13 +258,6 @@ typedef void(*remove_card) (void);
 #define HTONS(_x)
 
 #endif
-
-#define SWAP32(x) \
-	((uint32_t) (\
-	(((uint32_t) (x) & (uint32_t) 0x000000ffUL) << 24) | \
-	(((uint32_t) (x) & (uint32_t) 0x0000ff00UL) << 8) | \
-	(((uint32_t) (x) & (uint32_t) 0x00ff0000UL) >> 8) | \
-	(((uint32_t) (x) & (uint32_t) 0xff000000UL) >> 24)))
 
 /*******************************************************************************
  *                  F U N C T I O N   D E C L A R A T I O N S

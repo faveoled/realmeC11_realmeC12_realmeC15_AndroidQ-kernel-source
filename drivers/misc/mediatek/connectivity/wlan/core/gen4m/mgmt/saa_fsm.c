@@ -96,7 +96,6 @@ static uint8_t *apucDebugAAState[AA_STATE_NUM] = {
 	(uint8_t *) DISP_STRING("SAA_WAIT_AUTH2"),
 	(uint8_t *) DISP_STRING("SAA_SEND_AUTH3"),
 	(uint8_t *) DISP_STRING("SAA_WAIT_AUTH4"),
-	(uint8_t *) DISP_STRING("SAA_EXTERNAL_AUTH"),
 	(uint8_t *) DISP_STRING("SAA_SEND_ASSOC1"),
 	(uint8_t *) DISP_STRING("SAA_WAIT_ASSOC2"),
 	(uint8_t *) DISP_STRING("AAA_SEND_AUTH2"),
@@ -141,6 +140,7 @@ saaFsmSteps(IN struct ADAPTER *prAdapter,
 	enum ENUM_AA_STATE ePreviousState;
 	u_int8_t fgIsTransition;
 
+	ASSERT(prStaRec);
 	if (!prStaRec)
 		return;
 
@@ -173,21 +173,18 @@ saaFsmSteps(IN struct ADAPTER *prAdapter,
 				.eStatusType =
 				ENUM_STATUS_TYPE_FT_AUTH_STATUS};
 				struct cfg80211_ft_event_params *prFtEvent =
-				aisGetFtEventParam(prAdapter,
-				prStaRec->ucBssIndex);
+					&prAdapter->prGlueInfo->rFtEventParam;
 
 				prFtEvent->target_ap = prStaRec->aucMacAddr;
 				/* now, we don't support RIC first */
 				prFtEvent->ric_ies = NULL;
 				prFtEvent->ric_ies_len = 0;
 				DBGLOG(SAA, INFO,
-					"[%d] FT: notify supplicant to update FT IEs\n",
-					prStaRec->ucBssIndex);
+				       "FT: notify supplicant to update FT IEs\n");
 				kalIndicateStatusAndComplete(
 					prAdapter->prGlueInfo,
 					WLAN_STATUS_MEDIA_SPECIFIC_INDICATION,
-					&rStatus, sizeof(rStatus),
-					prStaRec->ucBssIndex);
+					&rStatus, sizeof(rStatus));
 				break;
 				/* wait supplicant update ft ies and then
 				 * continue to send assoc 1
@@ -221,14 +218,7 @@ saaFsmSteps(IN struct ADAPTER *prAdapter,
 				}
 
 			}
-#if CFG_SUPPORT_REPORT_MISC
-			if (prAdapter->rReportMiscSet.
-			    eQueryNum == REPORT_AUTHASSOC_START) {
-				wlanGetReportMisc(prAdapter);
-				prAdapter->rReportMiscSet.
-					eQueryNum = REPORT_AUTHASSOC_END;
-			}
-#endif
+
 			/* Free allocated TCM memory */
 			if (prStaRec->prChallengeText) {
 				cnmMemFree(prAdapter,
@@ -259,11 +249,6 @@ saaFsmSteps(IN struct ADAPTER *prAdapter,
 				cnmStaRecChangeState(prAdapter, prStaRec,
 						     STA_STATE_1);
 
-#if CFG_SUPPORT_REPORT_MISC
-				prAdapter->rReportMiscSet.
-					eQueryNum = REPORT_AUTHASSOC_START;
-				wlanGetReportMisc(prAdapter);
-#endif
 #if !CFG_SUPPORT_AAA
 				rStatus = authSendAuthFrame(prAdapter, prStaRec,
 						AUTH_TRANSACTION_SEQ_1);
@@ -342,10 +327,6 @@ saaFsmSteps(IN struct ADAPTER *prAdapter,
 		case SAA_STATE_WAIT_AUTH4:
 			break;
 
-		case SAA_STATE_EXTERNAL_AUTH:
-			kalExternalAuthRequest(prAdapter, prStaRec->ucBssIndex);
-			break;
-
 		case SAA_STATE_SEND_ASSOC1:
 			/* Do tasks in INIT STATE */
 			if (prStaRec->ucTxAuthAssocRetryCount >=
@@ -418,6 +399,7 @@ saaFsmSendEventJoinComplete(IN struct ADAPTER *prAdapter,
 {
 	struct BSS_INFO *prBssInfo;
 
+	ASSERT(prStaRec);
 	if (!prStaRec) {
 		DBGLOG(SAA, ERROR, "[%s]prStaRec is NULL\n", __func__);
 		return WLAN_STATUS_INVALID_PACKET;
@@ -470,7 +452,12 @@ saaFsmSendEventJoinComplete(IN struct ADAPTER *prAdapter,
 	}
 #endif /* CFG_ENABLE_WIFI_DIRECT */
 
-	if (IS_STA_IN_AIS(prStaRec)) {
+	if (!prAdapter->prAisBssInfo) {
+		DBGLOG(SAA, ERROR, "prAdapter->prAisBssInfo is NULL\n");
+		return WLAN_STATUS_INVALID_PACKET;
+	}
+
+	if (prStaRec->ucBssIndex == prAdapter->prAisBssInfo->ucBssIndex) {
 		struct MSG_SAA_FSM_COMP *prSaaFsmCompMsg;
 
 		prSaaFsmCompMsg = cnmMemAlloc(prAdapter, RAM_TYPE_MSG,
@@ -542,6 +529,9 @@ void saaFsmRunEventStart(IN struct ADAPTER *prAdapter,
 	struct STA_RECORD *prStaRec;
 	struct BSS_INFO *prBssInfo;
 
+	ASSERT(prAdapter);
+	ASSERT(prMsgHdr);
+
 	prSaaFsmStartMsg = (struct MSG_SAA_FSM_START *) prMsgHdr;
 	prStaRec = prSaaFsmStartMsg->prStaRec;
 
@@ -549,6 +539,8 @@ void saaFsmRunEventStart(IN struct ADAPTER *prAdapter,
 		cnmMemFree(prAdapter, prMsgHdr);
 		return;
 	}
+
+	ASSERT(prStaRec);
 
 	DBGLOG(SAA, LOUD, "EVENT-START: Trigger SAA FSM.\n");
 
@@ -626,15 +618,10 @@ void saaFsmRunEventStart(IN struct ADAPTER *prAdapter,
 		       prBssInfo->fgAssoc40mBwAllowed);
 	}
 	/* 4 <7> Trigger SAA FSM */
-	if (prStaRec->ucStaState == STA_STATE_1) {
-		if (prStaRec->ucAuthAlgNum == AUTH_ALGORITHM_NUM_SAE)
-			saaFsmSteps(prAdapter, prStaRec,
-				    SAA_STATE_EXTERNAL_AUTH,
-				    (struct SW_RFB *) NULL);
-		else
-			saaFsmSteps(prAdapter, prStaRec, SAA_STATE_SEND_AUTH1,
-				    (struct SW_RFB *) NULL);
-	} else if (prStaRec->ucStaState == STA_STATE_2 ||
+	if (prStaRec->ucStaState == STA_STATE_1)
+		saaFsmSteps(prAdapter, prStaRec, SAA_STATE_SEND_AUTH1,
+			    (struct SW_RFB *) NULL);
+	else if (prStaRec->ucStaState == STA_STATE_2 ||
 		 prStaRec->ucStaState == STA_STATE_3)
 		saaFsmSteps(prAdapter, prStaRec,
 			    SAA_STATE_SEND_ASSOC1, (struct SW_RFB *) NULL);
@@ -655,6 +642,9 @@ void saaFsmRunEventFTContinue(IN struct ADAPTER *prAdapter,
 	struct MSG_SAA_FT_CONTINUE *prSaaFsmMsg = NULL;
 	struct STA_RECORD *prStaRec;
 	u_int8_t fgFtRicRequest = FALSE;
+
+	ASSERT(prAdapter);
+	ASSERT(prMsgHdr);
 
 	prSaaFsmMsg = (struct MSG_SAA_FT_CONTINUE *)prMsgHdr;
 	prStaRec = prSaaFsmMsg->prStaRec;
@@ -701,10 +691,14 @@ saaFsmRunEventTxDone(IN struct ADAPTER *prAdapter,
 	struct STA_RECORD *prStaRec;
 	enum ENUM_AA_STATE eNextState;
 
+	ASSERT(prMsduInfo);
+
 	prStaRec = cnmGetStaRecByIndex(prAdapter, prMsduInfo->ucStaRecIndex);
 
 	if (!prStaRec)
 		return WLAN_STATUS_INVALID_PACKET;
+
+	ASSERT(prStaRec);
 
 	if (rTxDoneStatus)
 		DBGLOG(SAA, INFO,
@@ -849,6 +843,7 @@ void saaFsmRunEventTxReqTimeOut(IN struct ADAPTER *prAdapter,
 {
 	struct STA_RECORD *prStaRec = (struct STA_RECORD *) plParamPtr;
 
+	ASSERT(prStaRec);
 	if (!prStaRec)
 		return;
 
@@ -889,6 +884,7 @@ void saaFsmRunEventRxRespTimeOut(IN struct ADAPTER *prAdapter,
 	DBGLOG(SAA, LOUD, "EVENT-TIMER: RX RESP TIMEOUT, Current Time = %d\n",
 	       kalGetTimeTick());
 
+	ASSERT(prStaRec);
 	if (!prStaRec)
 		return;
 
@@ -946,6 +942,7 @@ void saaFsmRunEventRxAuth(IN struct ADAPTER *prAdapter,
 	enum ENUM_AA_STATE eNextState;
 	uint8_t ucWlanIdx;
 
+	ASSERT(prSwRfb);
 	prStaRec = cnmGetStaRecByIndex(prAdapter, prSwRfb->ucStaRecIdx);
 	ucWlanIdx = (uint8_t) HAL_RX_STATUS_GET_WLAN_IDX(prSwRfb->prRxStatus);
 
@@ -1088,11 +1085,6 @@ void saaFsmRunEventRxAuth(IN struct ADAPTER *prAdapter,
 		}
 		break;
 
-	case SAA_STATE_EXTERNAL_AUTH:
-		kalIndicateRxMgmtFrame(prAdapter->prGlueInfo, prSwRfb,
-				       prStaRec->ucBssIndex);
-		break;
-
 	default:
 		break;		/* Ignore other cases */
 	}
@@ -1120,6 +1112,7 @@ uint32_t saaFsmRunEventRxAssoc(IN struct ADAPTER *prAdapter,
 	uint8_t ucWlanIdx;
 	struct WLAN_MAC_MGMT_HEADER *prWlanMgmtHdr;
 
+	ASSERT(prSwRfb);
 	prStaRec = cnmGetStaRecByIndex(prAdapter, prSwRfb->ucStaRecIdx);
 	ucWlanIdx = (uint8_t) HAL_RX_STATUS_GET_WLAN_IDX(prSwRfb->prRxStatus);
 
@@ -1142,16 +1135,6 @@ uint32_t saaFsmRunEventRxAssoc(IN struct ADAPTER *prAdapter,
 		if (assocCheckRxReAssocRspFrameStatus(prAdapter,
 		    prSwRfb, &u2StatusCode) == WLAN_STATUS_SUCCESS) {
 
-#if CFG_SUPPORT_REPORT_MISC
-			if (prAdapter->rReportMiscSet.eQueryNum
-						== REPORT_AUTHASSOC_START) {
-				prAdapter->rReportMiscSet.i4Rssi =
-						RCPI_TO_dBm(prStaRec->ucRCPI);
-				wlanGetReportMisc(prAdapter);
-				prAdapter->rReportMiscSet.eQueryNum =
-						REPORT_AUTHASSOC_END;
-			}
-#endif
 			cnmTimerStopTimer(prAdapter,
 					  &prStaRec->rTxReqDoneOrRxRespTimer);
 
@@ -1231,6 +1214,7 @@ uint32_t saaFsmRunEventRxDeauth(IN struct ADAPTER *prAdapter,
 	struct WLAN_DEAUTH_FRAME *prDeauthFrame;
 	uint8_t ucWlanIdx;
 
+	ASSERT(prSwRfb);
 	prStaRec = cnmGetStaRecByIndex(prAdapter, prSwRfb->ucStaRecIdx);
 	prDeauthFrame = (struct WLAN_DEAUTH_FRAME *) prSwRfb->pvHeader;
 	ucWlanIdx = (uint8_t) HAL_RX_STATUS_GET_WLAN_IDX(prSwRfb->prRxStatus);
@@ -1253,15 +1237,11 @@ uint32_t saaFsmRunEventRxDeauth(IN struct ADAPTER *prAdapter,
 
 		if (IS_STA_IN_AIS(prStaRec)) {
 			struct BSS_INFO *prAisBssInfo;
-			uint8_t ucBssIndex = 0;
 
 			if (!IS_AP_STA(prStaRec))
 				break;
 
-			ucBssIndex = prStaRec->ucBssIndex;
-
-			prAisBssInfo = aisGetAisBssInfo(prAdapter,
-				ucBssIndex);
+			prAisBssInfo = prAdapter->prAisBssInfo;
 
 			if (prStaRec->ucStaState > STA_STATE_1) {
 
@@ -1278,8 +1258,8 @@ uint32_t saaFsmRunEventRxDeauth(IN struct ADAPTER *prAdapter,
 							*prAisSpecBssInfo;
 
 					prAisSpecBssInfo =
-						aisGetAisSpecBssInfo(prAdapter,
-						ucBssIndex);
+						&(prAdapter->rWifiVar.
+							rAisSpecificBssInfo);
 
 					DBGLOG(RSN, INFO,
 					       "QM RX MGT: Deauth frame, P=%d Sec=%d CM=%d BC=%d fc=%02x\n",
@@ -1358,11 +1338,9 @@ void saaChkDeauthfrmParamHandler(IN struct ADAPTER *prAdapter,
 		if (!IS_BMCAST_MAC_ADDR(prDeauthFrame->aucDestAddr) &&
 		    (prStaRec->u2ReasonCode == REASON_CODE_CLASS_2_ERR
 		     || prStaRec->u2ReasonCode == REASON_CODE_CLASS_3_ERR)) {
-			DBGLOG(RSN, INFO,
-				"[%d] QM RX MGT: rsnStartSaQuery\n",
-				prStaRec->ucBssIndex);
+			DBGLOG(RSN, INFO, "QM RX MGT: rsnStartSaQuery\n");
 			/* MFP test plan 5.3.3.5 */
-			rsnStartSaQuery(prAdapter, prStaRec->ucBssIndex);
+			rsnStartSaQuery(prAdapter);
 		} else {
 			DBGLOG(RSN, INFO, "RXM: Drop unprotected Mgmt frame\n");
 			DBGLOG(RSN, INFO,
@@ -1415,8 +1393,6 @@ saaSendDisconnectMsgHandler(IN struct ADAPTER *prAdapter,
 			prAisAbortMsg->ucReasonOfDisconnect =
 				DISCONNECT_REASON_CODE_DEAUTHENTICATED;
 			prAisAbortMsg->fgDelayIndication = FALSE;
-			prAisAbortMsg->ucBssIndex =
-				prStaRec->ucBssIndex;
 			mboxSendMsg(prAdapter, MBOX_ID_0,
 				    (struct MSG_HDR *) prAisAbortMsg,
 				    MSG_SEND_METHOD_BUF);
@@ -1446,8 +1422,6 @@ saaSendDisconnectMsgHandler(IN struct ADAPTER *prAdapter,
 			prAisAbortMsg->ucReasonOfDisconnect =
 				DISCONNECT_REASON_CODE_DISASSOCIATED;
 			prAisAbortMsg->fgDelayIndication = FALSE;
-			prAisAbortMsg->ucBssIndex =
-				prStaRec->ucBssIndex;
 			mboxSendMsg(prAdapter, MBOX_ID_0,
 				    (struct MSG_HDR *) prAisAbortMsg,
 				    MSG_SEND_METHOD_BUF);
@@ -1475,14 +1449,14 @@ uint32_t saaFsmRunEventRxDisassoc(IN struct ADAPTER *prAdapter,
 	struct WLAN_DISASSOC_FRAME *prDisassocFrame;
 	uint8_t ucWlanIdx;
 
+	ASSERT(prSwRfb);
 	prStaRec = cnmGetStaRecByIndex(prAdapter, prSwRfb->ucStaRecIdx);
 	prDisassocFrame = (struct WLAN_DISASSOC_FRAME *) prSwRfb->pvHeader;
 	ucWlanIdx = (uint8_t) HAL_RX_STATUS_GET_WLAN_IDX(prSwRfb->prRxStatus);
 
 	DBGLOG(SAA, INFO,
-	       "Rx Disassoc frame from SA[" MACSTR "] BSSID[" MACSTR
-	       "] DA[" MACSTR "] ReasonCode[0x%x]\n",
-	       MAC2STR(prDisassocFrame->aucSrcAddr),
+	       "Rx Disassoc frame from BSSID[" MACSTR "] DA[" MACSTR
+	       "] ReasonCode[0x%x]\n",
 	       MAC2STR(prDisassocFrame->aucBSSID),
 	       MAC2STR(prDisassocFrame->aucDestAddr),
 	       prDisassocFrame->u2ReasonCode);
@@ -1499,15 +1473,11 @@ uint32_t saaFsmRunEventRxDisassoc(IN struct ADAPTER *prAdapter,
 
 		if (IS_STA_IN_AIS(prStaRec)) {
 			struct BSS_INFO *prAisBssInfo;
-			uint8_t ucBssIndex = 0;
 
 			if (!IS_AP_STA(prStaRec))
 				break;
 
-			ucBssIndex = prStaRec->ucBssIndex;
-
-			prAisBssInfo = aisGetAisBssInfo(prAdapter,
-				ucBssIndex);
+			prAisBssInfo = prAdapter->prAisBssInfo;
 
 			if (prStaRec->ucStaState > STA_STATE_1) {
 
@@ -1523,8 +1493,8 @@ uint32_t saaFsmRunEventRxDisassoc(IN struct ADAPTER *prAdapter,
 							*prAisSpecBssInfo;
 
 					prAisSpecBssInfo =
-						aisGetAisSpecBssInfo(prAdapter,
-						ucBssIndex);
+						&(prAdapter->rWifiVar.
+							rAisSpecificBssInfo);
 
 					DBGLOG(RSN, INFO,
 					       "QM RX MGT: Disassoc frame, P=%d Sec=%d CM=%d BC=%d fc=%02x\n",
@@ -1609,10 +1579,8 @@ saaChkDisassocfrmParamHandler(IN struct ADAPTER *prAdapter,
 	    (prStaRec->u2ReasonCode == REASON_CODE_CLASS_2_ERR ||
 	     prStaRec->u2ReasonCode == REASON_CODE_CLASS_3_ERR)) {
 		/* MFP test plan 5.3.3.5 */
-		DBGLOG(RSN, INFO,
-			"[%d] QM RX MGT: rsnStartSaQuery\n",
-			prStaRec->ucBssIndex);
-		rsnStartSaQuery(prAdapter, prStaRec->ucBssIndex);
+		DBGLOG(RSN, INFO, "QM RX MGT: rsnStartSaQuery\n");
+		rsnStartSaQuery(prAdapter);
 	} else {
 		DBGLOG(RSN, INFO, "RXM: Drop unprotected Mgmt frame\n");
 		DBGLOG(RSN, INFO,
@@ -1638,9 +1606,12 @@ void saaFsmRunEventAbort(IN struct ADAPTER *prAdapter,
 	struct MSG_SAA_FSM_ABORT *prSaaFsmAbortMsg;
 	struct STA_RECORD *prStaRec;
 
+	ASSERT(prMsgHdr);
+
 	prSaaFsmAbortMsg = (struct MSG_SAA_FSM_ABORT *) prMsgHdr;
 	prStaRec = prSaaFsmAbortMsg->prStaRec;
 
+	ASSERT(prStaRec);
 	if (!prStaRec) {
 		cnmMemFree(prAdapter, prMsgHdr);
 		return;
@@ -1669,28 +1640,6 @@ void saaFsmRunEventAbort(IN struct ADAPTER *prAdapter,
 	cnmStaRecFree(prAdapter, prStaRec);
 #endif
 }				/* end of saaFsmRunEventAbort() */
-
-void saaFsmRunEventExternalAuthDone(IN struct ADAPTER *prAdapter,
-				    IN struct MSG_HDR *prMsgHdr)
-{
-	struct MSG_SAA_EXTERNAL_AUTH_DONE *prSaaFsmMsg = NULL;
-	struct STA_RECORD *prStaRec;
-	uint16_t status;
-
-	prSaaFsmMsg = (struct MSG_SAA_EXTERNAL_AUTH_DONE *)prMsgHdr;
-	prStaRec = prSaaFsmMsg->prStaRec;
-	status = prSaaFsmMsg->status;
-
-	if (status != WLAN_STATUS_SUCCESS)
-		saaFsmSteps(prAdapter, prStaRec, AA_STATE_IDLE,
-			    (struct SW_RFB *)NULL);
-	else if (prStaRec->eAuthAssocState != SAA_STATE_EXTERNAL_AUTH)
-		DBGLOG(SAA, WARN,
-		       "Receive External Auth DONE at wrong state\n");
-	else
-		saaFsmSteps(prAdapter, prStaRec, SAA_STATE_SEND_ASSOC1,
-			    (struct SW_RFB *)NULL);
-}				/* end of saaFsmRunEventExternalAuthDone() */
 
 /* TODO(Kevin): following code will be modified and move to AIS FSM */
 #if 0

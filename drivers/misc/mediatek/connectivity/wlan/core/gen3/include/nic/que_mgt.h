@@ -135,9 +135,6 @@ extern UINT_8 g_arTdlsLink[MAXNUM_TDLS_PEER];
  */
 #define QM_FWD_PKT_QUE_LOW_THRESHOLD        (QM_FWD_PKT_QUE_HIGH_THRESHOLD / 2)
 
-#define QM_RECENT_SSN_CACHE_NUM             10
-#define QM_INVALID_SSN                      65535
-
 
 /* 1 WMM-related */
 /* WMM FLAGS */
@@ -321,8 +318,6 @@ typedef struct _RX_BA_ENTRY_T {
 	UINT_8 ucIdleCount;
 	UINT_16 u2SnapShotSN;
 #endif
-	UINT_16 au2RecentSsn[QM_RECENT_SSN_CACHE_NUM];
-	UINT_8 ucLastSlot;
 	/* UINT_8                  ucTxBufferSize; */
 	/* BOOL                    fgIsAcConstrain; */
 	/* BOOL                    fgIsBaEnabled; */
@@ -898,15 +893,9 @@ P_SW_RFB_T qmHandleRxPackets(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfbList
 VOID qmProcessPktWithReordering(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb, OUT P_QUE_T prReturnedQue);
 
 VOID qmProcessBarFrame(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb, OUT P_QUE_T prReturnedQue);
-#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
+
 VOID
-qmInsertFallWithinReorderPkt(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb,
-		IN P_RX_BA_ENTRY_T prReorderQueParm, OUT P_QUE_T prReturnedQue);
-#else
-VOID
-qmInsertFallWithinReorderPkt(IN P_SW_RFB_T prSwRfb,
-		IN P_RX_BA_ENTRY_T prReorderQueParm, OUT P_QUE_T prReturnedQue);
-#endif
+qmInsertFallWithinReorderPkt(IN P_SW_RFB_T prSwRfb, IN P_RX_BA_ENTRY_T prReorderQueParm, OUT P_QUE_T prReturnedQue);
 
 VOID qmInsertFallAheadReorderPkt(IN P_SW_RFB_T prSwRfb, IN P_RX_BA_ENTRY_T prReorderQueParm, OUT P_QUE_T prReturnedQue);
 

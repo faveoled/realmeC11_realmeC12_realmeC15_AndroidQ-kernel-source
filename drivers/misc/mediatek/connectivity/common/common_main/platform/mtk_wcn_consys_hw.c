@@ -39,12 +39,8 @@
 #include "osal_typedef.h"
 #include "mtk_wcn_consys_hw.h"
 #include "wmt_step.h"
-#include "wmt_ic.h"
 #include <linux/of_reserved_mem.h>
 #include <linux/pinctrl/consumer.h>
-#include <linux/of_gpio.h>
-#include <connectivity_build_in_adapter.h>
-#include "wmt_lib.h"
 
 /*******************************************************************************
 *                              C O N S T A N T S
@@ -77,9 +73,6 @@ struct platform_device *g_pdev;
 
 UINT32 gps_lna_pin_num = 0xffffffff;
 
-INT32 chip_reset_status = -1;
-static INT32 wifi_ant_swap_gpio_pin_num;
-
 #ifdef CONFIG_OF
 const struct of_device_id apwmt_of_ids[] = {
 	{.compatible = "mediatek,mt3967-consys",},
@@ -100,10 +93,6 @@ const struct of_device_id apwmt_of_ids[] = {
 	{.compatible = "mediatek,mt6771-consys",},
 	{.compatible = "mediatek,mt6765-consys",},
 	{.compatible = "mediatek,mt6761-consys",},
-	{.compatible = "mediatek,mt6779-consys",},
-	{.compatible = "mediatek,mt6768-consys",},
-	{.compatible = "mediatek,mt6785-consys",},
-	{.compatible = "mediatek,mt8168-consys",},
 	{}
 };
 struct CONSYS_BASE_ADDRESS conn_reg;
@@ -167,16 +156,12 @@ static INT32 mtk_wmt_probe(struct platform_device *pdev)
 {
 	INT32 iRet = -1;
 	INT32 pin_ret = 0;
-	UINT32 pinmux = 0;
+	UINT32 pinmux;
 	struct device_node *pinctl_node, *pins_node;
 	UINT8 __iomem *pConnsysEmiStart;
 
 	if (pdev)
 		g_pdev = pdev;
-	else {
-		WMT_PLAT_PR_ERR("pdev is NULL\n");
-		return -1;
-	}
 
 	if (wmt_consys_ic_ops->consys_ic_need_store_pdev) {
 		if (wmt_consys_ic_ops->consys_ic_need_store_pdev() == MTK_WCN_BOOL_TRUE) {
@@ -256,14 +241,8 @@ static INT32 mtk_wmt_probe(struct platform_device *pdev)
 		}
 	}
 
-	wifi_ant_swap_gpio_pin_num = of_get_named_gpio(pdev->dev.of_node, "wifi_ant_swap_gpio", 0);
-	WMT_PLAT_PR_INFO("ant swap pin number:%d\n", wifi_ant_swap_gpio_pin_num);
-
 	if (wmt_consys_ic_ops->consys_ic_store_reset_control)
 		wmt_consys_ic_ops->consys_ic_store_reset_control(pdev);
-
-	if (wmt_consys_ic_ops->consys_ic_register_devapc_cb)
-		wmt_consys_ic_ops->consys_ic_register_devapc_cb();
 
 	return 0;
 }
@@ -295,17 +274,12 @@ static INT32 mtk_wmt_suspend(struct platform_device *pdev, pm_message_t state)
 
 static INT32 mtk_wmt_resume(struct platform_device *pdev)
 {
-	wmt_lib_resume_dump_info();
+	WMT_STEP_DO_ACTIONS_FUNC(STEP_TRIGGER_POINT_WHEN_AP_RESUME);
+
+	if (wmt_consys_ic_ops->consys_ic_resume_dump_info)
+		wmt_consys_ic_ops->consys_ic_resume_dump_info();
 
 	return 0;
-}
-
-PUINT32 mtk_wcn_consys_read_dump_info_reg(VOID)
-{
-	if (wmt_consys_ic_ops->consys_ic_resume_dump_info)
-		return wmt_consys_ic_ops->consys_ic_resume_dump_info();
-	else
-		return NULL;
 }
 
 INT32 mtk_wcn_consys_hw_reg_ctrl(UINT32 on, UINT32 co_clock_type)
@@ -556,14 +530,8 @@ INT32 mtk_wcn_consys_hw_rst(UINT32 co_clock_type)
 
 	WMT_PLAT_PR_INFO("CONSYS-HW, hw_rst start, eirq should be disabled before this step\n");
 
-	mtk_consys_set_chip_reset_status(1);
-
 	if (wmt_consys_ic_ops->consys_ic_set_dl_rom_patch_flag)
 		wmt_consys_ic_ops->consys_ic_set_dl_rom_patch_flag(1);
-
-	/* Dump infra register for debug purpose */
-	if (wmt_consys_ic_ops->consys_ic_infra_reg_dump)
-		wmt_consys_ic_ops->consys_ic_infra_reg_dump();
 
 	/* write 0x5000_0154.Bit[1] = 1 (pdma_axi_rready_force_high) to prevent pdma block slpprot */
 	if (wmt_consys_ic_ops->consys_ic_set_pdma_axi_rready_force_high)
@@ -572,17 +540,12 @@ INT32 mtk_wcn_consys_hw_rst(UINT32 co_clock_type)
 	/*1. do whole hw power off flow */
 	iRet += mtk_wcn_consys_hw_reg_ctrl(0, co_clock_type);
 
-	/* Write Wi-Fi calibration data back to EMI */
-	mtk_wcn_soc_restore_wifi_cal_result();
-
 	/*2. do whole hw power on flow */
 	iRet += mtk_wcn_consys_hw_reg_ctrl(1, co_clock_type);
 
 	/* Make sure pdma_axi_rready_force_high set to 0 after reset */
 	if (wmt_consys_ic_ops->consys_ic_set_pdma_axi_rready_force_high)
 		wmt_consys_ic_ops->consys_ic_set_pdma_axi_rready_force_high(0);
-
-	mtk_consys_set_chip_reset_status(0);
 
 	WMT_PLAT_PR_INFO("CONSYS-HW, hw_rst finish, eirq should be enabled after this step\n");
 	return iRet;
@@ -713,8 +676,7 @@ P_CONSYS_EMI_ADDR_INFO mtk_wcn_consys_soc_get_emi_phy_add(VOID)
 
 UINT32 mtk_wcn_consys_read_cpupcr(VOID)
 {
-	if (wmt_consys_ic_ops->consys_ic_read_cpupcr &&
-		mtk_consys_check_reg_readable())
+	if (wmt_consys_ic_ops->consys_ic_read_cpupcr)
 		return wmt_consys_ic_ops->consys_ic_read_cpupcr();
 	else
 		return 0;
@@ -799,7 +761,6 @@ VOID mtk_wcn_consys_clock_fail_dump(VOID)
 {
 	if (wmt_consys_ic_ops->consys_ic_clock_fail_dump)
 		wmt_consys_ic_ops->consys_ic_clock_fail_dump();
-	WMT_STEP_DO_ACTIONS_FUNC(STEP_TRIGGER_POINT_WHEN_CLOCK_FAIL);
 }
 
 INT32 mtk_consys_is_connsys_reg(UINT32 addr)
@@ -808,47 +769,6 @@ INT32 mtk_consys_is_connsys_reg(UINT32 addr)
 		return wmt_consys_ic_ops->consys_ic_is_connsys_reg(addr);
 	else
 		return 0;
-}
-
-VOID mtk_consys_set_mcif_mpu_protection(MTK_WCN_BOOL enable)
-{
-	if (wmt_consys_ic_ops->consys_ic_set_mcif_emi_mpu_protection)
-		wmt_consys_ic_ops->consys_ic_set_mcif_emi_mpu_protection(enable);
-}
-
-INT32 mtk_consys_is_calibration_backup_restore_support(VOID)
-{
-	if (wmt_consys_ic_ops->consys_ic_calibration_backup_restore)
-		return wmt_consys_ic_ops->consys_ic_calibration_backup_restore();
-	else
-		return 0;
-
-}
-
-VOID mtk_consys_set_chip_reset_status(INT32 status)
-{
-	chip_reset_status = status;
-}
-
-INT32 mtk_consys_chip_reset_status(VOID)
-{
-	return chip_reset_status;
-}
-
-INT32 mtk_consys_is_ant_swap_enable_by_hwid(VOID)
-{
-	if (wmt_consys_ic_ops->consys_ic_is_ant_swap_enable_by_hwid)
-		return wmt_consys_ic_ops->consys_ic_is_ant_swap_enable_by_hwid(wifi_ant_swap_gpio_pin_num);
-	else
-		return 0;
-}
-
-INT32 mtk_consys_resume_dump_info(VOID)
-{
-	if (wmt_consys_ic_ops->consys_ic_resume_dump_info)
-		wmt_consys_ic_ops->consys_ic_resume_dump_info();
-
-	return 0;
 }
 
 VOID mtk_wcn_consys_ic_get_ant_sel_cr_addr(PUINT32 default_invert_cr, PUINT32 default_invert_bit)

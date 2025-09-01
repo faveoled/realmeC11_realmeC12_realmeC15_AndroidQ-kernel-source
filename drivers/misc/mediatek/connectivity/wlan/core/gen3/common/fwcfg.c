@@ -31,49 +31,7 @@ static char *strtok_r(char *s, const char *delim, char **last);
 ********************************************************************************
 */
 struct _FW_CFG __weak fwCfgArray[] = {
-    #ifdef VENDOR_EDIT
-    //Shimin.Jiang@PSW.CN.WiFi.Connect.roaming.1268996,2018/1/29
-    //Add for 1268996 roam in strong rssi
-    {"RoamingCustomization", "1"},
-    {"RoamingRCPIGoodValue", "0x50"},//-70db
-    {"RoamingRCPIPoorValue", "0x40"},//-78db
-    #endif/* VENDOR_EDIT */
-
-	#ifdef VENDOR_EDIT
-	//Ming.Liu@PSW.CN.WiFi.Network.dl_speed.1115135, 2017/09/30,
-	//add for: [ modify Cw/TxOp param to the same with msm8953 ]
-	{"CwMax", "3"},
-	{"CwMin", "3"},
-	{"AifsN", "2"},
-	{"TxOp", "520"},
-	{"WmmParamCfgEn", "1"},
-	{"Cert11gModeEnable", "0"},
-	#endif /* VENDOR_EDIT */
 };
-#ifdef CFG_SUPPORT_COEX_IOT_AP
-/*
- *  Currently,Just supports Coex IOT AP List,
- *  Please don't add other type of IOT AP into arrary as below,
- *  Otherwise it could cause to unexpected exception!
- */
-struct FwCfgForIotAP fwCfgIotAP[] = {
-	{
-		COEX_ISSUE_TYPE_ID,
-		{0x80, 0x89, 0x17, 0x00, 0x00, 0x00},
-		{0xff, 0xff, 0xff, 0x00, 0x00, 0x00},
-		"A2DPUseCTS2Self 1",
-		"A2DPUseCTS2Self 0",
-	},
-	{
-		COEX_ISSUE_TYPE_ID,
-		{0x6c, 0xe8, 0x73, 0x00, 0x00, 0x00},
-		{0xff, 0xff, 0xff, 0x00, 0x00, 0x00},
-		"A2DPUseCTS2Self 1",
-		"A2DPUseCTS2Self 0",
-	},
-
-};
-#endif
 /* ******************************************************************************
 *                              F U N C T I O N S
 *********************************************************************************
@@ -214,7 +172,7 @@ WLAN_STATUS wlanFwFileCfg(IN P_ADAPTER_T prAdapter)
 WLAN_STATUS wlanFwCfgParse(IN P_ADAPTER_T prAdapter, PUINT_8 pucConfigBuf)
 {
 	/* here return a list should be better */
-	char *saveptr1 = NULL, *saveptr2 = NULL;
+	char *saveptr1, *saveptr2;
 	char *cfgItems = pucConfigBuf;
 	UINT_8 cmdNum = 0;
 
@@ -317,79 +275,3 @@ cont:
 		} while (sc != 0);
 	}
 }
-#ifdef CFG_SUPPORT_COEX_IOT_AP
-WLAN_STATUS wlanFWCfgForIotAP(IN P_ADAPTER_T prAdapter, UINT_8 aucBssid[])
-{
-	UINT_8 aucMacAddr[MAC_ADDR_LEN];
-	UINT_8 aucTargetBssid[MAC_ADDR_LEN];
-	UINT_8 aucCmdString[CMD_FORMAT_V1_LENGTH];
-	UINT_8 i = 0, j = 0, ucPrevItem = 0;
-	int fwIotCfgItemNum = 0;
-	UINT_8 fgEnBssid = FALSE;
-
-	if (!prAdapter || !(prAdapter->rWifiVar.ucEnCoexIotAP))
-		return WLAN_STATUS_FAILURE;
-	fwIotCfgItemNum = ARRAY_SIZE(fwCfgIotAP);
-	DBGLOG(INIT, INFO, "Total item num:%d\n", fwIotCfgItemNum);
-	if (fwIotCfgItemNum < 1)
-		return WLAN_STATUS_FAILURE;
-	for (j = 0; j < fwIotCfgItemNum; j++) {
-		if (fwCfgIotAP[j].ucIotType != COEX_ISSUE_TYPE_ID)
-			continue;
-		for (i = 0; i < MAC_ADDR_LEN; i++) {
-			aucMacAddr[i] = (fwCfgIotAP[j].aucIotApMacAddr[i]) & (fwCfgIotAP[j].ucMacAddrMask[i]);
-			aucTargetBssid[i]   = aucBssid[i] & (fwCfgIotAP[j].ucMacAddrMask[i]);
-		}
-		fgEnBssid = EQUAL_MAC_ADDR(aucTargetBssid, aucMacAddr);
-		if (fgEnBssid == TRUE)
-			break;
-	}
-	/* For Iot AP which don't stop tx when sta enters into Power save */
-	if (fgEnBssid && (prAdapter->fgEnCts2Self == FALSE)) {
-		kalMemCopy(aucCmdString, fwCfgIotAP[j].aucEnableCmdString, strlen(fwCfgIotAP[j].aucEnableCmdString)+1);
-		DBGLOG(INIT, INFO, "CMD:%s, item: %d\n", aucCmdString, j);
-		wlanFwCfgParse(prAdapter, (PUINT_8)(aucCmdString));
-		prAdapter->fgEnCts2Self = TRUE;
-		prAdapter->ucPrevItem = j;
-	} else if (fgEnBssid == FALSE && (prAdapter->fgEnCts2Self)) {
-		ucPrevItem = prAdapter->ucPrevItem;
-		if (ucPrevItem >= fwIotCfgItemNum) {
-			DBGLOG(INIT, WARN, "Invalid Index:%d\n", ucPrevItem);
-			ucPrevItem = 0;
-		}
-		kalMemCopy(aucCmdString, fwCfgIotAP[ucPrevItem].aucDisableCmdString,
-			strlen(fwCfgIotAP[ucPrevItem].aucDisableCmdString)+1);
-		DBGLOG(INIT, INFO, "CMD:%s, item: %d\n", aucCmdString, ucPrevItem);
-		wlanFwCfgParse(prAdapter, (PUINT_8)(aucCmdString));
-		prAdapter->fgEnCts2Self = FALSE;
-		prAdapter->ucPrevItem = 0;
-	}
-	DBGLOG(INIT, INFO, "End fgEnabled = %d\n", prAdapter->fgEnCts2Self);
-	return WLAN_STATUS_SUCCESS;
-}
-WLAN_STATUS wlanFWCfgForceDisIotAP(IN P_ADAPTER_T prAdapter)
-{
-	UINT_8 aucCmdString[CMD_FORMAT_V1_LENGTH];
-	UINT_8 j = 0;
-	int fwIotCfgItemNum = 0;
-
-	if (!prAdapter || !(prAdapter->rWifiVar.ucEnCoexIotAP))
-		return WLAN_STATUS_FAILURE;
-	fwIotCfgItemNum = ARRAY_SIZE(fwCfgIotAP);
-	if (fwIotCfgItemNum < 1)
-		return WLAN_STATUS_FAILURE;
-	for (j = 0; j < fwIotCfgItemNum; j++) {
-		if (prAdapter->fgEnCts2Self && fwCfgIotAP[j].ucIotType == COEX_ISSUE_TYPE_ID) {
-			kalMemCopy(aucCmdString, fwCfgIotAP[j].aucDisableCmdString,
-				strlen(fwCfgIotAP[j].aucDisableCmdString)+1);
-			DBGLOG(INIT, INFO, "CMD:%s, item: %d\n", aucCmdString, j);
-			wlanFwCfgParse(prAdapter, (PUINT_8)(aucCmdString));
-			prAdapter->fgEnCts2Self = FALSE;
-			prAdapter->ucPrevItem = 0;
-			break;
-		}
-	}
-	DBGLOG(INIT, INFO, "End fgEnabled = %d\n", prAdapter->fgEnCts2Self);
-	return WLAN_STATUS_SUCCESS;
-}
-#endif

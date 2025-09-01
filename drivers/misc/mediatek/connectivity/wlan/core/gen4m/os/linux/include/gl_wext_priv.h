@@ -156,7 +156,7 @@
 
 #define PRIV_CMD_GET_CH_LIST            24
 
-#define PRIV_CMD_SET_TX_POWER_NO_USED           25
+#define PRIV_CMD_SET_TX_POWER           25
 
 #define PRIV_CMD_BAND_CONFIG            26
 
@@ -263,10 +263,6 @@
 #define OID_IPC_WIFI_LOG_UI                             0xFFA0CC01
 #define OID_IPC_WIFI_LOG_LEVEL                          0xFFA0CC02
 
-#if CFG_SUPPORT_ANT_SWAP
-#define OID_CUSTOM_QUERY_ANT_SWAP_CAPABILITY		0xFFA0CD00
-#endif
-
 #if CFG_SUPPORT_NCHO
 #define CMD_NCHO_COMP_TIMEOUT			1500	/* ms */
 #define CMD_NCHO_AF_DATA_LENGTH			1040
@@ -282,11 +278,6 @@
 
 #if (CFG_SUPPORT_TXPOWER_INFO == 1)
 #define TX_POWER_SHOW_INFO                              0x7
-#endif
-
-#ifdef CFG_MODIFY_TX_POWER_BY_BAT_VOLT
-#define TX_POWER_PERCENTAGE_CTRL                        0x1
-#define TX_POWER_DROP_CTRL                              0x2
 #endif
 
 #define AGG_RANGE_SEL_NUM                               7
@@ -439,17 +430,6 @@ priv_ate_set(IN struct net_device *prNetDev,
 	     IN struct iw_request_info *prIwReqInfo,
 	     IN union iwreq_data *prIwReqData, IN char *pcExtra);
 #endif
-
-#if defined(CFG_REPORT_MAX_TX_RATE) && (CFG_REPORT_MAX_TX_RATE == 1)
-int kalGetMaxTxRate(IN struct ADAPTER *prAdapter,
-		 IN void *prBssPtr, IN struct STA_RECORD *prStaRec,
-		 OUT uint32_t *pu4CurRate, OUT uint32_t *pu4MaxRate);
-#endif /* CFG_REPORT_MAX_TX_RATE */
-
-#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
-int kalGetRxRate(IN struct GLUE_INFO *prGlueInfo,
-		 OUT uint32_t *pu4CurRate, OUT uint32_t *pu4MaxRate);
-#endif /* CFG_SUPPORT_LINK_QUALITY_MONITOR */
 
 /*******************************************************************************
  *                              F U N C T I O N S

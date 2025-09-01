@@ -41,6 +41,12 @@ else
     ccflags-y += -DWMT_IDC_SUPPORT=0
 endif
 
+ifeq ($(CONFIG_MTK_WAPI_SUPPORT), y)
+    ccflags-y += -DCFG_SUPPORT_WAPI=1
+else
+    ccflags-y += -DCFG_SUPPORT_WAPI=0
+endif
+
 ifeq ($(CONFIG_MTK_WIFI_MCC_SUPPORT), y)
     ccflags-y += -DCFG_SUPPORT_MCC=1
 else
@@ -81,7 +87,11 @@ else
 endif
 
 ifeq ($(CONFIG_MTK_TC1_FEATURE), y)
-    ccflags-y += -I$(srctree)/drivers/misc/mediatek/tc1_interface
+ifeq ($(CONFIG_MTK_GPT_SCHEME_SUPPORT), y)
+    ccflags-y += -I$(srctree)/drivers/misc/mediatek/tc1_interface/gpt
+else
+    ccflags-y += -I$(srctree)/drivers/misc/mediatek/tc1_interface/pmt
+endif
     ccflags-y += -DCFG_TC1_FEATURE=1
     ccflags-y += -DCFG_SUPPORT_CFG_FILE=1
 else
@@ -150,15 +160,15 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/emi/$(MTK_PLATFORM)
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/common
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include/mach/
-ccflags-y += -I$(TOP)/vendor/mediatek/kernel_modules/connectivity/common/common_main/include
-ccflags-y += -I$(TOP)/vendor/mediatek/kernel_modules/connectivity/common/common_main/linux/include
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/common/common_main/include
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/common/common_main/linux/include
 ccflags-y += -DMTK_WCN_WMT_STP_EXP_SYMBOL_ABSTRACT
 
 MODULE_NAME := wlan_drv_gen2
 #obj-$(CONFIG_MTK_COMBO_WIFI) += $(MODULE_NAME).o
 
 #if CONFIG_MTK_COMBO_WIFI=m ==> obj-m means ko module, not build in obj-y
-obj-m += $(MODULE_NAME).o
+obj-y += $(MODULE_NAME).o
 
 # ---------------------------------------------------
 # Directory List
@@ -268,7 +278,10 @@ MGMT_OBJS += $(MGMT_DIR)p2p_assoc.o \
              $(MGMT_DIR)wnm.o \
              $(MGMT_DIR)wmm.o
 
+
+ifeq ($(CONFIG_MTK_WAPI_SUPPORT), y)
 MGMT_OBJS += $(MGMT_DIR)wapi.o
+endif
 
 ifeq ($(WLAN_PROC), y)
 OS_OBJS += gl_proc.o

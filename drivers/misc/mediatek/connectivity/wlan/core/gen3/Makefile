@@ -1,12 +1,4 @@
 ###############################################################################
-# Necessary Check
-
-ifeq ($(AUTOCONF_H),)
-    $(error AUTOCONF_H is not defined)
-endif
-
-ccflags-y += -imacros $(AUTOCONF_H)
-
 # Force build fail on modpost warning
 KBUILD_MODPOST_FAIL_ON_WARNINGS := y
 ###############################################################################
@@ -29,6 +21,12 @@ ccflags-y += -DWLAN_INCLUDE_PROC
 ccflags-y += -DCFG_SUPPORT_AGPS_ASSIST=1
 ccflags-y += -DCFG_SUPPORT_TSF_USING_BOOTTIME=1
 ccflags-y += -DARP_MONITER_ENABLE=1
+
+ifeq ($(CONFIG_MTK_WIFI_MCC_SUPPORT), y)
+    ccflags-y += -DCFG_SUPPORT_CHNL_CONFLICT_REVISE=0
+else
+    ccflags-y += -DCFG_SUPPORT_CHNL_CONFLICT_REVISE=1
+endif
 
 ifeq ($(CONFIG_MTK_AEE_FEATURE), y)
     ccflags-y += -DCFG_SUPPORT_AEE=1
@@ -74,8 +72,7 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/emi/$(MTK_PLATFORM)
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/emi/submodule
-ccflags-y += -I$(srctree)/drivers/devfreq
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/pmic/include/
+ccflags-y += -I$(srctree)/drivers/devfreq/
 
 ifeq ($(WLAN_CHIP_ID), MT6631)
 # temp disable emi_mpu on these platforms since it is not ready
@@ -107,7 +104,7 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/common/
 ccflags-y += -D MTK_WCN_WMT_STP_EXP_SYMBOL_ABSTRACT
 
 MODULE_NAME := wlan_drv_gen3
-obj-m += $(MODULE_NAME).o
+obj-y += $(MODULE_NAME).o
 
 # ---------------------------------------------------
 # Directory List
@@ -248,7 +245,9 @@ ifneq ($(wildcard $(FWCFG_DIR)fw_config.c),)
 endif
     COMMON_OBJS += $(COMMON_DIR)fwcfg.o
     ccflags-y += -DFW_CFG_SUPPORT
+ifneq ($(TARGET_BUILD_VARIANT), user)
     ccflags-y += -DENABLED_IN_ENGUSERDEBUG
+endif
 endif
 # ---------------------------------------------------
 

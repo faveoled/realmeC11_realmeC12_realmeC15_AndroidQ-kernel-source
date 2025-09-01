@@ -353,7 +353,6 @@ WLAN_STATUS nicApplyNetworkAddress(IN P_ADAPTER_T prAdapter);
 /*----------------------------------------------------------------------------*/
 /* ECO Version                                                                */
 /*----------------------------------------------------------------------------*/
-uint8_t nicGetChipSwVer(void);
 UINT_8 nicGetChipEcoVer(IN P_ADAPTER_T prAdapter);
 BOOLEAN nicIsEcoVerEqualTo(IN P_ADAPTER_T prAdapter, UINT_8 ucEcoVer);
 BOOLEAN nicIsEcoVerEqualOrLaterTo(IN P_ADAPTER_T prAdapter, UINT_8 ucEcoVer);

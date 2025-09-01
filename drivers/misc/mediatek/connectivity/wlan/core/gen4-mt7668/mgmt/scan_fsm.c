@@ -291,7 +291,6 @@ VOID scnSendScanReqV2(IN P_ADAPTER_T prAdapter)
 	rCmdScanReq.ucBssIndex = prScanParam->ucBssIndex;
 	rCmdScanReq.ucScanType = (UINT_8) prScanParam->eScanType;
 	rCmdScanReq.ucSSIDType = prScanParam->ucSSIDType;
-	rCmdScanReq.ucSSIDNum = prScanParam->ucSSIDNum;
 
 	for (i = 0; i < prScanParam->ucSSIDNum; i++) {
 		COPY_SSID(rCmdScanReq.arSSID[i].aucSsid,
@@ -402,11 +401,6 @@ VOID scnFsmMsgAbort(IN P_ADAPTER_T prAdapter, IN P_MSG_HDR_T prMsgHdr)
 	prScanInfo = &(prAdapter->rWifiVar.rScanInfo);
 	prScanParam = &prScanInfo->rScanParam;
 
-	DBGLOG(AIS, STATE, "Abort Scan [%d - [%d %d] - %d]\n",
-		prScanInfo->eCurrentState,
-		prScanCancel->ucSeqNum, prScanParam->ucSeqNum,
-		prScanParam->fgIsObssScan);
-
 	if (prScanInfo->eCurrentState != SCAN_STATE_IDLE) {
 		if (prScanCancel->ucSeqNum == prScanParam->ucSeqNum &&
 		    prScanCancel->ucBssIndex == prScanParam->ucBssIndex) {
@@ -428,8 +422,6 @@ VOID scnFsmMsgAbort(IN P_ADAPTER_T prAdapter, IN P_MSG_HDR_T prMsgHdr)
 
 			/* switch to next pending scan */
 			scnFsmSteps(prAdapter, SCAN_STATE_IDLE);
-		} else if (prScanParam->fgIsObssScan == TRUE) {
-			rlmObssAbortScan(prAdapter);
 		} else {
 			scnFsmRemovePendingMsg(prAdapter, prScanCancel->ucSeqNum, prScanCancel->ucBssIndex);
 		}
@@ -664,7 +656,7 @@ VOID scnEventScanDone(IN P_ADAPTER_T prAdapter, IN P_EVENT_SCAN_DONE prScanDone,
 
 	if (fgIsNewVersion) {
 		DBGLOG(SCN, INFO,
-		       "scnEventScanDone Version%u!size of ScanDone%zu,ucCompleteChanCount[%u],ucCurrentState%u, u4ScanDurBcnCnt[%u]\n",
+		       "scnEventScanDone Version%d!size of ScanDone%d,ucCompleteChanCount[%d],ucCurrentState%d, u4ScanDurBcnCnt[%lu]\n",
 		       prScanDone->ucScanDoneVersion, sizeof(EVENT_SCAN_DONE), prScanDone->ucCompleteChanCount,
 		       prScanDone->ucCurrentState, prScanDone->u4ScanDurBcnCnt);
 
@@ -706,15 +698,12 @@ VOID scnEventScanDone(IN P_ADAPTER_T prAdapter, IN P_EVENT_SCAN_DONE prScanDone,
 					kalMemZero(g_aucScanChannelMDRDY, SCN_SCAN_DONE_PRINT_BUFFER_LENGTH);
 					u4PrintfIdx = 0;
 				}
-				kalSnprintf(g_aucScanChannelNum + u4PrintfIdx * 7,
-					sizeof(g_aucScanChannelNum) - u4PrintfIdx * 7,
-					"%7d", prScanInfo->aucChannelNum[u4ChCnt]);
-				kalSnprintf(g_aucScanChannelIdleTime + u4PrintfIdx * 7,
-					sizeof(g_aucScanChannelIdleTime) - u4PrintfIdx * 7,
-					"%7d", prScanInfo->au2ChannelIdleTime[u4ChCnt]);
-				kalSnprintf(g_aucScanChannelMDRDY + u4PrintfIdx * 7,
-					sizeof(g_aucScanChannelMDRDY) - u4PrintfIdx * 7,
-					"%7d", prScanInfo->aucChannelMDRDYCnt[u4ChCnt]);
+				kalSprintf(g_aucScanChannelNum + u4PrintfIdx*7, "%7d",
+					prScanInfo->aucChannelNum[u4ChCnt]);
+				kalSprintf(g_aucScanChannelIdleTime + u4PrintfIdx*7, "%7d",
+					prScanInfo->au2ChannelIdleTime[u4ChCnt]);
+				kalSprintf(g_aucScanChannelMDRDY + u4PrintfIdx*7, "%7d",
+					prScanInfo->aucChannelMDRDYCnt[u4ChCnt]);
 				u4PrintfIdx++;
 			}
 

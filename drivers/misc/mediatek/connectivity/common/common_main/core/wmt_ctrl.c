@@ -108,8 +108,6 @@ static INT32 wmt_ctrl_get_patch_name(P_WMT_CTRL_DATA pWmtCtrlData);
 
 static INT32 wmt_ctrl_get_rom_patch_info(P_WMT_CTRL_DATA pWmtCtrlData);
 
-static INT32 wmt_ctrl_update_patch_version(P_WMT_CTRL_DATA);
-
 /* TODO: [FixMe][GeorgeKuo]: remove unused function */
 /*static INT32  wmt_ctrl_hwver_get(P_WMT_CTRL_DATA);*/
 
@@ -161,7 +159,6 @@ static const WMT_CTRL_FUNC wmt_ctrl_func[] = {
 #endif
 	[WMT_CTRL_EVT_PARSER] = wmt_ctrl_evt_parser,
 	[WMT_CTRL_GET_ROM_PATCH_INFO] = wmt_ctrl_get_rom_patch_info,
-	[WMT_CTRL_UPDATE_PATCH_VERSION] = wmt_ctrl_update_patch_version,
 	[WMT_CTRL_MAX] = wmt_ctrl_others,
 };
 
@@ -275,7 +272,6 @@ INT32 wmt_ctrl_rx(P_WMT_CTRL_DATA pWmtCtrlData /*UINT8 *pBuff, UINT32 buffLen, U
 			leftCnt--;
 			/* dump btif_rxd's backtrace to check whether it is blocked or not */
 			osal_dump_thread_state("btif_rxd");
-			stp_dbg_poll_cpupcr(5, 1, 1);
 			if (!mtk_wcn_stp_is_sdio_mode())
 				mtk_wcn_consys_stp_btif_logger_ctrl(BTIF_DUMP_BTIF_IRQ);
 
@@ -294,11 +290,6 @@ INT32 wmt_ctrl_rx(P_WMT_CTRL_DATA pWmtCtrlData /*UINT8 *pBuff, UINT32 buffLen, U
 						leftCnt = WMT_LIB_RX_EXTEND_TIMEOUT/pDev->rWmtRxWq.timeoutValue;
 						extended = 1;
 						osal_thread_sched_mark(p_rx_thread, &schedstats);
-						continue;
-					}
-					/* wmt is closed, device is shuting down */
-					if (wmt_dev_is_close() || mtk_wcn_stp_is_wmt_last_close() == 1) {
-						leftCnt = 10;
 						continue;
 					}
 				}
@@ -607,11 +598,6 @@ INT32 wmt_ctrl_get_patch_info(P_WMT_CTRL_DATA pWmtCtrlData)
 	PUINT8 pNbuf = NULL;
 	PUINT8 pAbuf = NULL;
 
-	if (pDev->pWmtPatchInfo == NULL) {
-		WMT_ERR_FUNC("pWmtPatchInfo is NULL\n");
-		return -1;
-	}
-
 	downLoadSeq = pWmtCtrlData->au4CtrlData[0];
 	WMT_DBG_FUNC("download seq is %d\n", downLoadSeq);
 
@@ -642,8 +628,7 @@ INT32 wmt_ctrl_get_rom_patch_info(P_WMT_CTRL_DATA pWmtCtrlData)
 	type = pWmtCtrlData->au4CtrlData[0];
 	WMT_DBG_FUNC("rom patch type is %d\n", type);
 	pDev->ip_ver = pWmtCtrlData->au4CtrlData[3];
-	pDev->fw_ver = pWmtCtrlData->au4CtrlData[4];
-	WMT_DBG_FUNC("ip version is [%x] [%x]\n", pDev->ip_ver, pDev->fw_ver);
+	WMT_DBG_FUNC("ip version is %x\n", pDev->ip_ver);
 
 	if (!pDev->pWmtRomPatchInfo[WMTDRV_TYPE_WMT]) {
 		osal_snprintf(cmdStr, NAME_MAX, "srh_rom_patch");
@@ -673,21 +658,6 @@ INT32 wmt_ctrl_get_rom_patch_info(P_WMT_CTRL_DATA pWmtCtrlData)
 	}
 
 	return ret;
-}
-
-INT32 wmt_ctrl_update_patch_version(P_WMT_CTRL_DATA pWmtCtrlData)
-{
-	P_DEV_WMT pDev = &gDevWmt;	/* single instance */
-	INT32 iRet;
-	UINT8 cmdStr[NAME_MAX + 1] = { 0 };
-
-	osal_snprintf(cmdStr, NAME_MAX, "update_patch_version");
-	iRet = wmt_ctrl_ul_cmd(pDev, cmdStr);
-	if (iRet) {
-		WMT_WARN_FUNC("wmt_ctrl_ul_cmd fail(%d)\n", iRet);
-		return -1;
-	}
-	return 0;
 }
 
 INT32 wmt_ctrl_soc_paldo_ctrl(P_WMT_CTRL_DATA pWmtCtrlData)
@@ -1078,6 +1048,9 @@ INT32 wmt_ctrl_hwidver_set(P_WMT_CTRL_DATA pWmtCtrlData)
 	pDev->chip_id = (pWmtCtrlData->au4CtrlData[0] & 0xFFFF0000) >> 16;
 	pDev->hw_ver = pWmtCtrlData->au4CtrlData[0] & 0x0000FFFF;
 	pDev->fw_ver = pWmtCtrlData->au4CtrlData[1] & 0x0000FFFF;
+	/* TODO: [FixMe][GeorgeKuo] remove translated ENUM_WMTHWVER_TYPE_T in the future!!! */
+	/* Only use hw_ver read from hw. */
+	pDev->eWmtHwVer = (ENUM_WMTHWVER_TYPE_T) (pWmtCtrlData->au4CtrlData[1] & 0xFFFF0000) >> 16;
 
 	return 0;
 }
@@ -1176,14 +1149,9 @@ static INT32 wmt_ctrl_trg_assert(P_WMT_CTRL_DATA pWmtCtrlData)
 	keyword = (PUINT8) pWmtCtrlData->au4CtrlData[2];
 	WMT_INFO_FUNC("wmt-ctrl:drv_type(%d),reason(%d),keyword(%s)\n", drv_type, reason, keyword);
 
-	if (wmt_dev_is_close())
-		WMT_INFO_FUNC("WMT is closing, don't trigger assert\n");
-	else if (chip_reset_only == 1)
-		WMT_INFO_FUNC("Do chip reset only, don't trigger assert\n");
-	else if (mtk_wcn_stp_get_wmt_trg_assert() == 0) {
+	if (mtk_wcn_stp_get_wmt_trg_assert() == 0) {
 		mtk_wcn_stp_dbg_dump_package();
 		mtk_wcn_stp_set_wmt_trg_assert(1);
-		mtk_wcn_stp_assert_flow_ctrl(1);
 
 		iRet = mtk_wcn_stp_wmt_trg_assert();
 		if (iRet == 0) {

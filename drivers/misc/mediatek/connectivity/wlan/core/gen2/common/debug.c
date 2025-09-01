@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -480,7 +478,7 @@ VOID wlanPktStatusDebugDumpInfo(P_ADAPTER_T prAdapter)
 
 
 					offsetMsg += kalSnprintf(pucMsg + offsetMsg
-					, (PKT_STATUS_MSG_LENGTH - offsetMsg)
+					, PKT_STATUS_MSG_LENGTH
 					, "%d,%02x,%x,%d,%d "
 					, prPktInfo->u1Type
 					, prPktInfo->u2IpId
@@ -491,7 +489,7 @@ VOID wlanPktStatusDebugDumpInfo(P_ADAPTER_T prAdapter)
 				} else {
 					/*rx format*/
 					offsetMsg += kalSnprintf(pucMsg + offsetMsg
-					, (PKT_STATUS_MSG_LENGTH - offsetMsg)
+					, PKT_STATUS_MSG_LENGTH
 					, "%d,%02x,%x "
 					, prPktInfo->u1Type
 					, prPktInfo->u2IpId
@@ -1252,7 +1250,7 @@ VOID wlanReadFwInfoFromEmi(IN PUINT32 pAddr)
 	kalMemSet(pEmiBuf, 0, WLAN_EMI_DEBUG_BUF_SIZE);
 	cur_idx_pagedtrace = *pAddr;
 
-	DBGLOG(RX, TRACE, ">>Addr:0x%p CurIdx:%d,PreIdx:%d!\n", pAddr, cur_idx_pagedtrace, gPrevIdxPagedtrace);
+	DBGLOG(RX, INFO, ">>Addr:0x%p CurIdx:%d,PreIdx:%d!\n", pAddr, cur_idx_pagedtrace, gPrevIdxPagedtrace);
 
 	if (cur_idx_pagedtrace > gPrevIdxPagedtrace) {
 

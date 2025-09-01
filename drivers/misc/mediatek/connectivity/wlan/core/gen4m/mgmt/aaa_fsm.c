@@ -223,10 +223,11 @@ void aaaFsmRunEventTxReqTimeOut(IN struct ADAPTER *prAdapter,
 	struct STA_RECORD *prStaRec = (struct STA_RECORD *) plParamPtr;
 	struct BSS_INFO *prBssInfo;
 
+	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, prStaRec->ucBssIndex);
+
+	ASSERT(prStaRec);
 	if (!prStaRec)
 		return;
-
-	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, prStaRec->ucBssIndex);
 
 	DBGLOG(AAA, LOUD,
 		"EVENT-TIMER: TX REQ TIMEOUT, Current Time = %d\n",
@@ -552,12 +553,6 @@ uint32_t aaaFsmRunEventRxAssoc(IN struct ADAPTER *prAdapter,
 		 * for incoming Assoc Req
 		 */
 		prStaRec = cnmGetStaRecByIndex(prAdapter, prSwRfb->ucStaRecIdx);
-
-		/* No Wtbl handling */
-		if (!prStaRec) {
-			secHandleNoWtbl(prAdapter, prSwRfb);
-			prStaRec = prSwRfb->prStaRec;
-		}
 
 		/* We should have the corresponding Sta Record. */
 		if ((!prStaRec) || (!prStaRec->fgIsInUse)) {
@@ -942,10 +937,6 @@ aaaFsmRunEventTxDone(IN struct ADAPTER *prAdapter,
 
 		if (prStaRec->u2StatusCode == STATUS_CODE_SUCCESSFUL) {
 			if (rTxDoneStatus == TX_RESULT_SUCCESS) {
-				uint32_t timeout = 0;
-
-				timeout =
-					prAdapter->rWifiVar.u4AaaTxAssocTimeout;
 
 				/* NOTE(Kevin):
 				 * Change to STATE_2 at TX Done
@@ -957,7 +948,7 @@ aaaFsmRunEventTxDone(IN struct ADAPTER *prAdapter,
 				 */
 				cnmTimerStartTimer(prAdapter,
 					&prStaRec->rTxReqDoneOrRxRespTimer,
-					TU_TO_MSEC(timeout));
+					TU_TO_MSEC(TX_ASSOCIATE_TIMEOUT_TU));
 			} else {
 
 				prStaRec->eAuthAssocState =

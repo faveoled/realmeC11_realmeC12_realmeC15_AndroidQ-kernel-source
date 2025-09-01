@@ -332,49 +332,6 @@ scanSearchBssDescByBssidAndSsid(IN P_ADAPTER_T prAdapter,
 
 }				/* end of scanSearchBssDescByBssid() */
 
-#if CFG_SUPPORT_CFG80211_AUTH
-/*----------------------------------------------------------------------------*/
-/*!
-* @brief Find the corresponding BSS Descriptor
-*        according to given BSSID & ChanNum
-*
-* @param[in] prAdapter          Pointer to the Adapter structure.
-* @param[in] aucBSSID           Given BSSID.
-* @param[in] fgCheckChanNum     Need to check ChanNum or not.
-* @param[in] ucChannelNum       Specified Channel Num
-*
-* @return   Pointer to BSS Descriptor, if found. NULL, if not found
-*/
-/*----------------------------------------------------------------------------*/
-P_BSS_DESC_T scanSearchBssDescByBssidAndChanNum(IN P_ADAPTER_T prAdapter,
-	IN UINT_8 aucBSSID[], IN BOOLEAN fgCheckChanNum, IN UINT_8 ucChannelNum)
-{
-	P_SCAN_INFO_T prScanInfo;
-	P_LINK_T prBSSDescList;
-	P_BSS_DESC_T prBssDesc = (P_BSS_DESC_T) NULL;
-
-	ASSERT(prAdapter);
-	ASSERT(aucBSSID);
-	ASSERT(ucChannelNum);
-
-	prScanInfo = &(prAdapter->rWifiVar.rScanInfo);
-
-	prBSSDescList = &prScanInfo->rBSSDescList;
-
-	/* Search BSS Desc from current SCAN result list. */
-	LINK_FOR_EACH_ENTRY(prBssDesc, prBSSDescList, rLinkEntry, BSS_DESC_T) {
-		if (!(EQUAL_MAC_ADDR(prBssDesc->aucBSSID, aucBSSID)))
-			continue;
-		if (fgCheckChanNum == FALSE || ucChannelNum == 0)
-			return prBssDesc;
-		if (prBssDesc->ucChannelNum == ucChannelNum)
-			return prBssDesc;
-	}
-
-	return prBssDesc;
-}
-#endif
-
 /*----------------------------------------------------------------------------*/
 /*!
 * @brief Find the corresponding BSS Descriptor according to given Transmitter Address.
@@ -1192,7 +1149,7 @@ P_BSS_DESC_T scanAddToBssDesc(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb)
 	UINT_8 ucHwChannelNum = 0;
 	UINT_8 ucIeDsChannelNum = 0;
 	UINT_8 ucIeHtChannelNum = 0;
-	BOOLEAN fgIsValidSsid = FALSE, fgEscape = FALSE, fgIsCopy = FALSE;
+	BOOLEAN fgIsValidSsid = FALSE, fgEscape = FALSE;
 	PARAM_SSID_T rSsid;
 	UINT_64 u8Timestamp;
 	BOOLEAN fgIsNewBssDesc = FALSE;
@@ -1239,11 +1196,8 @@ P_BSS_DESC_T scanAddToBssDesc(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb)
 	u2IELength = (prSwRfb->u2PacketLen - prSwRfb->u2HeaderLen) -
 	    (UINT_16) OFFSET_OF(WLAN_BEACON_FRAME_BODY_T, aucInfoElem[0]);
 
-	if (u2IELength > CFG_IE_BUFFER_SIZE) {
+	if (u2IELength > CFG_IE_BUFFER_SIZE)
 		u2IELength = CFG_IE_BUFFER_SIZE;
-		DBGLOG(SCN, WARN, "IE len(%u) > Max IE buffer size(%u), truncate IE!\n",
-			   u2IELength, CFG_IE_BUFFER_SIZE);
-	}
 
 	IE_FOR_EACH(pucIE, u2IELength, u2Offset) {
 		switch (IE_ID(pucIE)) {
@@ -1378,18 +1332,11 @@ P_BSS_DESC_T scanAddToBssDesc(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb)
 			prBssDesc->fgIsConnecting = fgIsConnecting;
 		}
 	}
+#if 1
 
-	/* 2018/04/17 frog: always update IE is not a good choice. */
-	/* Because of not considering hidden BSS.                  */
-	/* Hidden BSS Beacon v.s. hidden BSS probe response.       */
-	if ((prBssDesc->u2RawLength == 0) || (fgIsValidSsid)) {
-		prBssDesc->u2RawLength = prSwRfb->u2PacketLen;
-		if (prBssDesc->u2RawLength > CFG_RAW_BUFFER_SIZE)
-			prBssDesc->u2RawLength = CFG_RAW_BUFFER_SIZE;
-		kalMemCopy(prBssDesc->aucRawBuf, prWlanBeaconFrame,
-			prBssDesc->u2RawLength);
-		fgIsCopy = TRUE;
-	}
+	prBssDesc->u2RawLength = prSwRfb->u2PacketLen;
+	kalMemCopy(prBssDesc->aucRawBuf, prWlanBeaconFrame, prBssDesc->u2RawLength);
+#endif
 
 	/* NOTE: Keep consistency of Scan Record during JOIN process */
 	if (fgIsNewBssDesc == FALSE && prBssDesc->fgIsConnecting)
@@ -1411,18 +1358,15 @@ P_BSS_DESC_T scanAddToBssDesc(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb)
 	u2IELength = (prSwRfb->u2PacketLen - prSwRfb->u2HeaderLen) -
 	    (UINT_16) OFFSET_OF(WLAN_BEACON_FRAME_BODY_T, aucInfoElem[0]);
 
-	if (fgIsCopy) {
-		if (u2IELength > CFG_IE_BUFFER_SIZE) {
-			u2IELength = CFG_IE_BUFFER_SIZE;
-			prBssDesc->fgIsIEOverflow = TRUE;
-		} else {
-			prBssDesc->fgIsIEOverflow = FALSE;
-		}
-
-		prBssDesc->u2IELength = u2IELength;
-		kalMemCopy(prBssDesc->aucIEBuf, prWlanBeaconFrame->aucInfoElem,
-			u2IELength);
+	if (u2IELength > CFG_IE_BUFFER_SIZE) {
+		u2IELength = CFG_IE_BUFFER_SIZE;
+		prBssDesc->fgIsIEOverflow = TRUE;
+	} else {
+		prBssDesc->fgIsIEOverflow = FALSE;
 	}
+	prBssDesc->u2IELength = u2IELength;
+
+	kalMemCopy(prBssDesc->aucIEBuf, prWlanBeaconFrame->aucInfoElem, u2IELength);
 
 	/* 4 <2.2> reset prBssDesc variables in case that AP has been reconfigured */
 	prBssDesc->fgIsERPPresent = FALSE;
@@ -1626,7 +1570,6 @@ P_BSS_DESC_T scanAddToBssDesc(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb)
 	{
 		P_HW_MAC_RX_DESC_T prRxStatus;
 		UINT_8 ucRxRCPI;
-		UINT_8 ucRxRCPI1;
 
 		prRxStatus = prSwRfb->prRxStatus;
 		ASSERT(prRxStatus);
@@ -1642,8 +1585,6 @@ P_BSS_DESC_T scanAddToBssDesc(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb)
 
 		ASSERT(prSwRfb->prRxStatusGroup3);
 		ucRxRCPI = nicRxGetRcpiValueFromRxv(RCPI_MODE_WF0, prSwRfb);
-		ucRxRCPI1 = nicRxGetRcpiValueFromRxv(RCPI_MODE_WF1, prSwRfb);
-
 		if (prBssDesc->eBand == BAND_2G4) {
 
 			/* Update RCPI if in right channel */
@@ -1651,25 +1592,19 @@ P_BSS_DESC_T scanAddToBssDesc(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb)
 			if (ucIeDsChannelNum >= 1 && ucIeDsChannelNum <= 14) {
 
 				/* Receive Beacon/ProbeResp frame from adjacent channel. */
-				if ((ucIeDsChannelNum == ucHwChannelNum) ||
-					(ucRxRCPI > prBssDesc->ucRCPI)) {
+				if ((ucIeDsChannelNum == ucHwChannelNum) || (ucRxRCPI > prBssDesc->ucRCPI))
 					prBssDesc->ucRCPI = ucRxRCPI;
-					prBssDesc->ucRCPI1 = ucRxRCPI1;
-				}
 				/* trust channel information brought by IE */
 				prBssDesc->ucChannelNum = ucIeDsChannelNum;
 			} else if (ucIeHtChannelNum >= 1 && ucIeHtChannelNum <= 14) {
 				/* Receive Beacon/ProbeResp frame from adjacent channel. */
-				if ((ucIeHtChannelNum == ucHwChannelNum) ||
-					(ucRxRCPI > prBssDesc->ucRCPI)) {
+				if ((ucIeHtChannelNum == ucHwChannelNum) || (ucRxRCPI > prBssDesc->ucRCPI))
 					prBssDesc->ucRCPI = ucRxRCPI;
-					prBssDesc->ucRCPI1 = ucRxRCPI1;
-				}
 				/* trust channel information brought by IE */
 				prBssDesc->ucChannelNum = ucIeHtChannelNum;
 			} else {
 				prBssDesc->ucRCPI = ucRxRCPI;
-				prBssDesc->ucRCPI1 = ucRxRCPI1;
+
 				prBssDesc->ucChannelNum = ucHwChannelNum;
 			}
 		}
@@ -1677,17 +1612,14 @@ P_BSS_DESC_T scanAddToBssDesc(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb)
 		else {
 			if (ucIeHtChannelNum >= 1 && ucIeHtChannelNum < 200) {
 				/* Receive Beacon/ProbeResp frame from adjacent channel. */
-				if ((ucIeHtChannelNum == ucHwChannelNum) ||
-					(ucRxRCPI > prBssDesc->ucRCPI)) {
+				if ((ucIeHtChannelNum == ucHwChannelNum) || (ucRxRCPI > prBssDesc->ucRCPI))
 					prBssDesc->ucRCPI = ucRxRCPI;
-					prBssDesc->ucRCPI1 = ucRxRCPI1;
-				}
 				/* trust channel information brought by IE */
 				prBssDesc->ucChannelNum = ucIeHtChannelNum;
 			} else {
 				/* Always update RCPI */
 				prBssDesc->ucRCPI = ucRxRCPI;
-				prBssDesc->ucRCPI1 = ucRxRCPI1;
+
 				prBssDesc->ucChannelNum = ucHwChannelNum;
 			}
 		}
@@ -2046,9 +1978,7 @@ P_BSS_DESC_T scanSearchBssDescByPolicy(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBss
 	BOOLEAN fgIsFindFirst = (BOOLEAN) FALSE;
 
 	BOOLEAN fgIsFindBestRSSI = (BOOLEAN) FALSE;
-#if !CFG_SUPPORT_CFG80211_AUTH
 	BOOLEAN fgIsFindBestEncryptionLevel = (BOOLEAN) FALSE;
-#endif
 	/* BOOLEAN fgIsFindMinChannelLoad = (BOOLEAN)FALSE; */
 
 	/* TODO(Kevin): Support Min Channel Load */
@@ -2126,8 +2056,7 @@ P_BSS_DESC_T scanSearchBssDescByPolicy(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBss
 		}
 		/* 4 <2.5> Check if this BSS_DESC_T is stale */
 		if (CHECK_FOR_TIMEOUT(rCurrentTime, prBssDesc->rUpdateTime, SEC_TO_SYSTIME(SCN_BSS_DESC_STALE_SEC))) {
-			DBGLOG(SCN, LOUD,
-			"SEARCH: Ignore stale Bss, CurrTime[%u] BssUpdateTime[%u]\n",
+			DBGLOG(SCN, LOUD, "SEARCH: Ignore stale Bss, CurrTime[%ld] BssUpdateTime[%ld]\n",
 				rCurrentTime, prBssDesc->rUpdateTime);
 			continue;
 		}
@@ -2169,7 +2098,7 @@ P_BSS_DESC_T scanSearchBssDescByPolicy(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBss
 					if (prStaRec->ucJoinFailureCount >= JOIN_MAX_RETRY_FAILURE_COUNT)
 						prStaRec->ucJoinFailureCount = 0;
 					DBGLOG(SCN, INFO,
-					       "SEARCH:Try to join BSS again,Status Code=%u(Curr=%u/Last Join=%u)\n",
+					       "SEARCH:Try to join BSS again,Status Code=%d(Curr=%ld/Last Join=%ld)\n",
 					       prStaRec->u2StatusCode, rCurrentTime, prStaRec->rLastJoinTime);
 				} else {
 					DBGLOG(SCN, INFO,
@@ -2200,8 +2129,7 @@ P_BSS_DESC_T scanSearchBssDescByPolicy(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBss
 			if ((prConnSettings->fgIsConnByBssidIssued) &&
 				(prBssDesc->eBSSType == BSS_TYPE_INFRASTRUCTURE)) {
 				if (UNEQUAL_MAC_ADDR(prConnSettings->aucBSSID, prBssDesc->aucBSSID)) {
-					DBGLOG(SCN, TRACE,
-						"SEARCH: Ignore due to BSSID was not matched!\n");
+					DBGLOG(SCN, INFO, "SEARCH: Ignore due to BSSID was not matched!\n");
 					continue;
 				}
 			}
@@ -2405,17 +2333,8 @@ P_BSS_DESC_T scanSearchBssDescByPolicy(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBss
 				if ((prBssDesc->ucSSIDLen > 0 && prConnSettings->ucSSIDLen > 0 &&
 					 EQUAL_SSID(prBssDesc->aucSSID, prBssDesc->ucSSIDLen,
 								prConnSettings->aucSSID, prConnSettings->ucSSIDLen)) ||
-					prConnSettings->ucSSIDLen == 0) {
-#if CFG_SUPPORT_CFG80211_AUTH
-					if (prBssDesc->ucChannelNum ==
-						prConnSettings->ucChannelNum) {
-						prPrimaryBssDesc = prBssDesc;
-						fgIsFindFirst = TRUE;
-					}
-#else
+					prConnSettings->ucSSIDLen == 0)
 					prPrimaryBssDesc = prBssDesc;
-#endif
-				}
 			}
 			break;
 
@@ -2428,7 +2347,6 @@ P_BSS_DESC_T scanSearchBssDescByPolicy(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBss
 			continue;
 		/* 4 <7> Check the Encryption Status. */
 		if (prPrimaryBssDesc->eBSSType == BSS_TYPE_INFRASTRUCTURE) {
-#if !CFG_SUPPORT_CFG80211_AUTH
 #if CFG_SUPPORT_WAPI
 			if (prAdapter->rWifiVar.rConnSettings.fgWapiMode) {
 				if (wapiPerformPolicySelection(prAdapter, prPrimaryBssDesc)) {
@@ -2456,7 +2374,6 @@ P_BSS_DESC_T scanSearchBssDescByPolicy(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBss
 				DBGLOG(RSN, INFO, "Ignore BSS can't pass Encryption Status Check\n");
 				continue;
 			}
-#endif
 		} else {
 			/* Todo:: P2P and BOW Policy Selection */
 		}
@@ -2632,10 +2549,12 @@ VOID scanReportBss2Cfg80211(IN P_ADAPTER_T prAdapter, IN ENUM_BSS_TYPE_T eBSSTyp
 
 			if ((prBssDesc->eBSSType == eBSSType)
 #if CFG_ENABLE_WIFI_DIRECT
-			    || (eBSSType == BSS_TYPE_P2P_DEVICE &&
-				prBssDesc->fgIsP2PReport == TRUE)
+			    || ((eBSSType == BSS_TYPE_P2P_DEVICE) &&
+				    (prBssDesc->fgIsP2PReport == TRUE &&
+				     prAdapter->p2p_scan_report_all_bss))
 #endif
 			    ) {
+
 				DBGLOG(SCN, TRACE, "Report ALL SSID[%s %d]\n",
 				       prBssDesc->aucSSID, prBssDesc->ucChannelNum);
 
@@ -2655,8 +2574,9 @@ VOID scanReportBss2Cfg80211(IN P_ADAPTER_T prAdapter, IN ENUM_BSS_TYPE_T eBSSTyp
 					}
 				} else {
 #if CFG_ENABLE_WIFI_DIRECT
-					if ((prBssDesc->fgIsP2PReport == TRUE)
-					    && prBssDesc->u2RawLength != 0) {
+					if ((prBssDesc->fgIsP2PReport == TRUE &&
+					      prAdapter->p2p_scan_report_all_bss) &&
+					    prBssDesc->u2RawLength != 0) {
 #endif
 						rChannelInfo.ucChannelNum = prBssDesc->ucChannelNum;
 						rChannelInfo.eBand = prBssDesc->eBand;
@@ -2744,18 +2664,10 @@ VOID scanReportScanResultToAgps(P_ADAPTER_T prAdapter)
 {
 	P_LINK_T prBSSDescList = &prAdapter->rWifiVar.rScanInfo.rBSSDescList;
 	P_BSS_DESC_T prBssDesc = NULL;
-	P_AGPS_AP_LIST_T prAgpsApList = NULL;
-	P_AGPS_AP_INFO_T prAgpsInfo = NULL;
+	P_AGPS_AP_LIST_T prAgpsApList = kalMemAlloc(sizeof(AGPS_AP_LIST_T), VIR_MEM_TYPE);
+	P_AGPS_AP_INFO_T prAgpsInfo = &prAgpsApList->arApInfo[0];
 	P_SCAN_INFO_T prScanInfo = &prAdapter->rWifiVar.rScanInfo;
 	UINT_8 ucIndex = 0;
-
-	prAgpsApList = kalMemAlloc(sizeof(AGPS_AP_LIST_T), VIR_MEM_TYPE);
-	if (!prAgpsApList) {
-		DBGLOG(INIT, ERROR, "Allocate ap list memory ==> FAILED\n");
-		return;
-	}
-	prAgpsInfo = &prAgpsApList->arApInfo[0];
-
 
 	LINK_FOR_EACH_ENTRY(prBssDesc, prBSSDescList, rLinkEntry, BSS_DESC_T) {
 		if (prBssDesc->rUpdateTime < prScanInfo->rLastScanCompletedTime)

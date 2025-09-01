@@ -202,8 +202,6 @@ static _osal_inline_ INT32 stp_dbg_soc_paged_dump(INT32 dump_sink)
 	g_paged_dump_len = 0;
 	p_ecsi = wmt_plat_get_emi_phy_add();
 	osal_assert(p_ecsi);
-	if (p_ecsi == NULL)
-		return -1;
 
 	issue_type = STP_FW_ASSERT_ISSUE;
 	if (chip_reset_only) {
@@ -214,12 +212,6 @@ static _osal_inline_ INT32 stp_dbg_soc_paged_dump(INT32 dump_sink)
 
 	if (dump_sink == 0)
 		return 0;
-
-	/* handshake error handle: notify FW assert in abnormal case */
-	if (p_ecsi->p_ecso->emi_apmem_ctrl_state == 0x0) {
-		mtk_wcn_force_trigger_assert_debug_pin();
-		osal_sleep_ms(100);
-	}
 
 	/*packet number depend on dump_num get from register:0xf0080044 ,support jade*/
 	dump_num = wmt_plat_get_dump_info(p_ecsi->p_ecso->emi_apmem_ctrl_chip_page_dump_num);
@@ -311,6 +303,9 @@ static _osal_inline_ INT32 stp_dbg_soc_paged_dump(INT32 dump_sink)
 		if (dump_len <= 32 * 1024) {
 			STP_DBG_PR_DBG("coredump mode: %d!\n", dump_sink);
 			switch (dump_sink) {
+			case 0:
+				STP_DBG_PR_INFO("coredump is disabled!\n");
+				return 0;
 			case 1:
 				ret = stp_dbg_aee_send(&g_paged_dump_buffer[0], dump_len, 0);
 				if (ret == 0)
@@ -380,11 +375,9 @@ static _osal_inline_ INT32 stp_dbg_soc_paged_dump(INT32 dump_sink)
 
 paged_dump_end:
 		wmt_plat_set_host_dump_state(STP_HOST_DUMP_NOT_START);
-		STP_DBG_PR_INFO("++ counter(%d) packet_num(%d) page_counter(%d) g_paged_dump_len(%d) fw_state(%d)++\n",
-				counter, packet_num, page_counter, g_paged_dump_len,
-				wmt_plat_get_dump_info(p_ecsi->p_ecso->emi_apmem_ctrl_state));
-		if (wmt_plat_get_dump_info(p_ecsi->p_ecso->emi_apmem_ctrl_chip_paded_dump_end) ||
-				(wmt_plat_get_dump_info(p_ecsi->p_ecso->emi_apmem_ctrl_state) == 0x8)) {
+		STP_DBG_PR_INFO("++ counter(%d) packet_num(%d) page_counter(%d) g_paged_dump_len(%d)++\n",
+			counter, packet_num, page_counter, g_paged_dump_len);
+		if (wmt_plat_get_dump_info(p_ecsi->p_ecso->emi_apmem_ctrl_chip_paded_dump_end)) {
 			if (stp_dbg_get_coredump_timer_state() == CORE_DUMP_DOING) {
 				STP_DBG_PR_INFO("paged dump end by emi flag\n");
 				if (dump_sink == 1)
@@ -425,11 +418,6 @@ static _osal_inline_ INT32 stp_dbg_soc_paged_trace(VOID)
 	INT32 dump_len = 0;
 
 	p_ecsi = wmt_plat_get_emi_phy_add();
-	if (p_ecsi == NULL) {
-		STP_DBG_PR_ERR("get EMI info failed.\n");
-		return -1;
-	}
-
 	do {
 		ctrl_val = 0;
 		loop_cnt1 = 0;
@@ -544,18 +532,14 @@ UINT32 stp_dbg_soc_read_debug_crs(ENUM_CONNSYS_DEBUG_CR cr)
 	emi_phy_addr = mtk_wcn_consys_soc_get_emi_phy_add();
 
 	if (cr == CONNSYS_EMI_REMAP) {
-		if (chip_id == 0x6771)
-			return 0;
-		if (emi_phy_addr != NULL && emi_phy_addr->emi_remap_offset)
+		if (emi_phy_addr->emi_remap_offset)
 			return CONSYS_REG_READ(conn_reg.topckgen_base +
 					emi_phy_addr->emi_remap_offset);
 		else
 			STP_DBG_PR_INFO("EMI remap has no value\n");
 	}
 
-	if (chip_id == 0x6765 || chip_id == 0x3967 || chip_id == 0x6761
-			|| chip_id == 0x6779 || chip_id == 0x6768 || chip_id == 0x6785
-			|| chip_id == 0x8168 || chip_id == 0x6771)
+	if (chip_id == 0x6765 || chip_id == 0x3967 || chip_id == 0x6761)
 		return 0;
 
 	if (conn_reg.mcu_base) {

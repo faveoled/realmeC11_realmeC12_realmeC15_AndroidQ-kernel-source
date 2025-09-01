@@ -155,15 +155,12 @@ struct BUS_INFO mt7663_bus_info = {
 	.bus2chip = mt7663_bus2chip_cr_mapping,
 	.tx_ring_fwdl_idx = 3,
 	.tx_ring_cmd_idx = 15,
-	.tx_ring0_data_idx = 0,
-	.tx_ring1_data_idx = 0,
-	.max_static_map_addr = 0x00040000,
+	.tx_ring_data_idx = 0,
 	.fgCheckDriverOwnInt = FALSE,
 	.fgInitPCIeInt = TRUE,
 	.u4DmaMask = 36,
 
 	.pdmaSetup = asicPdmaConfig,
-	.updateTxRingMaxQuota = NULL,
 	.enableInterrupt = asicEnableInterrupt,
 	.disableInterrupt = asicDisableInterrupt,
 	.lowPowerOwnRead = asicLowPowerOwnRead,
@@ -232,7 +229,6 @@ struct CHIP_DBG_OPS mt7663_debug_ops = {
 	.showCsrInfo = NULL,
 	.showDmaschInfo = NULL,
 #endif
-	.showHifInfo = NULL,
 };
 
 /* Litien code refine to support multi chip */
@@ -266,10 +262,8 @@ struct mt66xx_chip_info mt66xx_chip_info_mt7663 = {
 	.asicEnableFWDownload = asicEnableFWDownload,
 	.asicGetChipID = NULL,
 	.downloadBufferBin = wlanConnacDownloadBufferBin,
-	.showTaskStack = NULL,
 	.is_support_hw_amsdu = TRUE,
 	.ucMaxSwAmsduNum = 0,
-	.ucMaxSwapAntenna = 0,
 	.workAround = BIT(WORKAROUND_MT7663_BRINGUP_20171205),
 };
 

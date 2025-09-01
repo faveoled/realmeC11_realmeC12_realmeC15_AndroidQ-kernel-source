@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -1243,6 +1241,7 @@ kalP2PGCIndicateConnectionStatus(IN P_GLUE_INFO_T prGlueInfo,
 VOID kalP2PGOStationUpdate(IN P_GLUE_INFO_T prGlueInfo, IN P_STA_RECORD_T prCliStaRec, IN BOOLEAN fgIsNew)
 {
 	P_GL_P2P_INFO_T prP2pGlueInfo = (P_GL_P2P_INFO_T) NULL;
+	struct station_info rStationInfo;
 
 	do {
 		if ((prGlueInfo == NULL) || (prCliStaRec == NULL))
@@ -1251,9 +1250,10 @@ VOID kalP2PGOStationUpdate(IN P_GLUE_INFO_T prGlueInfo, IN P_STA_RECORD_T prCliS
 		prP2pGlueInfo = prGlueInfo->prP2PInfo;
 
 		if (fgIsNew) {
-			struct station_info rStationInfo;
+			if (prCliStaRec->fgIsConnected == TRUE)
+				break;
+			prCliStaRec->fgIsConnected = TRUE;
 
-			kalMemZero(&rStationInfo, sizeof(rStationInfo));
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0))
 			rStationInfo.filled = STATION_INFO_ASSOC_REQ_IES;
 #endif
@@ -1265,6 +1265,10 @@ VOID kalP2PGOStationUpdate(IN P_GLUE_INFO_T prGlueInfo, IN P_STA_RECORD_T prCliS
 			cfg80211_new_sta(prGlueInfo->prP2PInfo->prDevHandler,	/* struct net_device * dev, */
 					 prCliStaRec->aucMacAddr, &rStationInfo, GFP_KERNEL);
 		} else {
+			if (prCliStaRec->fgIsConnected == FALSE)
+				break;
+			prCliStaRec->fgIsConnected = FALSE;
+
 			++prP2pGlueInfo->i4Generation;
 
 			cfg80211_del_sta(prGlueInfo->prP2PInfo->prDevHandler,	/* struct net_device * dev, */
@@ -1627,103 +1631,5 @@ void kalP2pIndicateQueuedMgmtFrame(IN P_GLUE_INFO_T prGlueInfo,
 		prFrame->prHeader,
 		prFrame->u2Length,
 		GFP_ATOMIC);
-}
-
-void kalP2pIndicateAcsResult(IN P_GLUE_INFO_T prGlueInfo,
-		IN uint8_t ucPrimaryCh,
-		IN uint8_t ucSecondCh,
-		IN uint8_t ucSeg0Ch,
-		IN uint8_t ucSeg1Ch,
-		IN enum ENUM_MAX_BANDWIDTH_SETTING eChnlBw)
-{
-	struct sk_buff *vendor_event = NULL;
-	uint16_t ch_width = MAX_BW_20MHZ;
-
-	switch (eChnlBw) {
-	case MAX_BW_20MHZ:
-		ch_width = 20;
-		break;
-	case MAX_BW_40MHZ:
-		ch_width = 40;
-		break;
-	default:
-		DBGLOG(P2P, ERROR, "unsupport width: %d.\n", ch_width);
-		break;
-	}
-
-	DBGLOG(P2P, INFO, "pri: %d, sec: %d, seg0: %d, seg1: %d, ch_width: %d\n",
-			ucPrimaryCh,
-			ucSecondCh,
-			ucSeg0Ch,
-			ucSeg1Ch,
-			ch_width);
-
-#if KERNEL_VERSION(3, 14, 0) <= CFG80211_VERSION_CODE
-	vendor_event = cfg80211_vendor_event_alloc(
-			prGlueInfo->prP2PInfo->prWdev->wiphy,
-#if KERNEL_VERSION(4, 1, 0) <= CFG80211_VERSION_CODE
-			prGlueInfo->prP2PInfo->prWdev,
-#endif
-			4 * sizeof(u8) + 1 * sizeof(u16) + 4 + NLMSG_HDRLEN,
-			WIFI_EVENT_ACS,
-			GFP_KERNEL);
-#endif
-
-	if (!vendor_event) {
-		DBGLOG(P2P, ERROR, "allocate vendor event fail.\n");
-		goto nla_put_failure;
-	}
-
-	if (unlikely(nla_put_u8(vendor_event,
-			WIFI_VENDOR_ATTR_ACS_PRIMARY_CHANNEL,
-			ucPrimaryCh) < 0)) {
-		DBGLOG(P2P, ERROR, "put primary channel fail.\n");
-		goto nla_put_failure;
-	}
-
-	if (unlikely(nla_put_u8(vendor_event,
-			WIFI_VENDOR_ATTR_ACS_SECONDARY_CHANNEL,
-			ucSecondCh) < 0)) {
-		DBGLOG(P2P, ERROR, "put secondary channel fail.\n");
-		goto nla_put_failure;
-	}
-
-	if (unlikely(nla_put_u8(vendor_event,
-			WIFI_VENDOR_ATTR_ACS_VHT_SEG0_CENTER_CHANNEL,
-			ucSeg0Ch) < 0)) {
-		DBGLOG(P2P, ERROR, "put vht seg0 fail.\n");
-		goto nla_put_failure;
-	}
-
-	if (unlikely(nla_put_u8(vendor_event,
-			WIFI_VENDOR_ATTR_ACS_VHT_SEG1_CENTER_CHANNEL,
-			ucSeg1Ch) < 0)) {
-		DBGLOG(P2P, ERROR, "put vht seg1 fail.\n");
-		goto nla_put_failure;
-	}
-
-	if (unlikely(nla_put_u16(vendor_event,
-			WIFI_VENDOR_ATTR_ACS_CHWIDTH,
-			ch_width) < 0)) {
-		DBGLOG(P2P, ERROR, "put ch width fail.\n");
-		goto nla_put_failure;
-	}
-
-	if (unlikely(nla_put_u8(vendor_event,
-			WIFI_VENDOR_ATTR_ACS_HW_MODE,
-			ucPrimaryCh > 14 ?
-				P2P_VENDOR_ACS_HW_MODE_11A :
-				P2P_VENDOR_ACS_HW_MODE_11G) < 0)) {
-		DBGLOG(P2P, ERROR, "put hw mode fail.\n");
-		goto nla_put_failure;
-	}
-#if KERNEL_VERSION(3, 14, 0) <= CFG80211_VERSION_CODE
-	cfg80211_vendor_event(vendor_event, GFP_KERNEL);
-#endif
-	return;
-
-nla_put_failure:
-	if (vendor_event)
-		kfree_skb(vendor_event);
 }
 

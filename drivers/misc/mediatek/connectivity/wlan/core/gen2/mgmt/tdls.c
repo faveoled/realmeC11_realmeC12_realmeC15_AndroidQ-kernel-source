@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -215,9 +213,7 @@ static VOID TdlsCmdTestRxIndicatePkts(GLUE_INFO_T *prGlueInfo, struct sk_buff *p
 	prGlueInfo->rNetDevStats.rx_packets++;
 
 	/* pass to upper layer */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
 	prNetDev->last_rx = jiffies;
-#endif
 	prSkb->protocol = eth_type_trans(prSkb, prNetDev);
 	prSkb->dev = prNetDev;
 
@@ -562,7 +558,7 @@ static void TdlsCmdTestDataSend(P_GLUE_INFO_T prGlueInfo, UINT_8 *prInBuf, UINT_
 	P_ADAPTER_T prAdapter;
 	struct sk_buff *prMsduInfo;
 	UINT_8 *prPkt;
-	UINT_8 MAC[6] = {0};
+	UINT_8 MAC[6];
 	UINT_8 ucTxStatus;
 
 	/* init */
@@ -646,7 +642,7 @@ static void TdlsCmdTestDiscoveryReqRecv(GLUE_INFO_T *prGlueInfo, UINT_8 *prInBuf
 	struct sk_buff *prMsduInfo;
 	UINT_8 *pPkt;
 	UINT_32 u4PktLen, u4IeLen;
-	UINT_8 ucDialogToken, aucPeerMac[6] = {0}, aucBSSID[6], aucZeroMac[6];
+	UINT_8 ucDialogToken, aucPeerMac[6], aucBSSID[6], aucZeroMac[6];
 
 	/* parse arguments */
 	ucDialogToken = CmdStringDecParse(prInBuf, &prInBuf, &u4InBufLen);
@@ -1032,7 +1028,7 @@ static void TdlsCmdTestSetupConfirmRecv(GLUE_INFO_T *prGlueInfo, UINT_8 *prInBuf
 	struct sk_buff *prMsduInfo;
 	UINT_8 *pPkt;
 	UINT_32 u4PktLen, u4IeLen;
-	UINT_8 ucDialogToken, ucStatusCode, aucPeerMac[6] = {0};
+	UINT_8 ucDialogToken, ucStatusCode, aucPeerMac[6];
 
 	/* parse arguments */
 	ucDialogToken = CmdStringDecParse(prInBuf, &prInBuf, &u4InBufLen);
@@ -1140,7 +1136,7 @@ static void TdlsCmdTestSetupReqRecv(GLUE_INFO_T *prGlueInfo, UINT_8 *prInBuf, UI
 	struct sk_buff *prMsduInfo;
 	UINT_8 *pPkt;
 	UINT_32 u4PktLen, u4IeLen;
-	UINT_8 ucDialogToken, aucPeerMac[6] = {0}, aucBSSID[6], aucZeroMac[6];
+	UINT_8 ucDialogToken, aucPeerMac[6], aucBSSID[6], aucZeroMac[6];
 	UINT_16 u2CapInfo;
 
 	/* parse arguments */
@@ -1271,7 +1267,7 @@ static void TdlsCmdTestSetupRspRecv(GLUE_INFO_T *prGlueInfo, UINT_8 *prInBuf, UI
 	struct sk_buff *prMsduInfo;
 	UINT_8 *pPkt;
 	UINT_32 u4PktLen, u4IeLen;
-	UINT_8 ucDialogToken, ucStatusCode, aucPeerMac[6] = {0};
+	UINT_8 ucDialogToken, ucStatusCode, aucPeerMac[6];
 	UINT_16 u2CapInfo;
 
 	/* parse arguments */
@@ -1440,7 +1436,7 @@ static void TdlsCmdTestTearDownRecv(GLUE_INFO_T *prGlueInfo, UINT_8 *prInBuf, UI
 	UINT_8 *pPkt;
 	UINT_32 u4PktLen, u4IeLen;
 	BOOLEAN fgIsInitiator;
-	UINT_8 ucReasonCode, aucPeerMac[6] = {0};
+	UINT_8 ucReasonCode, aucPeerMac[6];
 	BOOLEAN fgIsFromWhich;
 	WLAN_STATUS rStatus;
 	TDLS_CMD_CORE_T rCmd;
@@ -1986,8 +1982,9 @@ TdlsTestFrameSend(ADAPTER_T *prAdapter, VOID *pvSetBuffer, UINT_32 u4SetBufferLe
 	UINT_32 u4PktLen, u4IeLen;
 
 	/* sanity check */
-	if (!prAdapter || !pvSetBuffer || !pu4SetInfoLen)
-		return TDLS_STATUS_FAILURE;
+	ASSERT(prAdapter);
+	ASSERT(pvSetBuffer);
+	ASSERT(pu4SetInfoLen);
 
 	DBGLOG(TDLS, INFO, "<tdls_fme> %s\n", __func__);
 
@@ -2399,8 +2396,9 @@ TdlsTestTdlsFrameSend(ADAPTER_T *prAdapter, VOID *pvSetBuffer, UINT_32 u4SetBuff
 	struct wireless_dev *prWdev;
 
 	/* sanity check */
-	if (!prAdapter || !pvSetBuffer || !pu4SetInfoLen)
-		return TDLS_STATUS_FAILURE;
+	ASSERT(prAdapter);
+	ASSERT(pvSetBuffer);
+	ASSERT(pu4SetInfoLen);
 
 	DBGLOG(TDLS, INFO, "<tdls_fme> %s\n", __func__);
 

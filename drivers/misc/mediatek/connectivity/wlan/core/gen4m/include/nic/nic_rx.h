@@ -80,7 +80,6 @@
 #define HALF_SEQ_NO_CNOUT           2048
 
 #define HALF_SEQ_NO_COUNT           2048
-#define QUARTER_SEQ_NO_COUNT        1024
 
 #define MT6620_FIXED_WIN_SIZE         64
 #define CFG_RX_MAX_BA_ENTRY            4
@@ -722,8 +721,6 @@ struct SW_RFB {
 	struct STA_RECORD *prStaRec;
 
 	uint8_t ucPacketType;
-	uint8_t ucPayloadFormat;
-	uint8_t ucSecMode;
 
 	/* rx sta record */
 	uint8_t ucWlanIdx;
@@ -732,13 +729,6 @@ struct SW_RFB {
 	u_int8_t fgReorderBuffer;
 	u_int8_t fgDataFrame;
 	u_int8_t fgFragFrame;
-
-	u_int8_t fgHdrTran;
-
-#if CFG_SUPPORT_FRAG_AGG_ATTACK_DETECTION
-	u_int8_t fgIsFirstSubAMSDULLCMS;
-#endif /* CFG_SUPPORT_FRAG_AGG_ATTACK_DETECTION */
-
 	/* duplicate detection */
 	uint16_t u2FrameCtrl;
 	uint16_t u2SequenceControl;
@@ -816,7 +806,7 @@ struct RX_CTRL {
 #endif
 
 	/* Store SysTime of Last Rx */
-	uint32_t u4LastRxTime[MAX_BSSID_NUM];
+	uint32_t u4LastRxTime;
 };
 
 struct RX_MAILBOX {
@@ -836,11 +826,6 @@ struct RX_EVENT_HANDLER {
 struct EMU_MAC_RATE_INFO {
 	uint8_t ucPhyRateCode;
 	uint32_t u4PhyRate[4][2];
-};
-
-struct ACTION_FRAME_SIZE_MAP {
-	uint16_t u2Index; /* High byte for Action, low byte for Category */
-	size_t len;
 };
 
 /*******************************************************************************
@@ -1102,14 +1087,6 @@ struct ACTION_FRAME_SIZE_MAP {
 #define RXM_IS_DATA_FRAME(_u2FrameCtrl) \
 	(((_u2FrameCtrl & MASK_FC_TYPE) == MAC_FRAME_TYPE_DATA) ? TRUE : FALSE)
 
-#define RXM_IS_TO_DS(_u2FrameCtrl) \
-	(((_u2FrameCtrl & MASK_TO_DS_FROM_DS) == MASK_FC_TO_DS) ?\
-		TRUE : FALSE)
-
-#define RXM_IS_FROM_DS(_u2FrameCtrl) \
-	(((_u2FrameCtrl & MASK_TO_DS_FROM_DS) == MASK_FC_FROM_DS) ?\
-		TRUE : FALSE)
-
 /*******************************************************************************
  *                   F U N C T I O N   D E C L A R A T I O N S
  *******************************************************************************
@@ -1133,9 +1110,6 @@ void nicProcessRxInterrupt(IN struct ADAPTER *prAdapter);
 void nicRxProcessPktWithoutReorder(IN struct ADAPTER *prAdapter,
 	IN struct SW_RFB *prSwRfb);
 
-u_int8_t nicRxCheckForwardPktResource(
-	IN struct ADAPTER *prAdapter, uint32_t ucTid);
-
 void nicRxProcessForwardPkt(IN struct ADAPTER *prAdapter,
 	IN struct SW_RFB *prSwRfb);
 
@@ -1145,9 +1119,6 @@ void nicRxProcessGOBroadcastPkt(IN struct ADAPTER *prAdapter,
 void nicRxFillRFB(IN struct ADAPTER *prAdapter,
 	IN OUT struct SW_RFB *prSwRfb);
 
-void nicRxClearFrag(IN struct ADAPTER *prAdapter,
-	IN struct STA_RECORD *prStaRec);
-
 struct SW_RFB *nicRxDefragMPDU(IN struct ADAPTER *prAdapter,
 	IN struct SW_RFB *prSWRfb, OUT struct QUE *prReturnedQue);
 
@@ -1156,11 +1127,6 @@ u_int8_t nicRxIsDuplicateFrame(IN OUT struct SW_RFB *prSwRfb);
 #if CFG_SUPPORT_SNIFFER
 void nicRxProcessMonitorPacket(IN struct ADAPTER *prAdapter,
 	IN OUT struct SW_RFB *prSwRfb);
-#endif
-#if CFG_SUPPORT_PERF_IND
-void nicRxProcessRXV(IN struct ADAPTER *prAdapter,
-	IN struct SW_RFB *prSwRfb,
-	IN uint8_t ucBssIndex);
 #endif
 
 void nicRxProcessDataPacket(IN struct ADAPTER *prAdapter,

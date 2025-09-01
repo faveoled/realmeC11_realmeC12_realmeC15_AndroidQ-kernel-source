@@ -165,12 +165,6 @@ extern UINT_32 g_au4IQData[256];
 #define CONFIG_BW_20_40M            0
 #define CONFIG_BW_20M               1	/* 20MHz only */
 
-#if CFG_SUPPORT_BFER
-#define MODE_LEGACY 0
-#define MODE_HT 1
-#define MODE_VHT 2
-#endif
-
 #if CFG_SUPPORT_802_11AC
 #if CFG_SUPPORT_BFEE
 #define FIELD_VHT_CAP_INFO_BFEE \
@@ -367,23 +361,6 @@ rlmChangeVhtOpBwPara(P_ADAPTER_T prAdapter, UINT_8 ucBssIndex, UINT_8 ucChannelW
 
 BOOLEAN
 rlmChangeOperationMode(P_ADAPTER_T prAdapter, UINT_8 ucBssIndex, UINT_8 ucChannelWidth, UINT_8 ucNss);
-
-#if CFG_SUPPORT_BFER
-VOID
-rlmBfStaRecPfmuUpdate(P_ADAPTER_T prAdapter, P_STA_RECORD_T prStaRec);
-
-VOID
-rlmETxBfTriggerPeriodicSounding(P_ADAPTER_T prAdapter);
-
-BOOLEAN
-rlmClientSupportsVhtETxBF(P_STA_RECORD_T prStaRec);
-
-UINT_8
-rlmClientSupportsVhtBfeeStsCap(P_STA_RECORD_T prStaRec);
-
-BOOLEAN
-rlmClientSupportsHtETxBF(P_STA_RECORD_T prStaRec);
-#endif
 
 #if CFG_SUPPORT_CAL_RESULT_BACKUP_TO_HOST
 WLAN_STATUS rlmCalBackup(

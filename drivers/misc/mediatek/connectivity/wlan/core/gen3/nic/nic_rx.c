@@ -1404,26 +1404,6 @@ VOID nicRxProcessDataPacket(IN P_ADAPTER_T prAdapter, IN OUT P_SW_RFB_T prSwRfb)
 	prRetSwRfb = qmHandleRxPackets(prAdapter, prSwRfb);
 
 	while (prRetSwRfb) {
-#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
-		if (prRetSwRfb->ucGroupVLD
-			& BIT(RX_GROUP_VLD_3)) {
-			prAdapter->arStaRec[prRetSwRfb->ucStaRecIdx].u4RxVector0 =
-				HAL_RX_VECTOR_GET_RX_VECTOR(
-					prRetSwRfb->prRxStatusGroup3, 0);
-			prAdapter->arStaRec[prRetSwRfb->ucStaRecIdx].u4RxVector1 =
-				HAL_RX_VECTOR_GET_RX_VECTOR(
-					prRetSwRfb->prRxStatusGroup3, 1);
-			prAdapter->arStaRec[prRetSwRfb->ucStaRecIdx].u4RxVector2 =
-				HAL_RX_VECTOR_GET_RX_VECTOR(
-					prRetSwRfb->prRxStatusGroup3, 2);
-			prAdapter->arStaRec[prRetSwRfb->ucStaRecIdx].u4RxVector3 =
-				HAL_RX_VECTOR_GET_RX_VECTOR(
-					prRetSwRfb->prRxStatusGroup3, 3);
-			prAdapter->arStaRec[prRetSwRfb->ucStaRecIdx].u4RxVector4 =
-				HAL_RX_VECTOR_GET_RX_VECTOR(
-					prRetSwRfb->prRxStatusGroup3, 4);
-		}
-#endif
 		/* save next first */
 		prNextSwRfb = (P_SW_RFB_T) QUEUE_GET_NEXT_ENTRY((P_QUE_ENTRY_T) prRetSwRfb);
 
@@ -1449,21 +1429,6 @@ VOID nicRxProcessDataPacket(IN P_ADAPTER_T prAdapter, IN OUT P_SW_RFB_T prSwRfb)
 				/* STA has install key,and AP encrypted 3/4 Eapol frame
 				 * We will set key after AP reply ACK for 4/4
 				 */
-#if CFG_SUPPORT_REPORT_MISC
-				if (prAdapter->rReportMiscSet.eQueryNum == REPORT_4WAYHS_START) {
-					wlanSendSetQueryCmd(prAdapter, CMD_ID_GET_REPORT_MISC,
-							    FALSE,
-							    TRUE,
-							    FALSE,
-							    nicCmdEventReportMisc,
-							    NULL,
-							    0,
-							    NULL,
-							    NULL,
-							    0);
-					prAdapter->rReportMiscSet.eQueryNum = REPORT_4WAYHS_END;
-				}
-#endif
 				if (HAL_RX_STATUS_GET_SEC_MODE(prRxStatus) != 0 &&
 					HAL_RX_STATUS_IS_CIPHER_MISMATCH(prRxStatus) == 0)
 					ucKeyCmdAction = SEC_QUEUE_KEY_COMMAND;
@@ -1679,13 +1644,7 @@ VOID nicRxProcessEventPacket(IN P_ADAPTER_T prAdapter, IN OUT P_SW_RFB_T prSwRfb
 	prGlueInfo = prAdapter->prGlueInfo;
 	wiphy = priv_to_wiphy(prGlueInfo);
 
-	if (prEvent->ucEID != EVENT_ID_LINK_QUALITY &&
-	    prEvent->ucEID != EVENT_ID_RX_ADDBA &&
-	    prEvent->ucEID != EVENT_ID_TX_DONE &&
-	    prEvent->ucEID != EVENT_ID_BSS_ABSENCE_PRESENCE &&
-	    prEvent->ucEID != EVENT_ID_STA_STATISTICS &&
-	    prEvent->ucEID != EVENT_ID_DEBUG_MSG &&
-	    prEvent->ucEID != EVENT_ID_CHECK_REORDER_BUBBLE)
+	if (prEvent->ucEID != EVENT_ID_DEBUG_MSG)
 		DBGLOG(RX, EVENT, "RX EVENT: ID[0x%02X] SEQ[%u] LEN[%u]\n",
 		prEvent->ucEID, prEvent->ucSeqNum, prEvent->u2PacketLength);
 
@@ -2537,7 +2496,6 @@ VOID nicRxProcessMgmtPacket(IN P_ADAPTER_T prAdapter, IN OUT P_SW_RFB_T prSwRfb)
 		nicRxReturnRFB(prAdapter, prSwRfb);
 		RX_INC_CNT(&prAdapter->rRxCtrl, RX_DROP_TOTAL_COUNT);
 #if defined(MT6631)
-		HAL_DUMP_AHB_INFO(prAdapter, prAdapter->u2ChipID);
 		GL_RESET_TRIGGER(prAdapter, RST_FLAG_DO_CORE_DUMP);
 #endif
 		return;
@@ -2842,9 +2800,6 @@ VOID nicRxProcessRFBs(IN P_ADAPTER_T prAdapter)
 					else
 						DBGLOG_MEM32(RX, ERROR,
 							     (PUINT_32)prSwRfb->prRxStatus, 200);
-					#if defined(MT6631)
-						HAL_DUMP_AHB_INFO(prAdapter, prAdapter->u2ChipID);
-					#endif
 						GL_RESET_TRIGGER(prAdapter, RST_FLAG_DO_CORE_DUMP);
 					} else
 						DBGLOG_MEM32(RX, ERROR, (PUINT_32)prSwRfb->prRxStatus,
@@ -3291,17 +3246,12 @@ VOID nicRxSDIOAggReceiveRFBs(IN P_ADAPTER_T prAdapter)
 					       u2PktLength, rxNum, i);
 					DBGLOG_MEM32(RX, WARN, (PUINT_32)&prEnhDataStr->rRxInfo,
 						     sizeof(prEnhDataStr->rRxInfo));
-					#if defined(MT6631)
-					HAL_DUMP_AHB_INFO(prAdapter, prAdapter->u2ChipID);
-					#endif
 					GL_RESET_TRIGGER(prAdapter, RST_FLAG_DO_CORE_DUMP);
 					return;
 				} else if (u2PktLength > CFG_RX_MAX_PKT_SIZE) {
 					DBGLOG(RX, ERROR,
 					       "PktLen(%d) > MAX_PKT_SIZE(%d) in RX%u idx %u, try to read out all\n",
 					       u2PktLength, CFG_RX_MAX_PKT_SIZE, rxNum, i);
-					DBGLOG_MEM32(RX, WARN, (PUINT_32)&prEnhDataStr->rRxInfo,
-						     sizeof(prEnhDataStr->rRxInfo));
 					/*
 					 * Rx packet length is too large and untrustable,
 					 * try to read out all data in this Rx port to
@@ -3315,9 +3265,6 @@ VOID nicRxSDIOAggReceiveRFBs(IN P_ADAPTER_T prAdapter)
 					 */
 					u4RxAvailAggLen = 0;
 					u4RxAggCount++;
-					#if defined(MT6631)
-					HAL_DUMP_AHB_INFO(prAdapter, prAdapter->u2ChipID);
-					#endif
 					break;
 				}
 
@@ -3369,9 +3316,11 @@ VOID nicRxSDIOAggReceiveRFBs(IN P_ADAPTER_T prAdapter)
 					else
 						DBGLOG_MEM32(RX, ERROR,
 							     pucSrcAddr, 200);
+
 					#if defined(MT6631)
 					HAL_DUMP_AHB_INFO(prAdapter, prAdapter->u2ChipID);
 					#endif
+
 					u2PktLenExceptionCount++;
 					/*
 					 * Trigger chip reset if we can not read out all data in one time

@@ -198,11 +198,9 @@ struct GL_P2P_INFO {
 	/* 0 for beacon, 1 for probe req, 2 for probe response */
 	uint8_t aucWFDIE[400];
 	uint16_t u2WFDIELen;
-	/* Save the other IE for probe resp */
-#endif
-#if CFG_SUPPORT_CUSTOM_VENDOR_IE
-	uint8_t aucVenderIE[1024];
-	uint16_t u2VenderIELen;
+	/* Save the other IE for prove resp */
+	/* UINT_8                      aucVenderIE[1024]; */
+/* UINT_16                     u2VenderIELen; */
 #endif
 
 	/*UINT_8 ucOperatingChnl;*//* TH3 multiple P2P */
@@ -232,11 +230,6 @@ struct GL_P2P_INFO {
 	/*BOOLEAN fgEnableHotspotOptimization;*//* TH3 multiple P2P */
 	/*UINT_32 u4PsLevel;*//* TH3 multiple P2P */
 #endif
-
-	/* indicate caller thread for stop ap complete */
-	struct completion rStopApComp;
-
-	enum ENUM_CHNL_SWITCH_POLICY eChnlSwitchPolicy;
 };
 
 struct GL_P2P_DEV_INFO {

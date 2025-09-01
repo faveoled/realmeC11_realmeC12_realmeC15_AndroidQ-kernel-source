@@ -120,7 +120,6 @@ struct TSPEC_INFO {
 	/* debug information */
 	uint16_t u2MediumTime;
 	uint32_t u4PhyRate;
-	uint8_t ucTid;
 };
 
 struct TSM_TRIGGER_COND {
@@ -147,7 +146,6 @@ struct ACTIVE_RM_TSM_REQ {
 	struct LINK_ENTRY rLinkEntry;
 	struct RM_TSM_REQ *prTsmReq;
 	struct TIMER rTsmTimer;
-	uint8_t ucBssIdx;
 };
 
 #if CFG_SUPPORT_SOFT_ACM
@@ -189,7 +187,6 @@ struct MSG_TS_OPERATE {
 	enum TSPEC_OP_CODE eOpCode;
 	uint8_t ucTid;
 	struct PARAM_QOS_TSPEC rTspecParam;
-	uint8_t ucBssIdx;
 };
 
 #define WMM_TSINFO_TRAFFIC_TYPE(tsinfo) (tsinfo & BIT(0))
@@ -207,30 +204,29 @@ struct MSG_TS_OPERATE {
 extern uint8_t const aucUp2ACIMap[8];
 void wmmFillTsinfo(struct PARAM_QOS_TSINFO *prTsInfo, uint8_t *pucTsInfo);
 void wmmSetupTspecTimeOut(struct ADAPTER *prAdapter, unsigned long ulParam);
-void wmmStartTsmMeasurement(struct ADAPTER *prAdapter, unsigned long ulParam,
-	uint8_t ucBssIndex);
+void wmmStartTsmMeasurement(struct ADAPTER *prAdapter, unsigned long ulParam);
 void wmmRunEventTSOperate(struct ADAPTER *prAdapter, struct MSG_HDR *prMsgHdr);
 u_int8_t wmmParseQosAction(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb);
 u_int8_t wmmParseTspecIE(struct ADAPTER *prAdapter, uint8_t *pucIE,
 			 struct PARAM_QOS_TSPEC *prTspec);
 void wmmTspecSteps(struct ADAPTER *prAdapter, uint8_t ucTid,
-	enum TSPEC_OP_CODE eOpCode, void *prStepParams, uint8_t ucBssIndex);
+		   enum TSPEC_OP_CODE eOpCode, void *prStepParams);
 uint8_t wmmHasActiveTspec(struct WMM_INFO *prWmmInfo);
-void wmmNotifyDisconnected(struct ADAPTER *prAdapter, uint8_t ucBssIndex);
+void wmmNotifyDisconnected(struct ADAPTER *prAdapter);
 void wmmComposeTsmRpt(struct ADAPTER *prAdapter, struct CMD_INFO *prCmdInfo,
 		      uint8_t *pucEventBuf);
 void wmmInit(IN struct ADAPTER *prAdapter);
 void wmmUnInit(IN struct ADAPTER *prAdapter);
-u_int8_t wmmTsmIsOngoing(struct ADAPTER *prAdapter, uint8_t ucBssIndex);
+u_int8_t wmmTsmIsOngoing(struct ADAPTER *prAdapter);
+void wmmNotifyDisconnected(struct ADAPTER *prAdapter);
 void wmmRemoveAllTsmMeasurement(struct ADAPTER *prAdapter,
-	u_int8_t fgOnlyTriggered, uint8_t ucBssIndex);
-uint8_t wmmCalculateUapsdSetting(struct ADAPTER *prAdapter,
-	uint8_t ucBssIndex);
+				u_int8_t fgOnlyTriggered);
+uint8_t wmmCalculateUapsdSetting(struct ADAPTER *prAdapter);
 uint32_t wmmDumpActiveTspecs(struct ADAPTER *prAdapter, uint8_t *pucBuffer,
-	uint16_t u2BufferLenu, uint8_t ucBssIndex);
+			     uint16_t u2BufferLen);
 #if CFG_SUPPORT_SOFT_ACM
 u_int8_t wmmAcmCanDequeue(struct ADAPTER *prAdapter, uint8_t ucAc,
-	uint32_t u4PktTxTime, uint8_t ucBssIndex);
+			  uint32_t u4PktTxTime);
 void wmmAcmTxStatistic(struct ADAPTER *prAdapter, uint8_t ucAc,
 		       uint32_t u4Remain, uint16_t u2DeqNum);
 

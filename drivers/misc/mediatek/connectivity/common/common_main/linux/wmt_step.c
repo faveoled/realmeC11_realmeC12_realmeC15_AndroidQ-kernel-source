@@ -227,18 +227,6 @@ static const char * const STEP_TRIGGER_TIME_NAME[] = {
 		"[TP 22] When AP suspend",
 	[STEP_TRIGGER_POINT_WHEN_AP_RESUME] =
 		"[TP 23] When AP resume",
-	[STEP_TRIGGER_POINT_POWER_OFF_HANDSHAKE] =
-		"[TP 24] When power off handshake",
-	[STEP_TRIGGER_POINT_BEFORE_RESTORE_CAL_RESULT] =
-		"[TP 25] Before restore calibration result",
-	[STEP_TRIGGER_POINT_AFTER_RESTORE_CAL_RESULT] =
-		"[TP 26] After restore calibration result",
-	[STEP_TRIGGER_POINT_POWER_ON_AFTER_BT_WIFI_CALIBRATION] =
-		"[TP 27] Power on sequence(5): After BT and Wi-Fi calibration",
-	[STEP_TRIGGER_POINT_AFTER_RESTORE_CAL_CMD] =
-		"[TP 28] After send calibration restore command",
-	[STEP_TRIGGER_POINT_WHEN_CLOCK_FAIL] =
-		"[TP 29] When clock fail",
 };
 
 static const int wmt_step_func_ctrl_id[WMTDRV_TYPE_MAX][2] = {
@@ -371,7 +359,7 @@ static unsigned char *mtk_step_get_emi_virt_addr(unsigned char *emi_base_addr, u
 	unsigned char *p_virtual_addr = NULL;
 
 	if (offset > gConEmiSize) {
-		WMT_ERR_FUNC("STEP failed: offset size %d over MAX size(%llu)\n", offset,
+		WMT_ERR_FUNC("STEP failed: offset size %d over MAX size(%d)\n", offset,
 			gConEmiSize);
 		return NULL;
 	}
@@ -385,10 +373,8 @@ static int wmt_step_get_cfg(const char *p_patch_name, osal_firmware **pp_patch)
 	osal_firmware *fw = NULL;
 
 	*pp_patch = NULL;
-	if (request_firmware((const struct firmware **)&fw, p_patch_name, NULL) != 0) {
-		release_firmware(fw);
+	if (request_firmware((const struct firmware **)&fw, p_patch_name, NULL) != 0)
 		return -1;
-	}
 
 	WMT_DBG_FUNC("Load step cfg %s ok!!\n", p_patch_name);
 	*pp_patch = fw;
@@ -858,7 +844,7 @@ static int wmt_step_parse_register_address(struct step_reg_addr_info *p_reg_addr
 		}
 
 		if (offset >= g_step_env.reg_base[symbol].size) {
-			WMT_ERR_FUNC("STEP failed: symbol(%d), offset(%d) over max size(%llu)\n",
+			WMT_ERR_FUNC("STEP failed: symbol(%d), offset(%d) over max size(%llu) %s\n",
 				symbol, (int) offset, g_step_env.reg_base[symbol].size);
 			return -1;
 		}
@@ -1633,8 +1619,7 @@ static int wmt_step_do_write_register_action(struct step_reigster_info *p_reg_in
 	if (p_reg_info->address_type == STEP_REGISTER_PHYSICAL_ADDRESS) {
 		phy_addr = p_reg_info->address + p_reg_info->offset;
 		if (phy_addr & 0x3) {
-			WMT_ERR_FUNC("STEP failed: phy_addr(0x%08x) page failed\n",
-					(unsigned int)phy_addr);
+			WMT_ERR_FUNC("STEP failed: phy_addr(0x%08x) page failed\n", phy_addr);
 			return -1;
 		}
 
@@ -1648,15 +1633,13 @@ static int wmt_step_do_write_register_action(struct step_reigster_info *p_reg_in
 				func_do_extra(1, CONSYS_REG_READ(p_addr));
 			iounmap(p_addr);
 		} else {
-			WMT_ERR_FUNC("STEP failed: ioremap(0x%08x) is NULL\n",
-					(unsigned int)phy_addr);
+			WMT_ERR_FUNC("STEP failed: ioremap(0x%08x) is NULL\n", phy_addr);
 			return -1;
 		}
 	} else {
 		vir_addr = p_reg_info->address + p_reg_info->offset;
 		if (vir_addr & 0x3) {
-			WMT_ERR_FUNC("STEP failed: vir_addr(0x%08x) page failed\n",
-					(unsigned int)vir_addr);
+			WMT_ERR_FUNC("STEP failed: vir_addr(0x%08x) page failed\n", vir_addr);
 			return -1;
 		}
 
@@ -1694,43 +1677,37 @@ static void _wmt_step_do_read_register_action(struct step_reigster_info *p_reg_i
 static int wmt_step_do_read_register_action(struct step_reigster_info *p_reg_info,
 	STEP_DO_EXTRA func_do_extra)
 {
-#define WMT_STEP_REGISTER_ACTION_BUF_LEN 128
 	phys_addr_t phy_addr;
 	void __iomem *p_addr = NULL;
 	SIZE_T vir_addr;
-	char buf[WMT_STEP_REGISTER_ACTION_BUF_LEN];
+	char buf[128];
 
 	if (p_reg_info->address_type == STEP_REGISTER_PHYSICAL_ADDRESS) {
 		phy_addr = p_reg_info->address + p_reg_info->offset;
 		if (phy_addr & 0x3) {
-			WMT_ERR_FUNC("STEP failed: phy_addr(0x%08x) page failed\n",
-					(unsigned int)phy_addr);
+			WMT_ERR_FUNC("STEP failed: phy_addr(0x%08x) page failed\n", phy_addr);
 			return -1;
 		}
 
 		p_addr = ioremap_nocache(phy_addr, 0x4);
 		if (p_addr) {
-			snprintf(buf, WMT_STEP_REGISTER_ACTION_BUF_LEN,
-				"STEP show: reg read Phy addr(0x%08x): 0x%08x\n",
+			sprintf(buf, "STEP show: reg read Phy addr(0x%08x): 0x%08x\n",
 				(unsigned int)phy_addr, CONSYS_REG_READ(p_addr));
 			_wmt_step_do_read_register_action(p_reg_info, func_do_extra, buf,
 				CONSYS_REG_READ(p_addr));
 			iounmap(p_addr);
 		} else {
-			WMT_ERR_FUNC("STEP failed: ioremap(0x%08x) is NULL\n",
-					(unsigned int)phy_addr);
+			WMT_ERR_FUNC("STEP failed: ioremap(0x%08x) is NULL\n", phy_addr);
 			return -1;
 		}
 	} else {
 		vir_addr = p_reg_info->address + p_reg_info->offset;
 		if (vir_addr & 0x3) {
-			WMT_ERR_FUNC("STEP failed: vir_addr(0x%08x) page failed\n",
-					(unsigned int)vir_addr);
+			WMT_ERR_FUNC("STEP failed: vir_addr(0x%08x) page failed\n", vir_addr);
 			return -1;
 		}
 
-		snprintf(buf, WMT_STEP_REGISTER_ACTION_BUF_LEN,
-			"STEP show: reg read (symbol, offset)(%d, 0x%08x): 0x%08x\n",
+		sprintf(buf, "STEP show: reg read (symbol, offset)(%d, 0x%08x): 0x%08x\n",
 			p_reg_info->address_type, p_reg_info->offset,
 			CONSYS_REG_READ(vir_addr));
 		_wmt_step_do_read_register_action(p_reg_info, func_do_extra, buf,
@@ -1931,8 +1908,6 @@ static bool wmt_step_reg_readable(struct step_reigster_info *p_reg_info)
 		if (p_reg_info->address_type == STEP_REGISTER_CONN_MCU_CONFIG_BASE ||
 		    p_reg_info->address_type == STEP_REGISTER_MISC_OFF_BASE ||
 		    p_reg_info->address_type == STEP_REGISTER_CFG_ON_BASE ||
-		    p_reg_info->address_type == STEP_REGISTER_HIF_ON_BASE ||
-		    p_reg_info->address_type == STEP_MCU_TOP_MISC_ON_BASE ||
 		    p_reg_info->address_type == STEP_CIRQ_BASE)
 			return mtk_consys_check_reg_readable();
 	}
@@ -2264,7 +2239,7 @@ int wmt_step_parse_data(const char *in_buf, unsigned int size,
 	STEP_WRITE_ACT_TO_LIST func_act_to_list)
 {
 	struct step_target_act_list_info parse_info;
-	char *buf, *tmp_buf;
+	char *buf;
 	char *line;
 
 	buf = osal_malloc(size + 1);
@@ -2280,8 +2255,7 @@ int wmt_step_parse_data(const char *in_buf, unsigned int size,
 	parse_info.p_target_list = NULL;
 	parse_info.p_pd_entry = NULL;
 
-	tmp_buf = buf;
-	while ((line = osal_strsep(&tmp_buf, "\r\n")) != NULL)
+	while ((line = osal_strsep(&buf, "\r\n")) != NULL)
 		wmt_step_parse_line_data(line, &parse_info, func_act_to_list);
 
 	osal_free(buf);

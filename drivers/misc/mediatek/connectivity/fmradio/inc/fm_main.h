@@ -84,14 +84,6 @@ struct fm_tune_parm {
 	unsigned short freq;		/* IN/OUT parameter */
 };
 
-struct fm_tune_parm_old {
-	unsigned char err;
-	unsigned char band;
-	unsigned char space;
-	unsigned char hilo;
-	unsigned short freq;		/* IN/OUT parameter */
-};
-
 struct fm_seek_parm {
 	unsigned char err;
 	unsigned char band;
@@ -421,6 +413,6 @@ extern signed int fm_rdstx_support(struct fm *fm, signed int *support);
 extern signed int fm_rdstx_enable(struct fm *fm, signed int enable);
 extern signed int fm_tx_scan(struct fm *fm, struct fm_tx_scan_parm *parm);
 signed int fm_full_cqi_logger(struct fm_full_cqi_log_t *setting);
-signed int fm_rds_parser(struct rds_rx_t *rds_raw, signed int rds_size);
+
 
 #endif /* __FM_MAIN_H__ */

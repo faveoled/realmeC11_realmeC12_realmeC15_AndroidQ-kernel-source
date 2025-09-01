@@ -170,18 +170,12 @@ VOID p2pSetMode(IN UINT_8 ucAPMode)
 #ifdef CFG_DRIVER_INF_NAME_CHANGE
 
 	if (kalStrLen(gprifnamep2p) > 0) {
-		if (kalStrStr(gprifnamep2p, "%d"))
-			prP2PInfName = gprifnamep2p;
-		else
-			prP2PInfName = kalStrCat(gprifnamep2p, "%d");
+		prP2PInfName = kalStrCat(gprifnamep2p, "%d");
 		DBGLOG(INIT, WARN, "P2P ifname customized, use %s\n", prP2PInfName);
 	}
 
 	if (kalStrLen(gprifnameap) > 0) {
-		if (kalStrStr(gprifnameap, "%d"))
-			prAPInfName = gprifnameap;
-		else
-			prAPInfName = kalStrCat(gprifnameap, "%d");
+		prAPInfName = kalStrCat(gprifnameap, "%d");
 		DBGLOG(INIT, WARN, "AP ifname customized, use %s\n", prAPInfName);
 	}
 
@@ -218,7 +212,6 @@ VOID p2pSetMode(IN UINT_8 ucAPMode)
 /*----------------------------------------------------------------------------*/
 BOOLEAN p2pRemove(P_GLUE_INFO_T prGlueInfo)
 {
-	int idx = 0;
 	if (prGlueInfo->prAdapter->fgIsP2PRegistered == FALSE) {
 		DBGLOG(P2P, INFO, "p2p is not registered\n");
 		return FALSE;
@@ -228,27 +221,6 @@ BOOLEAN p2pRemove(P_GLUE_INFO_T prGlueInfo)
 	prGlueInfo->prAdapter->fgIsP2PRegistered = FALSE;
 	prGlueInfo->prAdapter->p2p_scan_report_all_bss = FALSE;
 	glUnregisterP2P(prGlueInfo);
-
-	/* gprP2pWdev/gprP2pRoleWdev[0]: base P2P dev
-	 * gprP2pRoleWdev[1]: AP dev
-	 * Becase the interface dev (ex: usb_device) would be free
-	 * after un-plug event. Should set the wiphy->dev->parent which
-	 * pointer to the interface dev to NULL. Otherwise, the corresponding
-	 * system operation (poweroff, suspend) might reference it.
-	 * set_wiphy_dev(wiphy, NULL): set the wiphy->dev->parent = NULL
-	 * The trunk-ce1 does this, but the trunk seems not.
-	 * ce1 do set_wiphy_dev(prWdev->wiphy, prDev) in wlanNetCreate.
-	 * But that is after wiphy_register, and will cause exception in
-	 * wiphy_unregister(), if do not set_wiphy_dev(wiphy, NULL).
-	 */
-	for (idx = 0 ; idx < KAL_P2P_NUM; idx++) {
-		if (gprP2pRoleWdev[idx] == NULL)
-			continue;
-
-		DBGLOG(INIT, INFO, "Clean parent dev of P2P[%d] wiphy\n", idx);
-		set_wiphy_dev(gprP2pRoleWdev[idx]->wiphy, NULL);
-	}
-
 	return TRUE;
 }
 

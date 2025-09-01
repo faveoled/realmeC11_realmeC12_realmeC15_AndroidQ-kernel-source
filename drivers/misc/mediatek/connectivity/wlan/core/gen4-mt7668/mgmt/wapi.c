@@ -165,9 +165,9 @@ BOOLEAN wapiParseWapiIE(IN P_WAPI_INFO_ELEM_T prInfoElem, OUT P_WAPI_INFO_T prWa
 	UINT_32 u4GroupSuite = WAPI_CIPHER_SUITE_WPI;
 	UINT_16 u2PairSuiteCount = 0;
 	UINT_16 u2AuthSuiteCount = 0;
-	UINT_8 *pucPairSuite = NULL;
-	UINT_8 *pucAuthSuite = NULL;
-	UINT_8 *cp;
+	PUCHAR pucPairSuite = NULL;
+	PUCHAR pucAuthSuite = NULL;
+	PUCHAR cp;
 
 	DEBUGFUNC("wapiParseWapiIE");
 
@@ -187,7 +187,7 @@ BOOLEAN wapiParseWapiIE(IN P_WAPI_INFO_ELEM_T prInfoElem, OUT P_WAPI_INFO_T prWa
 		return FALSE;
 	}
 
-	cp = (UINT_8 *) &prInfoElem->u2AuthKeyMgtSuiteCount;
+	cp = (PUCHAR) &prInfoElem->u2AuthKeyMgtSuiteCount;
 	u4RemainWapiIeLen = (INT_32) prInfoElem->ucLength - 2;
 
 	do {
@@ -427,8 +427,7 @@ BOOLEAN wapiPerformPolicySelection(IN P_ADAPTER_T prAdapter, IN P_BSS_DESC_T prB
 	 *  BSS, do not check the supported AKM suites.
 	 */
 	if (u4PairwiseCipher == 0 || u4GroupCipher == 0) {
-		DBGLOG(SEC, TRACE,
-			"Failed to select pairwise/group cipher (0x%08x/0x%08x)\n",
+		DBGLOG(SEC, TRACE, "Failed to select pairwise/group cipher (0x%08lx/0x%08lx)\n",
 		       u4PairwiseCipher, u4GroupCipher);
 		return FALSE;
 	}

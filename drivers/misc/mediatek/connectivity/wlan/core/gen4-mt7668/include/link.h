@@ -100,11 +100,6 @@ typedef struct _LINK_T {
 	UINT_32 u4NumElem;
 } LINK_T, *P_LINK_T;
 
-struct LINK_MGMT {
-	LINK_T rUsingLink;
-	LINK_T rFreeLink;
-};
-
 /*******************************************************************************
 *                            P U B L I C   D A T A
 ********************************************************************************
@@ -132,42 +127,6 @@ struct LINK_MGMT {
 		((P_LINK_T)(prLink))->prPrev = (P_LINK_ENTRY_T)(prLink); \
 		((P_LINK_T)(prLink))->u4NumElem = 0; \
 	} while (0)
-
-#define LINK_MGMT_INIT(prLinkMgmt) \
-	do { \
-		LINK_INITIALIZE( \
-			&((struct LINK_MGMT *)prLinkMgmt)->rUsingLink); \
-		LINK_INITIALIZE( \
-			&((struct LINK_MGMT *)prLinkMgmt)->rFreeLink); \
-	} while (0)
-
-#define LINK_MGMT_GET_ENTRY(prLinkMgmt, prEntry, EntryType, memType) \
-	do { \
-		LINK_REMOVE_HEAD(&((struct LINK_MGMT *)prLinkMgmt)->rFreeLink, \
-			prEntry, EntryType*); \
-		if (!prEntry) \
-		prEntry = kalMemAlloc(sizeof(EntryType), memType); \
-	} while (0)
-
-#define LINK_MGMT_UNINIT(prLinkMgmt, EntryType, memType) \
-	do { \
-		EntryType *prEntry = NULL; \
-		P_LINK_T prFreeList = \
-			&((struct LINK_MGMT *)prLinkMgmt)->rFreeLink; \
-		P_LINK_T prUsingList = \
-			&((struct LINK_MGMT *)prLinkMgmt)->rUsingLink; \
-		LINK_REMOVE_HEAD(prFreeList, prEntry, EntryType *); \
-		while (prEntry) { \
-			kalMemFree(prEntry, memType, sizeof(EntryType)); \
-			LINK_REMOVE_HEAD(prFreeList, prEntry, EntryType *); \
-		} \
-		LINK_REMOVE_HEAD(prUsingList, prEntry, EntryType *); \
-		while (prEntry) { \
-			kalMemFree(prEntry, memType, sizeof(EntryType)); \
-			LINK_REMOVE_HEAD(prUsingList, prEntry, EntryType *); \
-		} \
-	} while (0)
-
 
 #define LINK_ENTRY_INITIALIZE(prEntry) \
 	do { \

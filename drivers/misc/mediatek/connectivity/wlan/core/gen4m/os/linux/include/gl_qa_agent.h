@@ -67,7 +67,7 @@
  *                    E X T E R N A L   R E F E R E N C E S
  *******************************************************************************
  */
-#if 1
+#ifdef CONFIG_MTK_EMI
 extern phys_addr_t gConEmiPhyBase;
 extern unsigned long long gConEmiSize;
 #endif

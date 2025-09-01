@@ -40,9 +40,8 @@ struct class *pDetectClass;
 struct device *pDetectDev;
 static int gWmtDetectMajor = WMT_DETECT_MAJOR;
 static struct cdev gWmtDetectCdev;
-int gWmtDetectDbgLvl = WMT_DETECT_LOG_INFO;
+unsigned int gWmtDetectDbgLvl = WMT_DETECT_LOG_INFO;
 static ENUM_WMT_CHIP_TYPE g_chip_type = WMT_CHIP_TYPE_INVALID;
-int g_wmt_cfg_ver;
 
 static int wmt_detect_open(struct inode *inode, struct file *file)
 {
@@ -130,10 +129,7 @@ static long wmt_detect_unlocked_ioctl(struct file *filp, unsigned int cmd, unsig
 		retval = mtk_wcn_common_drv_init();
 #endif
 		break;
-	case COMBO_IOCTL_SET_WMT_CFG_VER:
-		g_wmt_cfg_ver = arg;
-		WMT_DETECT_PR_INFO("g_wmt_cfg_ver: %d\n", g_wmt_cfg_ver);
-		break;
+
 	default:
 		WMT_DETECT_PR_WARN("unknown cmd (%d)\n", cmd);
 		retval = 0;
@@ -276,10 +272,6 @@ ENUM_WMT_CHIP_TYPE wmt_detect_get_chip_type(void)
 	return g_chip_type;
 }
 
-int wmt_detect_get_wmt_cfg_ver(void)
-{
-	return g_wmt_cfg_ver;
-}
 
 #ifdef MTK_WCN_COMBO_CHIP_SUPPORT
 static const struct of_device_id wmt_detect_match[] = {

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016 MediaTek Inc.
+ *  Copyright (c) 2016,2017 MediaTek Inc.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -17,10 +17,6 @@
 #include <linux/usb.h>
 #include <linux/version.h>
 
-/* It's for reset procedure */
-#include <linux/of_gpio.h>
-#include <linux/mmc/host.h>
-
 /**
  * Kernel configuration check
  */
@@ -33,7 +29,11 @@
  */
 #define SUPPORT_MT7662 1
 #define SUPPORT_MT7668 1
-#define SUPPORT_MT7663 1
+
+/**
+ * Debug Level Configureation
+ */
+#define ENABLE_BT_FIFO_THREAD	1
 
 /**
  * BTMTK LOG location, last char must be '/'
@@ -48,25 +48,20 @@
 #define FIXED_STPBT_MAJOR_DEV_ID 111
 
 /**
+ * GPIO PIN configureation
+ */
+#ifndef BT_DONGLE_RESET_GPIO_PIN
+	#define BT_DONGLE_RESET_GPIO_PIN	220
+#endif /* BT_DONGLE_RESET_GPIO_PIN */
+
+
+/**
  * WoBLE by BLE RC
  */
- /*Linux build fail due to wake_lock, please set SUPPORT_ANDROID 0 for Linux*/
-/*#define SUPPORT_ANDROID 0 */
+#define SUPPORT_ANDROID 0 /*Linux build fail due to wake_lock, please set SUPPORT_ANDROID 0 for Linux*/
+#define SUPPORT_UNIFY_WOBLE 1
+#define SUPPORT_LEGACY_WOBLE 0
 #define BT_RC_VENDOR_DEFAULT 1
 #define BT_RC_VENDOR_S0 0
-
-#define WAIT_POWERKEY_TIMEOUT 5000
-
-/**
- * Support toggle GPIO
- */
-#define MT76x8_PMU_EN_PIN_NAME		"mt76x8_pmu_en_gpio"
-#define MT76x8_PMU_EN_DELAY_NAME	"mt76x8_pmu_en_delay"
-#define MT76x8_PMU_EN_DEFAULT_DELAY	(5) /* Default delay 5ms */
-
-/**
- * L0 reset
- */
-#define L0_RESET_TAG				"[SER][L0] "
 
 #endif /* __BTMTK_CONFIG_H__ */

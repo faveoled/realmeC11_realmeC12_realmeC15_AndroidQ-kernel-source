@@ -107,7 +107,6 @@ const UINT_8 aucWmmAC2TcResourceSet2[WMM_AC_INDEX_NUM] = {
 static UINT_16 arpMoniter;
 static UINT_8 apIp[4];
 static UINT_8 gatewayIp[4];
-static UINT_64 last_rx_packets, latest_rx_packets;
 #endif
 
 /*******************************************************************************
@@ -116,13 +115,11 @@ static UINT_64 last_rx_packets, latest_rx_packets;
 */
 
 #if CFG_RX_REORDERING_ENABLED
-#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
 #define qmHandleRxPackets_AOSP_1 \
 do { \
 	/* ToDo[6630]: duplicate removal */ \
 	if (!fgIsBMC && nicRxIsDuplicateFrame(prCurrSwRfb) == TRUE) { \
-		DBGLOG(QM, TRACE, "Duplicated packet is detected\n");\
-		RX_INC_CNT(&prAdapter->rRxCtrl, RX_DUPICATE_DROP_COUNT);\
+		DBGLOG(QM, TRACE, "Duplicated packet is detected\n"); \
 		prCurrSwRfb->eDst = RX_PKT_DESTINATION_NULL; \
 	} \
 	/* ToDo[6630]: defragmentation */ \
@@ -169,59 +166,6 @@ do { \
 		QUEUE_INSERT_TAIL(prReturnedQue, (P_QUE_ENTRY_T)prCurrSwRfb); \
 	} \
 } while (0)
-#else
-#define qmHandleRxPackets_AOSP_1 \
-do { \
-	/* ToDo[6630]: duplicate removal */ \
-	if (!fgIsBMC && nicRxIsDuplicateFrame(prCurrSwRfb) == TRUE) { \
-		DBGLOG(QM, TRACE, "Duplicated packet is detected\n");\
-		prCurrSwRfb->eDst = RX_PKT_DESTINATION_NULL; \
-	} \
-	/* ToDo[6630]: defragmentation */ \
-	if (prCurrSwRfb->fgFragFrame) { \
-		prCurrSwRfb = nicRxDefragMPDU(prAdapter, prCurrSwRfb, prReturnedQue); \
-		if (prCurrSwRfb) { \
-			prRxStatus = prCurrSwRfb->prRxStatus; \
-			DBGLOG(QM, TRACE, "defragmentation RxStatus=%p\n", prRxStatus); \
-		} \
-	} \
-	if (prCurrSwRfb) { \
-		fgMicErr = FALSE; \
-		if (HAL_RX_STATUS_GET_SEC_MODE(prRxStatus) == CIPHER_SUITE_TKIP_WO_MIC) { \
-			if (prCurrSwRfb->prStaRec) { \
-				UINT_8 ucBssIndex; \
-				P_BSS_INFO_T prBssInfo = NULL; \
-				PUINT_8      pucMicKey = NULL; \
-				ucBssIndex = prCurrSwRfb->prStaRec->ucBssIndex; \
-				ASSERT(ucBssIndex < BSS_INFO_NUM); \
-				prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex); \
-				ASSERT(prBssInfo); \
-				if (prBssInfo && prBssInfo->eCurrentOPMode == OP_MODE_INFRASTRUCTURE) { \
-					pucMicKey = &(prAdapter->rWifiVar.rAisSpecificBssInfo.aucRxMicKey[0]); \
-				} \
-				else { \
-					ASSERT(FALSE); \
-					/* pucMicKey = &prCurrSwRfb->prStaRec->aucRxMicKey[0]; */ \
-				} \
-				/* SW TKIP MIC verify */ \
-				/* TODO:[6630] Need to Check Header Translation Case */ \
-				if (pucMicKey == NULL) { \
-					DBGLOG(RX, ERROR, "No TKIP Mic Key\n"); \
-					fgMicErr = TRUE; \
-				} \
-				else if (tkipMicDecapsulate(prCurrSwRfb, pucMicKey) == FALSE) { \
-					fgMicErr = TRUE; \
-				} \
-			} \
-			if (fgMicErr) { \
-				DBGLOG(RX, ERROR, "Mark NULL the Packet for TKIP Mic Error\n"); \
-				prCurrSwRfb->eDst = RX_PKT_DESTINATION_NULL; \
-			} \
-		} \
-		QUEUE_INSERT_TAIL(prReturnedQue, (P_QUE_ENTRY_T)prCurrSwRfb); \
-	} \
-} while (0)
-#endif
 #endif
 
 /*******************************************************************************
@@ -2542,7 +2486,6 @@ P_SW_RFB_T qmHandleRxPackets(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfbList
 
 		fgIsBMC = HAL_RX_STATUS_IS_BC(prRxStatus) | HAL_RX_STATUS_IS_MC(prRxStatus);
 		fgIsHTran = FALSE;
-
 		if (HAL_RX_STATUS_GET_HEADER_TRAN(prRxStatus) == TRUE) { /* (!HIF_RX_HDR_GET_80211_FLAG(prHifRxHdr)){ */
 
 			UINT_8 ucBssIndex;
@@ -2602,6 +2545,15 @@ P_SW_RFB_T qmHandleRxPackets(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfbList
 				}
 			}
 
+			if (prCurrSwRfb->ucTid >= CFG_RX_MAX_BA_TID_NUM) {
+				DBGLOG(QM, ERROR, "TID from RXD = %d, out of range !!!\n", prCurrSwRfb->ucTid);
+				DBGLOG_MEM8(QM, ERROR, prCurrSwRfb->pucRecvBuff,
+					    HAL_RX_STATUS_GET_RX_BYTE_CNT(prRxStatus));
+				prCurrSwRfb->eDst = RX_PKT_DESTINATION_NULL;
+				QUEUE_INSERT_TAIL(prReturnedQue, (P_QUE_ENTRY_T) prCurrSwRfb);
+				continue;
+			}
+
 			ucBssIndex = prCurrSwRfb->prStaRec->ucBssIndex;
 			prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
 
@@ -2649,10 +2601,7 @@ P_SW_RFB_T qmHandleRxPackets(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfbList
 
 				/* search StaRec related info */
 				kalMemCopy(aucTaAddr, prWlanHeader->aucAddr2, MAC_ADDR_LEN); /* use A2 instead */
-
 				prCurrSwRfb->ucStaRecIdx = secLookupStaRecIndexFromTA(prAdapter, aucTaAddr);
-				DBGLOG(QM, INFO, "prCurrSwRfb->ucStaRecIdx %u\n", prCurrSwRfb->ucStaRecIdx);
-
 				if (prCurrSwRfb->ucStaRecIdx < CFG_NUM_OF_STA_RECORD) {
 					prCurrSwRfb->prStaRec =
 					    cnmGetStaRecByIndex(prAdapter, prCurrSwRfb->ucStaRecIdx);
@@ -2664,7 +2613,6 @@ P_SW_RFB_T qmHandleRxPackets(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfbList
 
 				if (prCurrSwRfb->prStaRec != NULL) {
 					UINT_16 u2MACLen = 0;
-					PUINT_16 pu2PktLen = &prCurrSwRfb->u2PacketLen;
 
 					if (RXM_IS_QOS_DATA_FRAME(u2FrameCtrl)) /* QoS data, VHT */
 						u2MACLen = sizeof(WLAN_MAC_HEADER_QOS_T);
@@ -2673,41 +2621,17 @@ P_SW_RFB_T qmHandleRxPackets(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfbList
 					u2MACLen += ETH_LLC_LEN + ETH_SNAP_OUI_LEN;
 					u2MACLen -= ETHER_TYPE_LEN_OFFSET;
 
-					if (*pu2PktLen <= u2MACLen) {
-						DBGLOG_MEM8(QM, WARN, (PUINT_8) prCurrSwRfb->pvHeader,
-							(*pu2PktLen > 64) ? 64 : *pu2PktLen);
-						prCurrSwRfb->eDst = RX_PKT_DESTINATION_NULL;
-						QUEUE_INSERT_TAIL(prReturnedQue, (P_QUE_ENTRY_T) prCurrSwRfb);
-						continue;
-					}
-
 					prCurrSwRfb->pvHeader += u2MACLen; /* use prWlanHeader think deeply */
-
-					if (((u2FrameCtrl&0x0300) == 0x0100) /*to DS*/
-						&& (prCurrSwRfb->u2PacketLen > (sizeof(WLAN_MAC_HEADER_QOS_T) + 8))
-						&& (((unsigned char *)(prCurrSwRfb->pvHeader))[12] == 0x88)
-						&& (((unsigned char *)(prCurrSwRfb->pvHeader))[13] == 0x8e)) {
-
-						DBGLOG_MEM8(QM, WARN, (PUINT_8) prCurrSwRfb->pvHeader,
-							(*pu2PktLen > 120) ? 120 : *pu2PktLen);
-
-						kalMemCopy(prCurrSwRfb->pvHeader, prWlanHeader->aucAddr3, MAC_ADDR_LEN);
-						kalMemCopy(prCurrSwRfb->pvHeader + MAC_ADDR_LEN, prWlanHeader->aucAddr2,
-							MAC_ADDR_LEN);
-						DBGLOG(QM, INFO, " To ds case transfer header.\n");
-					} else {
-						kalMemCopy(prCurrSwRfb->pvHeader, prWlanHeader->aucAddr1, MAC_ADDR_LEN);
-						kalMemCopy(prCurrSwRfb->pvHeader + MAC_ADDR_LEN, prWlanHeader->aucAddr3,
-							MAC_ADDR_LEN);
-						DBGLOG(QM, INFO, " Old transfer header way.\n");
-					}
-					*pu2PktLen -= u2MACLen;
+					kalMemCopy(prCurrSwRfb->pvHeader, prWlanHeader->aucAddr1, MAC_ADDR_LEN);
+					kalMemCopy(prCurrSwRfb->pvHeader + MAC_ADDR_LEN, prWlanHeader->aucAddr3,
+						MAC_ADDR_LEN);
+					prCurrSwRfb->u2PacketLen -= u2MACLen;
 
 					prCurrSwRfb->ucWlanIdx = prCurrSwRfb->prStaRec->ucWlanIndex;
 					GLUE_SET_PKT_BSS_IDX(prCurrSwRfb->pvPacket,
 						     secGetBssIdxByWlanIdx(prAdapter, prCurrSwRfb->ucWlanIdx));
 					DBGLOG_MEM8(QM, WARN, (PUINT_8) prCurrSwRfb->pvHeader,
-						(*pu2PktLen > 64) ? 64 : *pu2PktLen);
+						(prCurrSwRfb->u2PacketLen > 64) ? 64 : prCurrSwRfb->u2PacketLen);
 				}
 			}
 		}
@@ -2765,21 +2689,14 @@ P_SW_RFB_T qmHandleRxPackets(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfbList
 			 *  into the reordering queue in the STA_REC rather than into the
 			 *  rReturnedQue.
 			 */
-			 if (prCurrSwRfb->ucTid >= CFG_RX_MAX_BA_TID_NUM) {
-				DBGLOG(QM, ERROR, "TID from RXD = %d, out of range !!!\n", prCurrSwRfb->ucTid);
-				DBGLOG_MEM8(QM, ERROR, prCurrSwRfb->pucRecvBuff,
-					    HAL_RX_STATUS_GET_RX_BYTE_CNT(prRxStatus));
-				QUEUE_INSERT_TAIL(prReturnedQue, (P_QUE_ENTRY_T) prCurrSwRfb);
-			} else
-				qmProcessPktWithReordering(prAdapter, prCurrSwRfb, prReturnedQue);
+			qmProcessPktWithReordering(prAdapter, prCurrSwRfb, prReturnedQue);
 
 		} else if (prCurrSwRfb->fgDataFrame) {
 			/* Check Class Error */
 			if (secCheckClassError(prAdapter, prCurrSwRfb, prCurrSwRfb->prStaRec) == TRUE) {
 				P_RX_BA_ENTRY_T prReorderQueParm = NULL;
 
-				if ((prCurrSwRfb->ucTid < CFG_RX_MAX_BA_TID_NUM) &&
-					!fgIsBMC && fgIsHTran && RXM_IS_QOS_DATA_FRAME(
+				if (!fgIsBMC && fgIsHTran && RXM_IS_QOS_DATA_FRAME(
 				    HAL_RX_STATUS_GET_FRAME_CTL_FIELD(prCurrSwRfb->prRxStatusGroup4))) {
 					prReorderQueParm =
 					    ((prCurrSwRfb->prStaRec->aprRxReorderParamRefTbl)[prCurrSwRfb->ucTid]);
@@ -2886,67 +2803,59 @@ VOID qmProcessPktWithReordering(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb,
 	u4WinEnd = (UINT_32) (prReorderQueParm->u2WinEnd);
 #if CFG_RX_BA_REORDERING_ENHANCEMENT
 	if (prAdapter->rWifiVar.fgEnableReportIndependentPkt) {
-		PUINT_16 pu2RecentSsn = &prReorderQueParm->au2RecentSsn[0];
+#define RECENT_SSN_CACHE_NUM 10
+#define INVALID_SSN 65535
+		static UINT_16 au2RecentSsn[RECENT_SSN_CACHE_NUM];
 		UINT_8 i = 0;
-		/* Cache index for this packet */
-		UINT_8 ucNewSlot = (prReorderQueParm->ucLastSlot + 1) % QM_RECENT_SSN_CACHE_NUM;
+		UINT_8 j = RECENT_SSN_CACHE_NUM;
 		PUINT_8 pucEth = (PUINT_8)prSwRfb->pvHeader;
-		PUINT_8 pucEthBody = NULL;
+		PUINT_8 pucEthBody = &pucEth[ETH_HLEN];
 		UINT_16 u2EthType = 0;
 
-		/* Clear SSN cache while window end was updated last time */
-		for (i = 0; i < QM_RECENT_SSN_CACHE_NUM; i++) {
-			if (pu2RecentSsn[i] == QM_INVALID_SSN)
-				continue;
-			if (pu2RecentSsn[i] <= u4WinEnd) {
-				if (pu2RecentSsn[i] + HALF_SEQ_NO_COUNT < u4WinEnd)
-					pu2RecentSsn[i] = QM_INVALID_SSN;
-			} else if (pu2RecentSsn[i] < u4WinEnd + HALF_SEQ_NO_COUNT)
-				pu2RecentSsn[i] = QM_INVALID_SSN;
+		if (prReorderQueParm->fgIsWaitingForPktWithSsn) {
+			DBGLOG(QM, TRACE, "Clear SSN cache due to new BA\n");
+			for (i = 0; i < RECENT_SSN_CACHE_NUM; i++)
+				au2RecentSsn[i] = INVALID_SSN;
 		}
-
+		for (i = 0; i < RECENT_SSN_CACHE_NUM; i++) {
+			if (u4SeqNo > HALF_SEQ_NO_COUNT) {
+				if (au2RecentSsn[i] <= HALF_SEQ_NO_COUNT)
+					au2RecentSsn[i] = INVALID_SSN;
+			} else if (au2RecentSsn[i] > HALF_SEQ_NO_COUNT)
+				au2RecentSsn[i] = INVALID_SSN;
+		}
 		if (qmIsIndependentPkt(prSwRfb)) {
-			/* If the sequence number equals last value, just drop it. */
-			if (u4SeqNo == pu2RecentSsn[prReorderQueParm->ucLastSlot])
-				i = prReorderQueParm->ucLastSlot;
-			else
-				i = 0;
-			if (prSwRfb->u2PacketLen > ETH_HLEN) {
-				pucEthBody = &pucEth[ETH_HLEN];
-				u2EthType = (pucEth[ETH_TYPE_LEN_OFFSET] << 8) | pucEth[ETH_TYPE_LEN_OFFSET + 1];
-			}
 			DBGLOG(QM, TRACE, "Cur: %d, SsnCache: %d %d %d %d %d %d %d %d %d %d\n",
 				u4SeqNo,
-				pu2RecentSsn[0], pu2RecentSsn[1], pu2RecentSsn[2], pu2RecentSsn[3],
-				pu2RecentSsn[4], pu2RecentSsn[5], pu2RecentSsn[6], pu2RecentSsn[7],
-				pu2RecentSsn[8], pu2RecentSsn[9]);
-			for (; i < QM_RECENT_SSN_CACHE_NUM; i++) {
-				if (pu2RecentSsn[i] == u4SeqNo) {
-					switch (u2EthType) {
-					case ETH_P_ARP:
-						DBGLOG(QM, WARN, "Drop dup arp, op %d from %pi4, Seq %u\n",
-							(pucEthBody[6] << 8) | pucEthBody[7], &pucEthBody[14], u4SeqNo);
-						break;
-					case ETH_P_IP:
-						DBGLOG(QM, WARN, "Drop dup IP, Id 0x%02x Proto %d from %pi4, Seq %u\n",
-							*(UINT_16 *)&pucEthBody[4], pucEthBody[9], &pucEthBody[12],
-							u4SeqNo);
-						break;
-					default:
-						DBGLOG(QM, WARN, "Drop pkt with Eth type %d, Seq %u\n",
-						       u2EthType, u4SeqNo);
-					}
-					prSwRfb->eDst = RX_PKT_DESTINATION_NULL;
-					QUEUE_INSERT_TAIL(prReturnedQue, (P_QUE_ENTRY_T) prSwRfb);
-					return;
+				au2RecentSsn[0], au2RecentSsn[1], au2RecentSsn[2], au2RecentSsn[3],
+				au2RecentSsn[4], au2RecentSsn[5], au2RecentSsn[6], au2RecentSsn[7],
+				au2RecentSsn[8], au2RecentSsn[9]);
+			for (i = 0; i < RECENT_SSN_CACHE_NUM; i++) {
+				if (j == RECENT_SSN_CACHE_NUM && au2RecentSsn[i] == INVALID_SSN) {
+					DBGLOG(QM, TRACE, "empty slot %d, value %d\n", i, au2RecentSsn[i]);
+					j = i;
 				}
-				if (pu2RecentSsn[ucNewSlot] != QM_INVALID_SSN && pu2RecentSsn[i] == QM_INVALID_SSN) {
-					DBGLOG(QM, TRACE, "empty slot %d, value %d\n", i, pu2RecentSsn[i]);
-					ucNewSlot = i;
+				if (au2RecentSsn[i] != u4SeqNo)
+					continue;
+				u2EthType = (pucEth[ETH_TYPE_LEN_OFFSET] << 8) | pucEth[ETH_TYPE_LEN_OFFSET + 1];
+				switch (u2EthType) {
+				case ETH_P_ARP:
+					DBGLOG(QM, WARN, "Drop dup arp, op %d from %pi4, Seq %u\n",
+						(pucEthBody[6] << 8) | pucEthBody[7], &pucEthBody[14], u4SeqNo);
+					break;
+				case ETH_P_IP:
+					DBGLOG(QM, WARN, "Drop dup IP, Id 0x%02x Proto %d from %pi4, Seq %u\n",
+						*(UINT_16 *)&pucEthBody[4], pucEthBody[9], &pucEthBody[12],
+						u4SeqNo);
+					break;
+				default:
+					DBGLOG(QM, WARN, "Drop pkt with Eth type %d, Seq %u\n", u2EthType, u4SeqNo);
 				}
+				prSwRfb->eDst = RX_PKT_DESTINATION_NULL;
+				QUEUE_INSERT_TAIL(prReturnedQue, (P_QUE_ENTRY_T) prSwRfb);
+				return;
 			}
-			pu2RecentSsn[ucNewSlot] = u4SeqNo;
-			prReorderQueParm->ucLastSlot = ucNewSlot;
+			au2RecentSsn[j % RECENT_SSN_CACHE_NUM] = u4SeqNo;
 			DBGLOG(QM, TRACE, "Insert independentPkt to returnedQue directly\n");
 			QUEUE_INSERT_TAIL(prReturnedQue, (P_QUE_ENTRY_T) prSwRfb);
 			qmInsertNoNeedWaitPkt(prSwRfb, PACKET_DROP_BY_INDEPENDENT_PKT);
@@ -2966,11 +2875,8 @@ VOID qmProcessPktWithReordering(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb,
 	     || ((u4WinEnd < u4WinStart) && (u4WinStart <= u4SeqNo))
 	     /* 0 - sn - end - start - 4095 */
 	     || ((u4SeqNo <= u4WinEnd) && (u4WinEnd < u4WinStart))) {
-#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
-		qmInsertFallWithinReorderPkt(prAdapter, prSwRfb, prReorderQueParm, prReturnedQue);
-#else
+
 		qmInsertFallWithinReorderPkt(prSwRfb, prReorderQueParm, prReturnedQue);
-#endif
 
 #if QM_RX_WIN_SSN_AUTO_ADVANCING
 		if (prReorderQueParm->fgIsWaitingForPktWithSsn) {
@@ -3019,31 +2925,6 @@ VOID qmProcessPktWithReordering(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb,
 	}
 	/* Case 3: Fall behind */
 	else {
-#if CFG_SUPPORT_OSHARE
-		if (prSwRfb->u2PacketLen > ETHER_HEADER_LEN) {
-
-			PUINT_8 pucData = (PUINT_8) prSwRfb->pvHeader;
-			UINT_16 u2Etype = (pucData[ETH_TYPE_LEN_OFFSET] << 8) | (pucData[ETH_TYPE_LEN_OFFSET + 1]);
-			UINT_8 ucBssIndex = secGetBssIdxByWlanIdx(prAdapter, prSwRfb->ucWlanIdx);
-
-			if ((prAdapter->fgEnOshareMode) && (ucBssIndex != 0xff) &&
-			    (GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex)->eNetworkType == NETWORK_TYPE_P2P)) {
-				if (u2Etype == ETH_P_IP) {
-					PUINT_8 pucEthBody = &pucData[ETH_HLEN];
-					UINT_8 ucIpProto = pucEthBody[9];
-
-					if (ucIpProto == IP_PRO_UDP || ucIpProto == IP_PRO_TCP) {
-						DBGLOG(QM, LOUD,
-						       "QM: Don't drop packet:Tid[%u]SeqNo(%u){Start%u,End%u}\n",
-						       prSwRfb->ucTid, u4SeqNo, u4WinStart, u4WinEnd);
-
-						QUEUE_INSERT_TAIL(prReturnedQue, (P_QUE_ENTRY_T) prSwRfb);
-						return;
-					}
-				}
-			}
-		}
-#endif
 
 #if QM_RX_WIN_SSN_AUTO_ADVANCING
 #if QM_RX_INIT_FALL_BEHIND_PASS
@@ -3144,13 +3025,8 @@ VOID qmProcessBarFrame(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb, OUT P_QU
 		DBGLOG(QM, TRACE, "QM:(BAR)(%hhu)(%u){%u,%u}\n", prSwRfb->ucTid, u4SSN, u4WinStart, u4WinEnd);
 	}
 }
-#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
-VOID qmInsertFallWithinReorderPkt(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb,
-	IN P_RX_BA_ENTRY_T prReorderQueParm, OUT P_QUE_T prReturnedQue)
-#else
-VOID qmInsertFallWithinReorderPkt(IN P_SW_RFB_T prSwRfb,
-	IN P_RX_BA_ENTRY_T prReorderQueParm, OUT P_QUE_T prReturnedQue)
-#endif
+
+VOID qmInsertFallWithinReorderPkt(IN P_SW_RFB_T prSwRfb, IN P_RX_BA_ENTRY_T prReorderQueParm, OUT P_QUE_T prReturnedQue)
 {
 	P_SW_RFB_T prExaminedQueuedSwRfb;
 	P_QUE_T prReorderQue;
@@ -3178,9 +3054,6 @@ VOID qmInsertFallWithinReorderPkt(IN P_SW_RFB_T prSwRfb,
 			if ((prExaminedQueuedSwRfb->u2SSN) == (prSwRfb->u2SSN)) {
 				prSwRfb->eDst = RX_PKT_DESTINATION_NULL;
 				QUEUE_INSERT_TAIL(prReturnedQue, (P_QUE_ENTRY_T) prSwRfb);
-#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
-				RX_INC_CNT(&prAdapter->rRxCtrl, RX_DUPICATE_DROP_COUNT);
-#endif
 				return;
 			}
 
@@ -3795,9 +3668,6 @@ qmAddRxBaEntry(IN P_ADAPTER_T prAdapter,
 		prRxBaEntry->fgIsValid = TRUE;
 		prRxBaEntry->fgIsWaitingForPktWithSsn = TRUE;
 		prRxBaEntry->fgHasBubble = FALSE;
-		prRxBaEntry->ucLastSlot = QM_RECENT_SSN_CACHE_NUM - 1;
-		for (i = 0; i < QM_RECENT_SSN_CACHE_NUM; i++)
-			prRxBaEntry->au2RecentSsn[i] = QM_INVALID_SSN;
 
 		g_arMissTimeout[ucStaRecIdx][ucTid] = 0;
 
@@ -4813,7 +4683,7 @@ mqmGenerateWmmInfoIEByStaRec(P_ADAPTER_T prAdapter, P_BSS_INFO_T prBssInfo, P_ST
 	if (prStaRec == NULL)
 		return 0;
 
-	if (!prStaRec->fgIsQoS)
+	if (!prStaRec->fgIsWmmSupported)
 		return 0;
 
 	prPmProfSetupInfo = &prBssInfo->rPmProfSetupInfo;
@@ -4847,10 +4717,17 @@ VOID mqmGenerateWmmInfoIE(IN P_ADAPTER_T prAdapter, IN P_MSDU_INFO_T prMsduInfo)
 
 	ASSERT(prMsduInfo);
 
+	/* In case QoS is not turned off, exit directly */
+	if (IS_FEATURE_DISABLED(prAdapter->rWifiVar.ucQoS))
+		return;
+
 	prStaRec = cnmGetStaRecByIndex(prAdapter, prMsduInfo->ucStaRecIndex);
 	ASSERT(prStaRec);
 
 	if (prStaRec == NULL)
+		return;
+
+	if (!prStaRec->fgIsWmmSupported)
 		return;
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, prStaRec->ucBssIndex);
@@ -6304,28 +6181,9 @@ VOID qmDetectArpNoResponse(P_ADAPTER_T prAdapter, P_MSDU_INFO_T prMsduInfo)
 	PUINT_8 pucData = NULL;
 	UINT_16 u2EtherType = 0;
 	int arpOpCode = 0;
-	P_WIFI_VAR_T prWifiVar = NULL;
-	uint32_t uArpMonitorNumber;
-	uint32_t uArpMonitorRxPktNum;
-	struct net_device *prNetDev = NULL;
-	P_GLUE_INFO_T prGlueInfo = NULL;
 
-	ASSERT(prAdapter);
-	ASSERT(prMsduInfo);
-
-	if (!prAdapter ||
-		!prAdapter->prGlueInfo ||
-		!prAdapter->prGlueInfo->prDevHandler) {
-		DBGLOG(QM, WARN, "Param is invalid\n");
-		return;
-	}
-	prGlueInfo = prAdapter->prGlueInfo;
-	prNetDev = prGlueInfo->prDevHandler;
-	prWifiVar = &prAdapter->rWifiVar;
-	uArpMonitorNumber = prWifiVar->uArpMonitorNumber;
-	uArpMonitorRxPktNum = prWifiVar->uArpMonitorRxPktNum;
-
-	if (uArpMonitorNumber == 0)
+	/* We need to disable arp monitor in CTIA mode */
+	if (!prAdapter || prAdapter->fgDisBcnLostDetection == TRUE)
 		return;
 
 	prSkb = (struct sk_buff *)prMsduInfo->prPacket;
@@ -6348,26 +6206,12 @@ VOID qmDetectArpNoResponse(P_ADAPTER_T prAdapter, P_MSDU_INFO_T prMsduInfo)
 	arpOpCode = (pucData[ETH_TYPE_LEN_OFFSET + 8] << 8) | (pucData[ETH_TYPE_LEN_OFFSET + 8 + 1]);
 	if (arpOpCode == ARP_PRO_REQ) {
 		arpMoniter++;
-		/* Record counts of RX Packets when Tx 1st ARP Req */
-		if (!last_rx_packets) {
-			last_rx_packets = prNetDev->stats.rx_packets;
-			latest_rx_packets = 0;
-			}
-		/* Record counts of RX Packets when TX ARP Req recently */
-		latest_rx_packets = prNetDev->stats.rx_packets;
-
-		if (arpMoniter > uArpMonitorNumber) {
-			if ((latest_rx_packets - last_rx_packets) <= uArpMonitorRxPktNum) {
-				DBGLOG(INIT, WARN, "IOT Critical issue, arp no resp, check AP!\n");
-				if (prAdapter->prAisBssInfo)
-					prAdapter->prAisBssInfo->u2DeauthReason = BEACON_TIMEOUT_DUE_2_APR_NO_RESPONSE;
-				kalSetResetConnEvent(prAdapter->prGlueInfo);
-			} else
-				DBGLOG(INIT, WARN, "ARP no resp, But still have %d packets\n",
-					latest_rx_packets - last_rx_packets);
+		if (arpMoniter > 20) {
+			DBGLOG(INIT, WARN, "IOT Critical issue, arp no resp, check AP!\n");
+			if (prAdapter && prAdapter->prAisBssInfo)
+				prAdapter->prAisBssInfo->u2DeauthReason = BEACON_TIMEOUT_DUE_2_APR_NO_RESPONSE;
+			aisBssBeaconTimeout(prAdapter);
 			arpMoniter = 0;
-			last_rx_packets = 0;
-			latest_rx_packets = 0;
 			kalMemZero(apIp, sizeof(apIp));
 		}
 	}
@@ -6498,8 +6342,6 @@ VOID qmHandleRxDhcpPackets(P_ADAPTER_T prAdapter, P_SW_RFB_T prSwRfb)
 VOID qmResetArpDetect(VOID)
 {
 	arpMoniter = 0;
-	last_rx_packets = 0;
-	latest_rx_packets = 0;
 	kalMemZero(apIp, sizeof(apIp));
 	kalMemZero(gatewayIp, sizeof(gatewayIp));
 }

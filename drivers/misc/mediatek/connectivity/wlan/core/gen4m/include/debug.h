@@ -71,7 +71,7 @@
 #define BUILD_QA_DBG 0
 #endif
 
-#define DBG_DISABLE_ALL_LOG             0
+#define DBG_DISABLE_ALL_LOG             1
 
 /*******************************************************************************
  *                    E X T E R N A L   R E F E R E N C E S
@@ -79,7 +79,6 @@
  */
 #include "gl_typedef.h"
 
-extern u_int8_t wlan_fb_power_down;
 extern uint8_t aucDebugModule[];
 extern uint32_t au4LogLevel[];
 
@@ -104,13 +103,13 @@ extern int get_logtoomuch_enable(void) __attribute__((weak));
 #define DBG_CLASS_MASK          BITS(0, 7)
 
 #define DBG_LOG_LEVEL_DEFAULT \
-	(DBG_CLASS_ERROR | \
-	DBG_CLASS_WARN | \
-	DBG_CLASS_STATE | \
-	DBG_CLASS_EVENT | \
-	DBG_CLASS_INFO)
+	(DBG_CLASS_ERROR)
 #define DBG_LOG_LEVEL_MORE \
 	(DBG_LOG_LEVEL_DEFAULT | \
+    DBG_CLASS_WARN | \
+	DBG_CLASS_STATE | \
+	DBG_CLASS_EVENT | \
+	DBG_CLASS_INFO | \
 	DBG_CLASS_TRACE)
 #define DBG_LOG_LEVEL_EXTREME \
 	(DBG_LOG_LEVEL_MORE | \
@@ -197,7 +196,6 @@ struct CHIP_DBG_OPS {
 	void (*showPleInfo)(IN struct ADAPTER *prAdapter);
 	bool (*showCsrInfo)(IN struct ADAPTER *prAdapter);
 	void (*showDmaschInfo)(IN struct ADAPTER *prAdapter);
-	void (*showHifInfo)(IN struct ADAPTER *prAdapter);
 };
 
 enum PKT_PHASE {
@@ -227,19 +225,6 @@ enum DRV_STATUS_T {
 	ROAMING_SCAN_START,
 	ROAMING_SCAN_DONE,
 };
-
-#if (CFG_SUPPORT_STATISTICS == 1)
-enum WAKE_DATA_TYPE {
-	WLAN_WAKE_ARP = 0,
-	WLAN_WAKE_IPV4,
-	WLAN_WAKE_IPV6,
-	WLAN_WAKE_1X,
-	WLAN_WAKE_TDLS,
-	WLAN_WAKE_OTHER,
-	WLAN_WAKE_MAX_NUM
-};
-#endif
-
 
 #if MTK_WCN_HIF_SDIO
 #define DBG_ASSERT_PATH_DEFAULT DBG_ASSERT_PATH_WMT
@@ -272,7 +257,6 @@ enum WAKE_DATA_TYPE {
 #define MACSTR          "%02x:%02x:**:**:**:%02x"
 #define MAC2STR(a)   ((uint8_t *)a)[0], ((uint8_t *)a)[1], ((uint8_t *)a)[5]
 #endif
-#define PMKSTR "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%03x%02x%02x"
 /* Debug print format string for the IPv4 Address */
 #define IPV4STR		"%pI4"
 /* Debug print argument for the IPv4 Address */
@@ -287,13 +271,6 @@ enum WAKE_DATA_TYPE {
 #define DUMPMACADDR(addr)           (#addr " = " MACSTR "\n", MAC2STR(addr))
 /* Debug print format string for the floating point */
 #define FPSTR		"%u.%u"
-
-#ifdef CONFIG_64BIT
-#define PRIx64 "%lx"
-#else
-#define PRIx64 "%llx"
-#endif
-
 /* Debug print argument for the floating point */
 #define DIV2INT(_dividend, _divisor) \
 		((_divisor) ? (_dividend) / (_divisor) : 0)
@@ -318,8 +295,10 @@ enum WAKE_DATA_TYPE {
  * #endif
  */
 #if DBG_DISABLE_ALL_LOG
-#define DBGLOG(_Module, _Class, _Fmt)
-#define DBGLOG_LIMITED(_Module, _Class, _Fmt)
+#define DBGLOG(_Module, _Class, _Fmt, ...)
+#define DBGLOG_LIMITED(_Module, _Class, _Fmt, ...)
+#define DBGFWLOG(_Module, _Class, _Fmt, ...)
+#define TOOL_PRINTLOG(_Module, _Class, _Fmt, ...)
 #define DBGLOG_MEM8(_Module, _Class, _StartAddr, _Length)
 #define DBGLOG_MEM32(_Module, _Class, _StartAddr, _Length)
 #else
@@ -403,7 +382,7 @@ enum WAKE_DATA_TYPE {
 #define UNICODE_TEXT(_msg)  TEXT(_msg)
 #define ASSERT(_exp) \
 	{ \
-		if (!(_exp)) { \
+		if (!(_exp) && !fgIsBusAccessFailed) { \
 			TCHAR rUbuf[256]; \
 			kalBreakPoint(); \
 			_stprintf(rUbuf, TEXT("Assertion failed: %s:%d %s\n"), \
@@ -414,7 +393,7 @@ enum WAKE_DATA_TYPE {
 	}
 #define ASSERT_REPORT(_exp, _fmt) \
 	{ \
-		if (!(_exp)) { \
+		if (!(_exp) && !fgIsBusAccessFailed) { \
 			TCHAR rUbuf[256]; \
 			kalBreakPoint(); \
 			_stprintf(rUbuf, TEXT("Assertion failed: %s:%d %s\n"), \
@@ -433,7 +412,7 @@ enum WAKE_DATA_TYPE {
 
 #define ASSERT(_exp) \
 	{ \
-		if (!(_exp)) { \
+		if (!(_exp) && !fgIsBusAccessFailed) { \
 			LOG_FUNC("Assertion failed: %s:%d (%s)\n", \
 				__FILE__, __LINE__, #_exp); \
 			kalBreakPoint(); \
@@ -441,7 +420,7 @@ enum WAKE_DATA_TYPE {
 	}
 #define ASSERT_REPORT(_exp, _fmt) \
 	{ \
-		if (!(_exp)) { \
+		if (!(_exp) && !fgIsBusAccessFailed) { \
 			LOG_FUNC("Assertion failed: %s:%d (%s)\n", \
 				__FILE__, __LINE__, #_exp); \
 			LOG_FUNC _fmt; \
@@ -450,26 +429,9 @@ enum WAKE_DATA_TYPE {
 	}
 #endif /* WINDOWS_CE */
 #else
-#define ASSERT_NOMEM() \
-{ \
-	LOG_FUNC("alloate memory failed at %s:%d\n", __FILE__, __LINE__); \
-}
-
-#define ASSERT(_exp) \
-	{ \
-		if (!(_exp)) { \
-			LOG_FUNC("Assertion failed: %s:%d (%s)\n", \
-				__FILE__, __LINE__, #_exp); \
-		} \
-	}
-#define ASSERT_REPORT(_exp, _fmt) \
-	{ \
-		if (!(_exp)) { \
-			LOG_FUNC("Assertion failed: %s:%d (%s)\n", \
-				__FILE__, __LINE__, #_exp); \
-			LOG_FUNC _fmt; \
-		} \
-	}
+#define ASSERT_NOMEM()
+#define ASSERT(_exp)
+#define ASSERT_REPORT(_exp, _fmt)
 #endif /* BUILD_QA_DBG */
 /* LOG function for print to buffer */
 /* If buffer pointer is NULL, redirect to normal DBGLOG */
@@ -523,16 +485,6 @@ u_int8_t wlanDbgSetGlobalLogLevel(uint32_t u4Module, uint32_t u4Level);
 void wlanFillTimestamp(struct ADAPTER *prAdapter, void *pvPacket,
 		       uint8_t ucPhase);
 void glNotifyDrvStatus(enum DRV_STATUS_T eDrvStatus, void *pvInfo);
-
-#if (CFG_SUPPORT_STATISTICS == 1)
-void wlanWakeStaticsInit(void);
-void wlanWakeStaticsUninit(void);
-uint32_t wlanWakeLogCmd(uint8_t ucCmdId);
-uint32_t wlanWakeLogEvent(uint8_t ucEventId);
-void wlanLogTxData(enum WAKE_DATA_TYPE dataType);
-void wlanLogRxData(enum WAKE_DATA_TYPE dataType);
-uint32_t wlanWakeDumpRes(void);
-#endif
 /*******************************************************************************
  *                              F U N C T I O N S
  *******************************************************************************

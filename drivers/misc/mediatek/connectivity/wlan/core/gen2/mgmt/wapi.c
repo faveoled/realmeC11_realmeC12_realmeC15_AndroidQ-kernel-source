@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -58,6 +56,41 @@
 *                              F U N C T I O N S
 ********************************************************************************
 */
+
+/*----------------------------------------------------------------------------*/
+/*!
+*
+* \brief This routine is called to generate WPA IE for
+*        associate request frame.
+*
+* \param[in]  prCurrentBss     The Selected BSS description
+*
+* \retval The append WPA IE length
+*
+* \note
+*      Called by: AIS module, Associate request
+*/
+/*----------------------------------------------------------------------------*/
+VOID wapiGenerateWAPIIE(IN P_ADAPTER_T prAdapter, IN P_MSDU_INFO_T prMsduInfo)
+{
+	PUINT_8 pucBuffer;
+
+	ASSERT(prAdapter);
+	ASSERT(prMsduInfo);
+
+	if (prMsduInfo->ucNetworkType != NETWORK_TYPE_AIS_INDEX)
+		return;
+
+	pucBuffer = (PUINT_8) ((ULONG) prMsduInfo->prPacket + prMsduInfo->u2FrameLength);
+
+	/* ASSOC INFO IE ID: 68 :0x44 */
+	if (/* prWlanInfo->fgWapiMode && */ prAdapter->prGlueInfo->u2WapiAssocInfoIESz) {
+		kalMemCopy(pucBuffer, &prAdapter->prGlueInfo->aucWapiAssocInfoIEs,
+			   prAdapter->prGlueInfo->u2WapiAssocInfoIESz);
+		prMsduInfo->u2FrameLength += prAdapter->prGlueInfo->u2WapiAssocInfoIESz;
+	}
+
+}
 
 /*----------------------------------------------------------------------------*/
 /*!

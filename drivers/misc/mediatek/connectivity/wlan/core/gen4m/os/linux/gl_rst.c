@@ -89,7 +89,6 @@
  */
 static u_int8_t fgResetTriggered = FALSE;
 u_int8_t fgIsResetting = FALSE;
-u_int8_t fgSimplifyResetFlow = FALSE;
 /*******************************************************************************
  *                           P R I V A T E   D A T A
  *******************************************************************************
@@ -194,14 +193,13 @@ static void *glResetCallback(enum ENUM_WMTDRV_TYPE eSrcType,
 				DBGLOG(INIT, WARN, "Whole chip reset start!\n");
 				fgIsResetting = TRUE;
 				fgResetTriggered = FALSE;
-				fgSimplifyResetFlow = TRUE;
 				wifi_reset_start();
 				break;
 
 			case WMTRSTMSG_RESET_END:
 				DBGLOG(INIT, WARN, "Whole chip reset end!\n");
-				wifi_rst.rst_data = RESET_SUCCESS;
 				fgIsResetting = FALSE;
+				wifi_rst.rst_data = RESET_SUCCESS;
 				schedule_work(&(wifi_rst.rst_work));
 				break;
 
@@ -241,9 +239,7 @@ static void mtk_wifi_reset(struct work_struct *work)
 	struct RESET_STRUCT *rst = container_of(work,
 						struct RESET_STRUCT, rst_work);
 
-	/* wlanOnAtReset(); */
 	wifi_reset_end(rst->rst_data);
-	fgSimplifyResetFlow = FALSE;
 }
 
 /*----------------------------------------------------------------------------*/

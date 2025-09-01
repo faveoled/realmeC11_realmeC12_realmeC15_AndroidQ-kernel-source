@@ -222,23 +222,21 @@ extern signed int fm_spin_lock_get(struct fm_lock *thiz);
 
 extern signed int fm_spin_lock_put(struct fm_lock *thiz);
 
-#define FM_LOCK(a)					\
-	({						\
-		signed int __ret = (signed int)0;	\
-		if (!a) {				\
-			__ret = -1;			\
-		} else if ((a)->lock) {			\
-			__ret = (a)->lock(a);		\
-		}					\
-		__ret;					\
-	})
+#define FM_LOCK(a)         \
+({                           \
+	signed int __ret = (signed int)0; \
+	if (a && (a)->lock) {          \
+		__ret = (a)->lock(a);    \
+	}                       \
+	__ret;                   \
+})
 
-#define FM_UNLOCK(a)				\
-	{					\
-		if (a && (a)->unlock) {		\
-			(a)->unlock(a);		\
-		}				\
-	}
+#define FM_UNLOCK(a)         \
+{                             \
+	if ((a)->unlock) {          \
+		(a)->unlock(a);    \
+	}                       \
+}
 
 /*
  * FM timer mechanism
@@ -319,13 +317,5 @@ extern signed int fm_workthread_put(struct fm_workthread *thiz);
 signed int fm_delayms(unsigned int data);
 
 signed int fm_delayus(unsigned int data);
-
-unsigned short fm_get_u16_from_auc(unsigned char *buf);
-
-void fm_set_u16_to_auc(unsigned char *buf, unsigned short val);
-
-unsigned int fm_get_u32_from_auc(unsigned char *buf);
-
-void fm_set_u32_to_auc(unsigned char *buf, unsigned int val);
 
 #endif /* __FM_UTILS_H__ */

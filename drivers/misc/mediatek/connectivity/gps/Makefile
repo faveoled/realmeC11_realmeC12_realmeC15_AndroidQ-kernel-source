@@ -10,13 +10,9 @@
 # published by the Free Software Foundation.
 
 ###############################################################################
-# Necessary Check
-
-ifneq ($(KERNEL_OUT),)
-ccflags-y += -imacros $(KERNEL_OUT)/include/generated/autoconf.h
+ifeq ($(CONFIG_MTK_COMBO_CHIP),)
+    $(error CONFIG_MTK_COMBO_CHIP not defined)
 endif
-
-
 
 ifeq ($(TARGET_BUILD_VARIANT),$(filter $(TARGET_BUILD_VARIANT),userdebug user))
     ldflags-y += -s
@@ -27,7 +23,7 @@ KBUILD_MODPOST_FAIL_ON_WARNINGS := y
 ###############################################################################
 
 # only WMT align this design flow, but gps use this also.
-#ccflags-y += -D MTK_WCN_REMOVE_KERNEL_MODULE
+ccflags-y += -D MTK_WCN_REMOVE_KERNEL_MODULE
 
 ifeq ($(CONFIG_ARM64), y)
     ccflags-y += -D CONFIG_MTK_WCN_ARM64
@@ -44,8 +40,6 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include/mach
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/freqhopping
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/freqhopping/$(MTK_PLATFORM)
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/emi/submodule
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/emi/$(MTK_PLATFORM)
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/common
@@ -58,13 +52,8 @@ ccflags-y += -I$(srctree)/drivers/devfreq
 ###############################################################################
 
 MODULE_NAME := gps_drv
-obj-m += $(MODULE_NAME).o
-
+obj-y += $(MODULE_NAME).o
 WMT_SRC_FOLDER := $(srctree)/drivers/misc/mediatek/connectivity/common
-
-ifeq ($(CONFIG_MTK_COMBO_CHIP),)
-    $(error CONFIG_MTK_COMBO_CHIP not defined)
-endif
 
 ifneq ($(filter "CONSYS_%",$(CONFIG_MTK_COMBO_CHIP)),)
         ccflags-y += -DSOC_CO_CLOCK_FLAG=1
@@ -79,7 +68,7 @@ else
         ccflags-y += -DREMOVE_MK_NODE=1
 endif
 
-ifneq ($(filter "CONSYS_6771" "CONSYS_6775" "CONSYS_6779",$(CONFIG_MTK_COMBO_CHIP)),)
+ifneq ($(filter "CONSYS_6771" "CONSYS_6775",$(CONFIG_MTK_COMBO_CHIP)),)
         ccflags-y += -DEMI_MPU_PROTECTION_IS_READY=1
 endif
 

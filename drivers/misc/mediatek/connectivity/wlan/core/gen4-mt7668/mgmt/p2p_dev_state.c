@@ -126,8 +126,7 @@ p2pDevStateInit_REQING_CHANNEL(IN P_ADAPTER_T prAdapter,
 
 		LINK_REMOVE_HEAD(&(prChnlReqInfo->rP2pChnlReqLink), prP2pMsgChnlReq, P_MSG_P2P_CHNL_REQUEST_T);
 
-		if (!prP2pMsgChnlReq)
-			break;
+		ASSERT(prP2pMsgChnlReq);
 
 #if (CFG_HW_WMM_BY_BSS == 1)
 		if (prBssInfo->fgIsWmmInited == FALSE)

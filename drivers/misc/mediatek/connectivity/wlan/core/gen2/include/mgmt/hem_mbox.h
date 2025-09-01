@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -69,7 +67,6 @@ typedef enum _ENUM_MSG_ID_T {
 	MID_OID_AIS_FSM_ABORT,	/* OID/IOCTL notify AIS for abort */
 	MID_AIS_SAA_FSM_START,	/* AIS notify SAA for Starting authentication/association fsm */
 	MID_OID_SAA_FSM_CONTINUE, /* OID notify SAA to continue to do authentication/association fsm for FT */
-	MID_OID_SAA_FSM_EXTERNAL_AUTH, /* OID notify SAA to continue SAE authentication/association fsm */
 	MID_AIS_SAA_FSM_ABORT,	/* AIS notify SAA for Aborting authentication/association fsm */
 	MID_SAA_AIS_JOIN_COMPLETE,	/* SAA notify AIS for indicating join complete */
 
@@ -135,7 +132,6 @@ typedef enum _ENUM_MSG_ID_T {
 #if CFG_SUPPORT_NCHO
 	MID_MNY_AIS_NCHO_ACTION_FRAME,
 #endif
-	MID_MNY_P2P_ACS,
 	MID_TOTAL_NUM
 } ENUM_MSG_ID_T, *P_ENUM_MSG_ID_T;
 
@@ -224,12 +220,6 @@ struct MSG_SAA_FT_CONTINUE {
 	MSG_HDR_T rMsgHdr;
 	P_STA_RECORD_T prStaRec;
 	BOOLEAN fgFTRicRequest; /* if fgFTRicRequest is TRUE, then will do FT Resource Request Protocol */
-};
-
-struct MSG_SAA_EXTERNAL_AUTH_DONE {
-	MSG_HDR_T rMsgHdr;
-	P_STA_RECORD_T prStaRec;
-	uint16_t status;
 };
 
 /* specific message data types */

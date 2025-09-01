@@ -146,12 +146,10 @@ typedef struct _OSAL_TIMER_ {
 typedef struct _OSAL_UNSLEEPABLE_LOCK_ {
 	spinlock_t lock;
 	ULONG flag;
-	INT32 init_flag;
 } OSAL_UNSLEEPABLE_LOCK, *P_OSAL_UNSLEEPABLE_LOCK;
 
 typedef struct _OSAL_SLEEPABLE_LOCK_ {
 	struct mutex lock;
-	INT32 init_flag;
 } OSAL_SLEEPABLE_LOCK, *P_OSAL_SLEEPABLE_LOCK;
 
 typedef struct _OSAL_SIGNAL_ {

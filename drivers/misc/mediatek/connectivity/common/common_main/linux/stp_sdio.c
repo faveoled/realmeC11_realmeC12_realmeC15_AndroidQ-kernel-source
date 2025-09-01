@@ -247,7 +247,7 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("MediaTek Inc WCN_SE_CS3");
 MODULE_DESCRIPTION("Read-Copy Update tracing for hierarchical implementation");
 
-INT32 gStpSdioDbgLvl = STPSDIO_LOG_INFO;
+UINT32 gStpSdioDbgLvl = STPSDIO_LOG_INFO;
 /*******************************************************************************
 *                                 M A C R O S
 ********************************************************************************
@@ -3223,7 +3223,7 @@ ssize_t stp_sdio_own_write(struct file *filp, const char __user *buffer, size_t 
 	PINT8 pDelimiter = " \t";
 	INT32 x = 0;
 	INT8 buf[128] = { 0 };
-	LONG res = 0;
+	LONG res;
 
 	if (len >= osal_sizeof(buf)) {
 		STPSDIO_PR_ERR("input handling fail!\n");

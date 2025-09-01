@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -178,12 +176,6 @@
 #include <net/iw_handler.h>
 #endif
 
-#ifdef CFG_CFG80211_VERSION
-#define CFG80211_VERSION_CODE CFG_CFG80211_VERSION
-#else
-#define CFG80211_VERSION_CODE LINUX_VERSION_CODE
-#endif
-
 #include "version.h"
 #include "config.h"
 
@@ -289,7 +281,6 @@ typedef struct _GL_WPA_INFO_T {
 	BOOLEAN fgPrivacyInvoke;
 #if CFG_SUPPORT_802_11W
 	UINT_32 u4Mfp;
-	UINT_8 ucRSNMfpCap;
 #endif
 } GL_WPA_INFO_T, *P_GL_WPA_INFO_T;
 
@@ -976,11 +967,6 @@ INT_32 cfgRemoveProcEntry(void);
 
 typedef UINT_8 (*file_buf_handler) (PVOID ctx, const CHAR __user *buf, UINT_16 length);
 extern VOID register_file_buf_handler(file_buf_handler handler, PVOID ctx, UINT_8 ucType);
-extern const uint8_t *kalFindIeMatchMask(uint8_t eid,
-				const uint8_t *ies, int len,
-				const uint8_t *match,
-				int match_len, int match_offset,
-				const uint8_t *match_mask);
 
 /*******************************************************************************
 *                              F U N C T I O N S

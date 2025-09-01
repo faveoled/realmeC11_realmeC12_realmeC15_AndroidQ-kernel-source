@@ -221,7 +221,7 @@ extern const PUINT_8 apucACI2Str[4];
 
 #define TXM_DEFAULT_FLUSH_QUEUE_GUARD_TIME              0	/* Unit: 64 us */
 
-#define QM_RX_BA_ENTRY_MISS_TIMEOUT_MS      (200)
+#define QM_RX_BA_ENTRY_MISS_TIMEOUT_MS      (1000)
 
 #if CFG_M0VE_BA_TO_DRIVER
 /* MQM internal control bitmap per-bit usage (for operations on g_prMqm->u4FlagBitmap) */
@@ -348,7 +348,6 @@ typedef struct _RX_BA_ENTRY_T {
 	UINT_8 u8LastAmsduSubIdx;
 	BOOL fgIsAmsduDuplicated;
 #endif
-	BOOLEAN fgFirstSnToWinStart;
 } RX_BA_ENTRY_T, *P_RX_BA_ENTRY_T;
 
 typedef UINT_32(*PFN_DEQUEUE_FUNCTION) (IN P_ADAPTER_T prAdapter, OUT P_QUE_T prQue, IN UINT_8 ucTC, IN UINT_32
@@ -953,12 +952,6 @@ VOID mqmHandleBaActionFrame(P_ADAPTER_T prAdapter, P_SW_RFB_T prSwRfb);
 #endif
 
 VOID qmResetTcControlResource(IN P_ADAPTER_T prAdapter);
-
-#if CFG_SUPPORT_REPLAY_DETECTION
-BOOLEAN qmHandleRxReplay(P_ADAPTER_T prAdapter, P_SW_RFB_T prSwRfb);
-BOOLEAN qmRxDetectReplay(PUINT_8 pucPNS, PUINT_8 pucPNT);
-#endif
-
 /*******************************************************************************
  *                              F U N C T I O N S
  ********************************************************************************

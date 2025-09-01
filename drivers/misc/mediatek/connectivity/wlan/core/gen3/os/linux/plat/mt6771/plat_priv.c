@@ -1,23 +1,19 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License version 2 as
+* published by the Free Software Foundation.
 *
-* This program is free software: you can redistribute it and/or modify it under the terms of the
-* GNU General Public License version 2 as published by the Free Software Foundation.
-*
-* This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
-* without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-* See the GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License along with this program.
-* If not, see <http://www.gnu.org/licenses/>.
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+* See http://www.gnu.org/licenses/gpl-2.0.html for more details.
 */
-
 #include <linux/version.h>
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(4, 4, 146)
-#include "legacy_controller.h"
-#else
+#ifdef CONFIG_MTK_CPU_CTRL
 #include <cpu_ctrl.h>
+#elif LINUX_VERSION_CODE <= KERNEL_VERSION(4, 4, 146)
+#include "legacy_controller.h"
 #endif
 
 #include <linux/pm_qos.h>
@@ -35,12 +31,8 @@
 #define MAX_CPU_FREQ 2340000 /* in kHZ */
 #define CLUSTER_NUM  2       /* 2 clusters, 4 big cores + 4 little cores */
 
-#ifdef CONFIG_MTK_QOS_SUPPORT
-
-static DEFINE_MUTEX(grPmQosLock);
-
-#endif
-
+#if defined(COFNIG_MTK_CPU_CTRL) || \
+	(LINUX_VERSION_CODE <= KERNEL_VERSION(4, 4, 146))
 int kalBoostCpu(unsigned int level)
 {
 	int i = 0;
@@ -55,11 +47,9 @@ int kalBoostCpu(unsigned int level)
 		freq_to_set[i].max = -1; /* -1 means don't care */
 		freq_to_set[i].min = level ? MAX_CPU_FREQ : -1;
 	}
-	update_userlimit_cpu_freq(CPU_KIR_WIFI, CLUSTER_NUM, freq_to_set);
+	update_userlimit_cpu_freq(PPM_KIR_WIFI, CLUSTER_NUM, freq_to_set);
 
 #ifdef CONFIG_MTK_QOS_SUPPORT
-
-	mutex_lock(&grPmQosLock);
 	if (level) {
 		if (!requested) {
 			requested = 1;
@@ -71,12 +61,11 @@ int kalBoostCpu(unsigned int level)
 		pm_qos_remove_request(&wifi_qos_request);
 		requested = 0;
 	}
-	mutex_unlock(&grPmQosLock);
-
 #endif
 
 	return 0;
 }
+#endif
 
 #ifdef CONFIG_MTK_EMI
 VOID kalSetEmiMpuProtection(phys_addr_t emiPhyBase, UINT_32 size, BOOLEAN enable)

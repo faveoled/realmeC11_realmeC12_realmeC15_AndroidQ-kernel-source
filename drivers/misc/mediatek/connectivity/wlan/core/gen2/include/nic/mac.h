@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -425,7 +423,6 @@
 #define AUTH_ALGORITHM_NUM_OPEN_SYSTEM              0	/* Open System */
 #define AUTH_ALGORITHM_NUM_SHARED_KEY               1	/* Shared Key */
 #define AUTH_ALGORITHM_NUM_FAST_BSS_TRANSITION      2	/* Fast BSS Transition */
-#define AUTH_ALGORITHM_NUM_SAE                      3	/* WPA3 - SAE */
 
 /* 7.3.1.2 Authentication Transaction Sequence Number field */
 #define AUTH_TRANSACTION_SEQENCE_NUM_FIELD_LEN      2
@@ -830,6 +827,11 @@
 #define ELEM_RM_TYPE_STA_STATISTICS_REPORT          7
 #define ELEM_RM_TYPE_LCI_REPORT                     8
 #define ELEM_RM_TYPE_TSM_REPORT                      9
+/*Auto Channel Selection*/
+#if CFG_AUTO_CHANNEL_SEL_SUPPORT
+#define ELEM_RM_TYPE_ACS_CHN			    1
+#define ELEM_RM_TYPE_LTE_CHN			    2
+#endif
 
 /* 7.3.2.25 RSN information element */
 #define ELEM_MAX_LEN_WPA                            34	/* one pairwise, one AKM suite, one PMKID */
@@ -2324,10 +2326,6 @@ typedef struct _WAPI_INFO_ELEM_T {
 	UINT_16 u2Version;
 	UINT_16 u2AuthKeyMgtSuiteCount;
 	UCHAR aucAuthKeyMgtSuite1[4];
-	UINT_16 u2PairwiseKeyCipherSuiteCount;
-	UINT_32 au4PairwiseKeyCipherSuite;
-	UINT_32 u4GroupKeyCipherSuite;
-	UINT_16 u2WapiCap;
 } __KAL_ATTRIB_PACKED__ WAPI_INFO_ELEM_T, *P_WAPI_INFO_ELEM_T;
 /* Information Elements from MTK Synergies.*/
 typedef struct _IE_MTK_OUI_T {

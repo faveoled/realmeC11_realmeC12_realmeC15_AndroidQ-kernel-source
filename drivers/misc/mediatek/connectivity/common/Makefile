@@ -1,13 +1,5 @@
 ###############################################################################
-# Necessary Check
-ifneq ($(KERNEL_OUT),)
-ccflags-y += -imacros $(KERNEL_OUT)/include/generated/autoconf.h
-endif
-
-
 ifneq ($(CONFIG_MTK_COMBO),)
-
-#ccflags-y += -imacros $(AUTOCONF_H)
 
 ifeq ($(CONFIG_MTK_COMBO_CHIP),)
     $(error CONFIG_MTK_COMBO_CHIP not defined)
@@ -49,12 +41,8 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/conn_md/include
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/mach/$(MTK_PLATFORM)/include/mach
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/emi/submodule
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/emi/$(MTK_PLATFORM)
-ifeq ($(CONFIG_MTK_PMIC_CHIP_MT6359),y)
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/pmic/include/mt6359
-endif
 ccflags-y += -I$(srctree)/drivers/mmc/core
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/common
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat
 ###############################################################################
 
 
@@ -79,11 +67,7 @@ endif
 #obj-y   +=  common_main/
 #obj-y   +=  common_detect/
 
-ifneq ($(filter MT6631,$(MTK_CONSYS_ADIE)),)
-    ccflags-y += -D CONSYS_PMIC_CTRL_6635=0
-else
-    ccflags-y += -D CONSYS_PMIC_CTRL_6635=1
-endif
+
 
 ###############################################################################
 MODULE_NAME := wmt_drv
@@ -92,7 +76,7 @@ $(warning $(MODULE_NAME) build-in boot.img)
 obj-y += $(MODULE_NAME).o
 else
 $(warning $(MODULE_NAME) is kernel module)
-obj-m += $(MODULE_NAME).o
+obj-y += $(MODULE_NAME).o
 endif
 
 ###############################################################################
@@ -180,12 +164,6 @@ ifneq ($(TARGET_BUILD_VARIANT), user)
     ccflags-y += -D WMT_DBG_SUPPORT=1
 else
     ccflags-y += -D WMT_DBG_SUPPORT=0
-endif
-
-ifeq ($(CONFIG_MTK_DEVAPC),y)
-    ccflags-y += -D WMT_DEVAPC_DBG_SUPPORT=1
-else
-    ccflags-y += -D WMT_DEVAPC_DBG_SUPPORT=0
 endif
 
 ifeq ($(CONFIG_ARCH_MT6580), y)

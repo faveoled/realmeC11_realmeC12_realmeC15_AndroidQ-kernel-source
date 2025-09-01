@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -2740,7 +2738,7 @@ VOID qmInsertFallWithinReorderPkt(IN P_SW_RFB_T prSwRfb, IN P_RX_BA_ENTRY_T prRe
 	else {
 		do {
 			/* Case 1: Terminate. A duplicate packet */
-			if ((prExaminedQueuedSwRfb->u2SSN) == (prSwRfb->u2SSN)) {
+			if (((prExaminedQueuedSwRfb->u2SSN) == (prSwRfb->u2SSN))) {
 				prSwRfb->eDst = RX_PKT_DESTINATION_NULL;
 				QUEUE_INSERT_TAIL(prReturnedQue, (P_QUE_ENTRY_T) prSwRfb);
 				return;
@@ -3709,7 +3707,7 @@ VOID mqmProcessAssocRsp(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb, IN PUIN
 	UINT_16 u2Offset;
 	PUINT_8 pucIEStart;
 	UINT_8 aucWfaOui[] = VENDOR_OUI_WFA;
-	BOOLEAN hasnoQosMapSetIE = TRUE;
+
 
 	DEBUGFUNC("mqmProcessAssocRsp");
 
@@ -3769,19 +3767,10 @@ VOID mqmProcessAssocRsp(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb, IN PUIN
 			break;
 		case ELEM_ID_QOS_MAP_SET:
 			DBGLOG(QM, WARN, "QM: received assoc resp qosmapset ie\n");
-			if (prStaRec->qosMapSet)
-				QosMapSetRelease(prStaRec);
-			prStaRec->qosMapSet = qosParseQosMapSet(prAdapter, pucIE);
-			hasnoQosMapSetIE = FALSE;
+			qosParseQosMapSet(prAdapter, prStaRec->qosMapSet, pucIE);
 		default:
 			break;
 		}
-	}
-
-	if (hasnoQosMapSetIE) {
-		DBGLOG(QM, WARN, "QM: remove assoc resp qosmapset ie\n");
-		QosMapSetRelease(prStaRec);
-		prStaRec->qosMapSet = NULL;
 	}
 
 	/* Parse AC parameters and write to HW CRs */

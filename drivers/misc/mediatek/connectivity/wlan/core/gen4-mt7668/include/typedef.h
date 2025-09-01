@@ -93,9 +93,7 @@
 #define WLAN_STATUS_MEDIA_SPECIFIC_INDICATION   ((WLAN_STATUS) 0x40010012L)
 
 #define WLAN_STATUS_SCAN_COMPLETE               ((WLAN_STATUS) 0x60010001L)
-#define WLAN_STATUS_SCAN_ABORT                  ((WLAN_STATUS) 0x60010002L)
-#define WLAN_STATUS_MSDU_OK                     ((WLAN_STATUS) 0x60010003L)
-
+#define WLAN_STATUS_MSDU_OK                     ((WLAN_STATUS) 0x60010002L)
 
 /* TODO(Kevin): double check if 0x60010001 & 0x60010002 is proprietary */
 #define WLAN_STATUS_ROAM_OUT_FIND_BEST          ((WLAN_STATUS) 0x60010101L)
@@ -175,6 +173,7 @@ typedef VOID(*IST_EVENT_FUNCTION) (P_ADAPTER_T);
 
 /* Type definition for function pointer of timer handler */
 typedef VOID(*PFN_TIMER_CALLBACK) (IN P_GLUE_INFO_T);
+
 /*******************************************************************************
 *                            P U B L I C   D A T A
 ********************************************************************************

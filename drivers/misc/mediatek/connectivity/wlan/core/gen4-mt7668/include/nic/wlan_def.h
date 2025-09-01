@@ -84,11 +84,6 @@
 #define DISCONNECT_REASON_CODE_NEW_CONNECTION   4
 #define DISCONNECT_REASON_CODE_REASSOCIATION    5
 
-/* disconnect trigger */
-#define DISCONNECT_TRIGGER_RESERVED  0
-#define DISCONNECT_TRIGGER_ACTIVE    1
-#define DISCONNECT_TRIGGER_PASSIVE   2
-
 /* The rate definitions */
 #define TX_MODE_CCK             0x00
 #define TX_MODE_OFDM            0x40
@@ -360,9 +355,6 @@
 #define AUTH_TYPE_OPEN_SYSTEM                       BIT(AUTH_ALGORITHM_NUM_OPEN_SYSTEM)
 #define AUTH_TYPE_SHARED_KEY                        BIT(AUTH_ALGORITHM_NUM_SHARED_KEY)
 #define AUTH_TYPE_FAST_BSS_TRANSITION               BIT(AUTH_ALGORITHM_NUM_FAST_BSS_TRANSITION)
-#if CFG_SUPPORT_CFG80211_AUTH
-#define AUTH_TYPE_SAE                  BIT(AUTH_ALGORITHM_NUM_SAE)
-#endif
 
 /* Authentication Retry Limit */
 #define TX_AUTH_ASSOCI_RETRY_LIMIT                  2
@@ -568,98 +560,8 @@ typedef enum _ENUM_MODULATION_TYPE_T {
 	MODULATION_TYPE_QPSK,
 	MODULATION_TYPE_16QAM,
 	MODULATION_TYPE_64QAM,
-	MODULATION_TYPE_MCS6,
-	MODULATION_TYPE_54M_MCS7,
-	MODULATION_TYPE_MCS32,
 	MODULATION_TYPE_NUM
 } ENUM_MODULATION_TYPE_T, *P_ENUM_MODULATION_TYPE_T;
-
-enum ENUM_VHT_SYSTEM {
-	VHT_SYSTEM_VHT20 = 0,
-	VHT_SYSTEM_VHT40,
-	VHT_SYSTEM_VHT80,
-	VHT_SYSTEM_VHT160C,
-	VHT_SYSTEM_VHT160NC,
-	VHT_SYSTEM_LG_VHT40,
-	VHT_SYSTEM_LG_VHT80,
-	VHT_SYSTEM_LG_VHT160,
-	VHT_SYSTEM_NUM
-};
-
-enum ENUM_VHT_MODULATION_TYPE {
-	MODULATION_TYPE_VHT_BPSK = 0,
-	MODULATION_TYPE_VHT_QPSK,
-	MODULATION_TYPE_VHT_16QAM,
-	MODULATION_TYPE_VHT_64QAM_MSC5_6,
-	MODULATION_TYPE_VHT_64QAM_MSC7,
-	MODULATION_TYPE_VHT_64QAM_MSC8,
-	MODULATION_TYPE_VHT_64QAM_MSC9,
-	MODULATION_TYPE_VHT_NUM
-};
-
-enum PWR_DSSS_CAT {
-	PWR_DSSS_CCK,
-	PWR_DSSS_BPKS,
-	PWR_DSSS_NUM
-};
-
-enum PWR_OFDM_CAT {
-	PWR_OFDM_BPSK, /* 6M, 9M */
-	PWR_OFDM_QPSK, /* 12M, 18M */
-	PWR_OFDM_16QAM, /* 24M, 36M */
-	PWR_OFDM_48Mbps, /* 48M */
-	PWR_OFDM_54Mbps, /* 54M */
-	PWR_OFDM_NUM
-};
-
-enum PWR_HT20_CAT {
-	PWR_HT_BPSK, /* MCS0*/
-	PWR_HT_QPSK, /* MCS1, MCS2 */
-	PWR_HT_16QAM, /* MCS3, MCS4 */
-	PWR_HT_MCS5, /* MCS5 */
-	PWR_HT_MCS6, /* MCS6 */
-	PWR_HT_MCS7, /* MCS7 */
-	PWR_HT_MCS32, /* MCS32 */
-	PWR_HT_NUM
-};
-
-enum PWR_VHT20_CAT {
-	PWR_VHT20_BPSK,
-	PWR_VHT20_QPSK,
-	PWR_VHT20_16QAM,
-	PWR_VHT20_64QAM,
-	PWR_VHT20_MCS7,
-	PWR_VHT20_MCS8,
-	PWR_VHT20_MCS9,
-	PWR_VHT20_NUM
-};
-
-enum PWR_VHT_OFST_CAT {
-	PWR_Vht40_OFFSET = VHT_SYSTEM_VHT40, /*to sync to ENUM_VHT_SYSTEM_T*/
-	PWR_Vht80_OFFSET,
-	PWR_Vht160c_OFFSET,
-	PWR_Vht160nc_OFFSET,
-	PWR_LgVht40_OFFSET,
-	PWR_LgVht80_OFFSET,
-	PWR_VHT_OFST_NUM
-};
-
-struct POWER_LIMIT {
-	UINT_8 ucCentralCh;
-	UINT_8 tx_pwr_dsss[PWR_DSSS_NUM]; /*unit: 0.5 dbm*/
-	UINT_8 tx_pwr_ofdm[PWR_OFDM_NUM]; /*unit: 0.5 dbm*/
-	UINT_8 tx_pwr_ht20[PWR_HT_NUM]; /*unit: 0.5 dbm*/
-	UINT_8 tx_pwr_ht40[PWR_HT_NUM]; /*unit: 0.5 dbm*/
-	UINT_8 tx_pwr_vht20[PWR_VHT20_NUM]; /*unit: 0.5 dbm*/
-	UINT_8 tx_pwr_vht_OFST[PWR_VHT_OFST_NUM]; /*unit: 0.5 dbm*/
-};
-
-enum ENUM_TXPWR_TBL_IDX {
-	LIMIT_TBL,
-	EEPROM_TBL,
-	MAC_TBL,
-	TXPWR_TBL_NUM
-};
 
 typedef enum _ENUM_ACPI_STATE_T {
 	ACPI_STATE_D0 = 0,
@@ -879,50 +781,23 @@ typedef enum _ENUM_ANTENNA_NUM {
 	MAX_ANTENNA_NUM
 } ENUM_ANTENNA_NUM, *P_ENUM_ANTENNA_NUM;
 
-#if CFG_SUPPORT_CSI
-enum ENUM_CSI_MODULATION_BW_TYPE_T {
-	CSI_TYPE_CCK_BW20,
-	CSI_TYPE_OFDM_BW20,
-	CSI_TYPE_OFDM_BW40,
-	CSI_TYPE_OFDM_BW80
-};
-#endif
-
-
-
 /*----------------------------------------------------------------------------*/
 /* RSN structures                                                             */
 /*----------------------------------------------------------------------------*/
 /* #if defined(WINDOWS_DDK) || defined(WINDOWS_CE) */
 /* #pragma pack(1) */
 /* #endif */
-#if CFG_SUPPORT_CFG80211_AUTH
-/* max number of supported cipher suites */
-#define MAX_NUM_SUPPORTED_CIPHER_SUITES 10
+
+#define MAX_NUM_SUPPORTED_CIPHER_SUITES 8	/* max number of supported cipher suites */
 #if CFG_SUPPORT_802_11W
-/* max number of supported AKM suites */
-#define MAX_NUM_SUPPORTED_AKM_SUITES    15
+#define MAX_NUM_SUPPORTED_AKM_SUITES    8	/* max number of supported AKM suites */
 #else
-/* max number of supported AKM suites */
-#define MAX_NUM_SUPPORTED_AKM_SUITES    13
+#define MAX_NUM_SUPPORTED_AKM_SUITES    6	/* max number of supported AKM suites */
 #endif
-#else
-#define MAX_NUM_SUPPORTED_CIPHER_SUITES 8
-#if CFG_SUPPORT_802_11W
-/* max number of supported AKM suites */
-#define MAX_NUM_SUPPORTED_AKM_SUITES    8
-#else
-/* max number of supported AKM suites */
-#define MAX_NUM_SUPPORTED_AKM_SUITES    6
-#endif
-#endif
-/* max number of supported PMKID */
-#define MAX_NUM_SUPPORTED_PMKID	10
 
 /* Structure of RSN Information */
 typedef struct _RSN_INFO_T {
 	UINT_8 ucElemId;
-	UINT_8 ucRsneLen;
 	UINT_16 u2Version;
 	UINT_32 u4GroupKeyCipherSuite;
 	UINT_32 u4PairwiseKeyCipherSuiteCount;
@@ -931,9 +806,6 @@ typedef struct _RSN_INFO_T {
 	UINT_32 au4AuthKeyMgtSuite[MAX_NUM_SUPPORTED_AKM_SUITES];
 	UINT_16 u2RsnCap;
 	BOOLEAN fgRsnCapPresent;
-	UINT_16 u2PmkidCnt;
-	BOOLEAN aucPmkidList[MAX_NUM_SUPPORTED_PMKID * RSN_PMKID_LEN];
-	UINT_32 u4GroupMgmtKeyCipherSuite;
 } /*__KAL_ATTRIB_PACKED__*/ RSN_INFO_T, *P_RSN_INFO_T;
 
 #define MAX_NUM_SUPPORTED_WAPI_AKM_SUITES    1	/* max number of supported AKM suites */
@@ -981,17 +853,6 @@ typedef struct _P2P_DEVICE_DESC_T {
 	/* TODO: Service Information or PasswordID valid? */
 } P2P_DEVICE_DESC_T, *P_P2P_DEVICE_DESC_T;
 
-#endif
-
-#if CFG_SUPPORT_OWE
-/* Structure of OWE Information */
-struct OWE_INFO_T {
-	UINT_8 ucElemId;
-	UINT_8 ucLength;
-	UINT_8 ucElemIdExt;
-	UINT_16 u2Group;
-	UINT_8 aucPublicKey[100];
-};
 #endif
 
 /*******************************************************************************

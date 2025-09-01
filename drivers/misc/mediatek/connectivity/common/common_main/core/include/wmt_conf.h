@@ -32,8 +32,6 @@
 */
 #define CUST_CFG_WMT "WMT.cfg"
 #define CUST_CFG_WMT_SOC "WMT_SOC.cfg"
-#define CUST_CFG_WMT_SOC_PREFIX "WMT_SOC_"
-#define CUST_CFG_WMT_SOC_SUFFIX ".cfg"
 
 /*******************************************************************************
 *                    E X T E R N A L   R E F E R E N C E S
@@ -83,6 +81,5 @@ INT32 wmt_conf_read_file(VOID);
 P_WMT_GEN_CONF wmt_conf_get_cfg(VOID);
 INT32 wmt_conf_set_cfg_file(const PINT8 name);
 INT32 wmt_conf_deinit(VOID);
-void wmt_set_bt_tssi_target(int value);
 
 #endif				/* _WMT_CONF_H_ */

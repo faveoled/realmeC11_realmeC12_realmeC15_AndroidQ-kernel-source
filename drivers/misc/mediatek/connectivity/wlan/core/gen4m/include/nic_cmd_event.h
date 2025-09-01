@@ -402,16 +402,14 @@ enum {
 	MU_SET_TRIGGER_MU_TX,
 	/* F/W flow test commands */
 	MU_SET_TRIGGER_GID_MGMT_FRAME,
-	/* HQA STA commands */
-	MU_HQA_SET_STA_PARAM = 60,
-	/* HQA AP Commands*/
-	MU_HQA_SET_ENABLE = 70,
+	/* HQA commands */
+	MU_HQA_SET_STA_PARAM,
+	MU_HQA_SET_ENABLE,
 	MU_HQA_SET_SNR_OFFSET,
 	MU_HQA_SET_ZERO_NSS,
 	MU_HQA_SET_SPEED_UP_LQ,
 	MU_HQA_SET_GROUP,
 	MU_HQA_SET_MU_TABLE,
-	MU_HQA_SET_SU_TABLE,
 	MU_HQA_SET_CALC_LQ,
 	MU_HQA_GET_CALC_LQ,
 	MU_HQA_SET_CALC_INIT_MCS,
@@ -530,7 +528,6 @@ enum ENUM_CMD_ID {
 	CMD_ID_TDLS_PS = 0x75,		/* 0x75 (Set) */
 	CMD_ID_GET_CNM = 0x79,
 	CMD_ID_FRM_IND_FROM_HOST = 0x7D,
-	CMD_ID_PERF_IND = 0x7E,     /* 0x7E(Set) */
 	CMD_ID_GET_NIC_CAPABILITY = 0x80,	/* 0x80 (Query) */
 	CMD_ID_GET_LINK_QUALITY,	/* 0x81 (Query) */
 	CMD_ID_GET_STATISTICS,	/* 0x82 (Query) */
@@ -541,9 +538,6 @@ enum ENUM_CMD_ID {
 	CMD_ID_GET_CHN_LOADING = 0x88,	/* 0x88 (Query) */
 	CMD_ID_GET_BUG_REPORT = 0x89,	/* 0x89 (Query) */
 	CMD_ID_GET_NIC_CAPABILITY_V2 = 0x8A,/* 0x8A (Query) */
-#if CFG_SUPPORT_LOWLATENCY_MODE
-	CMD_ID_SET_LOW_LATENCY_MODE = 0x8B, /* 0x8B (Set) */
-#endif
 	CMD_ID_LOG_UI_INFO = 0x8D,	/* 0x8D (Set / Query) */
 
 #if CFG_SUPPORT_OSHARE
@@ -557,7 +551,7 @@ enum ENUM_CMD_ID {
 #if CFG_SUPPORT_CAL_RESULT_BACKUP_TO_HOST
 	CMD_ID_CAL_BACKUP_IN_HOST_V2 = 0xAE,	/* 0xAE (Set / Query) */
 #endif
-	CMD_ID_SET_FORCE_RTS = 0x90,
+
 	CMD_ID_WFC_KEEP_ALIVE = 0xA0,	/* 0xa0(Set) */
 	CMD_ID_RSSI_MONITOR = 0xA1,	/* 0xa1(Set) */
 	CMD_ID_ACCESS_REG = 0xc0,	/* 0xc0 (Set / Query) */
@@ -667,15 +661,12 @@ enum ENUM_EVENT_ID {
 	EVENT_ID_MU_GET_LQ = 0x54,
 #endif
 
-	EVENT_ID_LOW_LATENCY_INFO = 0x5B,	/* 0x5B (Unsolicited) */
-
 #if (CFG_SUPPORT_DFS_MASTER == 1)
 	EVENT_ID_RDD_REPORT = 0x60,
 	EVENT_ID_CSA_DONE = 0x61,
-#endif
-	EVENT_ID_OPMODE_CHANGE = 0x63,
 #if CFG_SUPPORT_IDC_CH_SWITCH
-	EVENT_ID_LTE_IDC_REPORT = 0x64,
+	EVENT_ID_LTE_IDC_REPORT = 0x62,
+#endif
 #endif
 	EVENT_ID_DBDC_SWITCH_DONE = 0x78,
 	EVENT_ID_GET_CNM = 0x79,
@@ -812,7 +803,6 @@ enum ENUM_PF_OPCODE {
 
 enum ENUM_SCN_FUNC_MASK {
 	ENUM_SCN_RANDOM_MAC_EN = (1 << 0),
-	ENUM_SCN_DBDC_SCAN_DIS = (1 << 1),
 };
 
 struct CMD_PACKET_FILTER_CAP {
@@ -1176,8 +1166,8 @@ struct CMD_DEFAULT_KEY {
 
 /* WPA2 PMKID cache structure */
 struct PMKID_ENTRY {
-	struct LINK_ENTRY rLinkEntry;
-	struct PARAM_PMKID rBssidInfo;
+	struct PARAM_BSSID_INFO rBssidInfo;
+	u_int8_t fgPmkidExist;
 };
 
 struct CMD_802_11_PMKID {
@@ -1373,10 +1363,6 @@ enum NIC_CAPABILITY_V2_TAG {
 	TAG_CAP_LOCATION_CAP = 0xc,
 	TAG_CAP_MUMIMO_CAP = 0xd,
 	TAG_CAP_BUFFER_MODE_INFO = 0xe,
-	TAG_CAP_HW_ADIE_VERSION = 0x14,
-#if CFG_SUPPORT_ANT_SWAP
-	TAG_CAP_ANTSWP = 0x16,
-#endif
 	TAG_CAP_TOTAL
 };
 
@@ -1406,12 +1392,6 @@ struct CAP_HW_VERSION {
 	uint32_t u4ConfigId;  /* Configuration ID */
 };
 
-struct CAP_HW_ADIE_VERSION {
-	uint16_t u2ProductID; /* CHIP ID */
-	uint16_t u2EcoVersion; /* ECO version */
-	uint32_t aucReserved[4];
-};
-
 struct CAP_SW_VERSION {
 	uint16_t u2FwVersion; /* FW version <major.minor> */
 	uint16_t u2FwBuildNumber; /* FW build number */
@@ -1436,13 +1416,7 @@ struct CAP_PHY_CAP {
 	uint8_t ucRxLdpc; /* 1:support, 0:not*/
 	uint8_t ucTxStbc; /* 1:support, 0:not*/
 	uint8_t ucRxStbc; /* 1:support, 0:not*/
-	/* BIT(0): WLAN_FLAG_2G4_WF0
-	 * BIT(1): WLAN_FLAG_5G_WF0
-	 * BIT(2): WLAN_FLAG_2G4_WF1
-	 * BIT(3): WLAN_FLAG_5G_WF1
-	 */
-	uint8_t ucWifiPath;
-	uint8_t ucReserved;
+	uint8_t aucReserved[2];
 };
 
 struct CAP_MAC_CAP {
@@ -1485,15 +1459,6 @@ struct CAP_MUMIMO_CAP {
 	uint8_t ucMuMimoTx; /* 1:support, 0:not */
 	uint8_t aucReserved[2];
 };
-
-#if CFG_SUPPORT_ANT_SWAP
-struct CAP_ANTSWP {
-	uint8_t  ucVersion;
-	uint8_t  ucRsvd;
-	uint8_t  ucIsSupported;	/* 1:support, 0:not */
-	uint8_t  ucReserved[1];
-};
-#endif
 
 #define EFUSE_SECTION_TABLE_SIZE        (10)   /* It should not be changed. */
 
@@ -1654,6 +1619,7 @@ struct CMD_CAL_BACKUP_STRUCT {
 };
 #endif
 
+#if CFG_AUTO_CHANNEL_SEL_SUPPORT
 struct CMD_ACCESS_CHN_LOAD {
 	uint32_t u4Address;
 	uint32_t u4Data;
@@ -1667,6 +1633,7 @@ struct CMD_GET_LTE_SAFE_CHN {
 	uint8_t aucReserved0[2];
 	uint8_t aucReserved2[16];
 };
+#endif
 
 /* CMD_DUMP_MEMORY */
 struct CMD_DUMP_MEM {
@@ -1869,24 +1836,6 @@ struct CMD_PS_PROFILE {
 	uint8_t aucReserved[2];
 };
 
-#if CFG_SUPPORT_LOWLATENCY_MODE
-/* CMD_ID_SET_LOW_LATENCY_MODE */
-struct LOW_LATENCY_MODE_SETTING {
-	u_int8_t fgEnable; /* Low Latency mode on/off */
-	u_int8_t fgTxDupDetect; /* Start/stop Tx dup detect */
-	u_int8_t fgTxDupCertQuery; /* Get Tx Dup Certificate */
-	uint8_t aucReserved[5];
-};
-
-struct CMD_LOW_LATENCY_MODE_HEADER {
-	uint8_t ucVersion;
-	uint8_t ucType;
-	uint8_t ucMagicCode;
-	uint8_t ucBufferLen;
-	struct LOW_LATENCY_MODE_SETTING rSetting;
-};
-#endif
-
 /* EVENT_LINK_QUALITY */
 #if 1
 struct LINK_QUALITY_ {
@@ -2061,23 +2010,6 @@ struct CMD_RDD_ON_OFF_CTRL {
 	uint8_t aucReserve[4];
 };
 #endif
-
-struct CMD_PERF_IND {
-	/* DWORD_0 - Common Part */
-	uint8_t  ucCmdVer;
-	uint8_t  aucPadding0[1];
-	uint16_t u2CmdLen;       /* cmd size including common part and body. */
-	/* DWORD_1 ~ x - Command Body */
-	uint32_t u4VaildPeriod;   /* in ms */
-	/* Current State */
-	uint32_t ulCurTxBytes[4];   /* in Bps */
-	uint32_t ulCurRxBytes[4];   /* in Bps */
-	uint16_t u2CurRxRate[4];     /* Unit 500 Kbps */
-	uint8_t ucCurRxRCPI0[4];
-	uint8_t ucCurRxRCPI1[4];
-	uint8_t ucCurRxNss[4];
-	uint32_t au4Reserve[63];
-};
 
 /* EVENT_BT_OVER_WIFI */
 struct EVENT_BT_OVER_WIFI {
@@ -2302,10 +2234,6 @@ struct CMD_BSS_ACTIVATE_CTRL {
 	uint8_t ucReserved;
 };
 
-/* This struct only uses uint16_t,
- * compiler will use 2-byte alignment.
- * sizeof(struct CMD_SET_BSS_RLM_PARAM) is 22
- */
 struct CMD_SET_BSS_RLM_PARAM {
 	uint8_t ucBssIndex;
 	uint8_t ucRfBand;
@@ -2324,14 +2252,9 @@ struct CMD_SET_BSS_RLM_PARAM {
 	uint8_t ucVhtChannelFrequencyS1;
 	uint8_t ucVhtChannelFrequencyS2;
 	uint16_t u2VhtBasicMcsSet;
-	uint8_t ucOpTxNss;
-	uint8_t ucOpRxNss;
+	uint8_t ucNss;
 };
 
-/* This struct uses uint32_t,
- * compiler will use 4-byte alignment.
- * sizeof(struct CMD_SET_BSS_INFO) is 116
- */
 struct CMD_SET_BSS_INFO {
 	uint8_t ucBssIndex;
 	uint8_t ucConnectionState;
@@ -2344,7 +2267,6 @@ struct CMD_SET_BSS_INFO {
 	uint16_t u2OperationalRateSet;
 	uint16_t u2BSSBasicRateSet;
 	uint8_t ucStaRecIdxOfAP;
-	uint8_t aucPadding0[1];
 	uint16_t u2HwDefaultFixedRateCode;
 	uint8_t ucNonHTBasicPhyType;	/* For Slot Time and CWmin */
 	uint8_t ucAuthMode;
@@ -2355,14 +2277,13 @@ struct CMD_SET_BSS_INFO {
 	uint8_t ucBMCWlanIndex;
 	uint8_t ucHiddenSsidMode;
 	uint8_t ucDisconnectDetectTh;
-	uint8_t aucPadding1[3];
 	uint32_t u4PrivateData;
-	struct CMD_SET_BSS_RLM_PARAM rBssRlmParam;  /* 68 */
-	uint8_t ucDBDCBand; /* 90 */
+	struct CMD_SET_BSS_RLM_PARAM rBssRlmParam;
+	uint8_t ucDBDCBand;
 	uint8_t ucWmmSet;
 	uint8_t  ucDBDCAction;
 	uint8_t  ucNss;
-	uint8_t aucReserved[22]; /* 94 */
+	uint8_t aucReserved[20];
 };
 
 enum ENUM_RTS_POLICY {
@@ -2934,14 +2855,8 @@ struct CMD_DBDC_SETTING {
 	uint8_t ucDbdcEn;
 	uint8_t ucWmmBandBitmap;
 	uint8_t ucUpdateSettingNextChReq;
-	uint8_t aucPadding0[1];
-	uint8_t ucCmdVer;
-	uint8_t aucPadding1[1];
-	uint16_t u2CmdLen;
-	uint8_t ucPrimaryChannel;
-	uint8_t ucWmmQueIdx;
-	uint8_t aucPadding2[2];
-	uint8_t aucPadding3[24];
+	uint8_t aucReserved1;
+	uint8_t aucReserved2[32];
 };
 
 struct EVENT_CH_PRIVILEGE {
@@ -2992,25 +2907,6 @@ struct EVENT_RDD_REPORT {
 	struct PERIODIC_PULSE_BUFFER arPpbContent[32];
 };
 #endif
-
-enum ENUM_BEACON_TIMEOUT_REASON {
-	BEACON_TIMEOUT_REASON_HW_BEACON_LOST_NONADHOC,
-	BEACON_TIMEOUT_REASON_HW_BEACON_LOST_ADHOC,
-	BEACON_TIMEOUT_REASON_HW_TSF_DRIFT,
-	BEACON_TIMEOUT_REASON_NULL_FRAME_THRESHOLD,
-	BEACON_TIMEOUT_REASON_AGING_THRESHOLD,
-	BEACON_TIMEOUT_REASON_BSSID_BEACON_PEIROD_NOT_ILLIGAL,
-	BEACON_TIMEOUT_REASON_CONNECTION_FAIL,
-	BEACON_TIMEOUT_REASON_ALLOCAT_NULL_PKT_FAIL_THRESHOLD,
-	BEACON_TIMEOUT_REASON_NO_TX_DONE_EVENT,
-	BEACON_TIMEOUT_REASON_UNSPECIF_REASON,
-	BEACON_TIMEOUT_REASON_SET_CHIP,
-	BEACON_TIMEOUT_REASON_KEEP_SCAN_AP_MISS_CHECK_FAIL,
-	BEACON_TIMEOUT_REASON_KEEP_UNCHANGED_LOW_RSSI_CHECK_FAIL,
-	BEACON_TIMEOUT_REASON_NULL_FRAME_LIFE_TIMEOUT,
-	BEACON_TIMEOUT_REASON_HIGH_PER,
-	BEACON_TIMEOUT_REASON_NUM
-};
 
 struct EVENT_BSS_BEACON_TIMEOUT {
 	uint8_t ucBssIndex;
@@ -3089,7 +2985,6 @@ struct CMD_NVRAM_SETTING {
 #if CFG_SUPPORT_TDLS
 struct CMD_TDLS_CH_SW {
 	u_int8_t fgIsTDLSChSwProhibit;
-	/* uint8_t ucBssIndex; */
 };
 #endif
 
@@ -3427,12 +3322,14 @@ struct EVENT_STA_STATISTICS {
 	uint8_t aucReserved[4];
 };
 
+#if CFG_AUTO_CHANNEL_SEL_SUPPORT
 struct EVENT_LTE_SAFE_CHN {
 	uint8_t ucVersion;
 	uint8_t aucReserved[3];
 	uint32_t u4Flags;	/* Bit0: valid */
 	struct LTE_SAFE_CHN_INFO rLteSafeChn;
 };
+#endif
 
 #if CFG_SUPPORT_SNIFFER
 struct CMD_MONITOR_SET_INFO {
@@ -3590,22 +3487,6 @@ struct EXT_EVENT_TXPOWER_ALL_RATE_POWER_INFO_T {
 };
 #endif
 
-#if CFG_MODIFY_TX_POWER_BY_BAT_VOLT
-struct CMD_TX_POWER_PERCENTAGE_CTRL_T {
-	uint8_t ucPowerCtrlFormatId;
-	bool  fgPercentageEnable;
-	uint8_t ucBandIdx;
-	uint8_t ucReserved;
-};
-
-struct CMD_TX_POWER_PERCENTAGE_DROP_CTRL_T {
-	uint8_t ucPowerCtrlFormatId;
-	uint8_t i1PowerDropLevel;
-	uint8_t ucBandIdx;
-	uint8_t ucReserved;
-};
-#endif
-
 struct CMD_SET_SCHED_SCAN_ENABLE {
 	uint8_t ucSchedScanAct;
 	uint8_t aucReserved[3];
@@ -3652,24 +3533,6 @@ enum ENUM_FRAME_DHCP_TYPE {
 	FRAME_DHCP_TYPE_DHCP_MAX         = 0xFF,
 };
 
-#if CFG_SUPPORT_REPORT_MISC
-enum ENUM_REPORT_MISC {
-	REPORT_AUTHASSOC_START = 0x01,
-	REPORT_AUTHASSOC_END,
-	REPORT_4WAYHS_START,
-	REPORT_4WAYHS_END,
-	REPORT_DHCP_START,
-	REPORT_DHCP_END,
-};
-
-struct EVENT_REPORT_MISC {
-	uint32_t u4MdrdyCnt;
-	uint32_t u4RxMpduCnt;
-	uint32_t u4ChannelIdleCnt;
-	int8_t cRssi;
-};
-#endif
-
 struct CMD_INDICATE_CONNECTION_FRAME {
 	uint8_t ucCmdVer;
 	uint8_t aucPadding0[1];
@@ -3686,44 +3549,6 @@ struct CMD_INDICATE_CONNECTION_FRAME {
 	uint8_t TxS; /* Only TXS type  value in txS*/
 	uint8_t	aucPadding3[3];
 	uint8_t	aucPadding4[64];
-};
-
-enum ENUM_EVENT_OPMODE_CHANGE_REASON_T {
-	EVENT_OPMODE_CHANGE_REASON_DBDC      = 0,
-	EVENT_OPMODE_CHANGE_REASON_COANT     = 1,
-	EVENT_OPMODE_CHANGE_REASON_DBDC_SCAN = 2,
-	EVENT_OPMODE_CHANGE_REASON_SMARTGEAR = 3,
-};
-
-struct EVENT_OPMODE_CHANGE {
-	uint8_t  ucEvtVer;
-	uint8_t  aucPadding0[1];
-	uint16_t u2EvtLen;
-	uint8_t  ucBssBitmap;
-	uint8_t  ucEnable;
-	uint8_t  ucOpTxNss;
-	uint8_t  ucOpRxNss;
-	uint8_t  ucReason;		/* ENUM_EVENT_OPMODE_CHANGE_REASON_T */
-	uint8_t  aucPadding2[63];
-};
-
-struct EVENT_LOW_LATENCY_INFO {
-	/* DWORD_0 - Common Part */
-	uint8_t  ucEvtVer;
-	uint8_t  aucPadding0[1];
-	uint16_t u2EvtLen;
-
-	/* DWORD_1 - afterwards */
-	u_int8_t  fgTxDupCert;
-	u_int8_t  fgTxDupEnable;
-	uint8_t  aucPadding1[2];
-	uint8_t  aucPayload[1024];
-};
-
-struct CMD_SET_FORCE_RTS {
-	uint8_t ucForceRtsEn;
-	uint8_t ucRtsPktNum;
-	uint8_t aucReserved[2];
 };
 
 /*******************************************************************************
@@ -3808,6 +3633,10 @@ void nicCmdEventQueryRfTestATInfo(IN struct ADAPTER *prAdapter,
 void nicCmdEventSetCommon(IN struct ADAPTER *prAdapter,
 	IN struct CMD_INFO *prCmdInfo, IN uint8_t *pucEventBuf);
 
+void nicCmdEventSetDisassociate(IN struct ADAPTER
+				*prAdapter, IN struct CMD_INFO *prCmdInfo,
+				IN uint8_t *pucEventBuf);
+
 void nicCmdEventSetIpAddress(IN struct ADAPTER *prAdapter,
 	IN struct CMD_INFO *prCmdInfo, IN uint8_t *pucEventBuf);
 
@@ -3846,6 +3675,44 @@ void nicCmdEventSetStopSchedScan(IN struct ADAPTER *prAdapter,
 	IN struct CMD_INFO *prCmdInfo,
 	IN uint8_t *pucEventBuf);
 
+/* Statistics responder */
+void nicCmdEventQueryXmitOk(IN struct ADAPTER *prAdapter,
+	IN struct CMD_INFO *prCmdInfo, IN uint8_t *pucEventBuf);
+
+void nicCmdEventQueryRecvOk(IN struct ADAPTER *prAdapter,
+	IN struct CMD_INFO *prCmdInfo, IN uint8_t *pucEventBuf);
+
+void nicCmdEventQueryXmitError(IN struct ADAPTER *prAdapter,
+	IN struct CMD_INFO *prCmdInfo, IN uint8_t *pucEventBuf);
+
+void nicCmdEventQueryRecvError(IN struct ADAPTER *prAdapter,
+	IN struct CMD_INFO *prCmdInfo, IN uint8_t *pucEventBuf);
+
+void nicCmdEventQueryRecvNoBuffer(IN struct ADAPTER *prAdapter,
+	IN struct CMD_INFO *prCmdInfo,
+	IN uint8_t *pucEventBuf);
+
+void nicCmdEventQueryRecvCrcError(IN struct ADAPTER *prAdapter,
+	IN struct CMD_INFO *prCmdInfo,
+	IN uint8_t *pucEventBuf);
+
+void nicCmdEventQueryRecvErrorAlignment(IN struct ADAPTER *prAdapter,
+	IN struct CMD_INFO *prCmdInfo,
+	IN uint8_t *pucEventBuf);
+
+void nicCmdEventQueryXmitOneCollision(IN struct ADAPTER *prAdapter,
+	IN struct CMD_INFO *prCmdInfo,
+	IN uint8_t *pucEventBuf);
+
+void nicCmdEventQueryXmitMoreCollisions(IN struct ADAPTER *prAdapter,
+	IN struct CMD_INFO *prCmdInfo,
+	IN uint8_t *pucEventBuf);
+
+void nicCmdEventQueryXmitMaxCollisions(IN struct ADAPTER *prAdapter,
+	IN struct CMD_INFO *prCmdInfo,
+	IN uint8_t *pucEventBuf);
+
+/* for timeout check */
 void nicOidCmdTimeoutCommon(IN struct ADAPTER *prAdapter,
 	IN struct CMD_INFO *prCmdInfo);
 
@@ -3867,9 +3734,12 @@ void nicCmdEventQueryStaStatistics(IN struct ADAPTER *prAdapter,
 void nicCmdEventQueryBugReport(IN struct ADAPTER *prAdapter,
 	IN struct CMD_INFO *prCmdInfo, IN uint8_t *pucEventBuf);
 
+#if CFG_AUTO_CHANNEL_SEL_SUPPORT
+/* 4 Auto Channel Selection */
 void nicCmdEventQueryLteSafeChn(IN struct ADAPTER *prAdapter,
 	IN struct CMD_INFO *prCmdInfo,
 	IN uint8_t *pucEventBuf);
+#endif
 
 #if CFG_SUPPORT_BATCH_SCAN
 void nicCmdEventBatchScanResult(IN struct ADAPTER *prAdapter,
@@ -3923,12 +3793,7 @@ uint32_t nicCfgChipCapLocationCap(IN struct ADAPTER *prAdapter,
 	IN uint8_t *pucEventBuf);
 uint32_t nicCfgChipCapMuMimoCap(IN struct ADAPTER *prAdapter,
 	IN uint8_t *pucEventBuf);
-uint32_t nicCfgChipAdieHwVersion(IN struct ADAPTER *prAdapter,
-	IN uint8_t *pucEventBuf);
-#if CFG_SUPPORT_ANT_SWAP
-uint32_t nicCfgChipCapAntSwpCap(IN struct ADAPTER *prAdapter,
-	IN uint8_t *pucEventBuf);
-#endif
+
 void nicExtEventICapIQData(IN struct ADAPTER *prAdapter,
 	IN uint8_t *pucEventBuf);
 void nicExtEventQueryMemDump(IN struct ADAPTER *prAdapter,
@@ -4011,15 +3876,6 @@ void nicCmdEventSetAddKey(IN struct ADAPTER *prAdapter,
 void nicOidCmdTimeoutSetAddKey(IN struct ADAPTER *prAdapter,
 	IN struct CMD_INFO *prCmdInfo);
 #endif
-#if CFG_SUPPORT_REPORT_MISC
-void nicCmdEventReportMisc(IN struct ADAPTER *prAdapter,
-			   IN struct CMD_INFO *prCmdInfo,
-			   IN uint8_t *pucEventBuf);
-#endif
-
-void nicEventUpdateLowLatencyInfoStatus(IN struct ADAPTER *prAdapter,
-		  IN struct WIFI_EVENT *prEvent);
-
 /*******************************************************************************
  *                              F U N C T I O N S
  *******************************************************************************

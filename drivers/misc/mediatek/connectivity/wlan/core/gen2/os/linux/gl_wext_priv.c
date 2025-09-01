@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -1930,6 +1928,15 @@ static WLAN_REQ_ENTRY arWlanOidReqTable[] = {
 	 FALSE, FALSE, ENUM_OID_DRIVER_CORE, sizeof(PARAM_WPI_KEY_T),
 	 NULL,
 	 (PFN_OID_HANDLER_FUNC_REQ) wlanoidSetWapiKey}
+	,
+#endif
+
+#if CFG_SUPPORT_WPS2
+	{OID_802_11_WSC_ASSOC_INFO,
+	 DISP_STRING("OID_802_11_WSC_ASSOC_INFO"),
+	 FALSE, FALSE, ENUM_OID_DRIVER_CORE, 0,
+	 NULL,
+	 (PFN_OID_HANDLER_FUNC_REQ) wlanoidSetWSCAssocInfo}
 	,
 #endif
 

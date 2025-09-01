@@ -163,13 +163,6 @@ VOID secInit(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBssIndex)
 	prAdapter->rMib.dot11RSNAConfigPairwiseCiphersTable[5].dot11RSNAConfigPairwiseCipher = RSN_CIPHER_SUITE_TKIP;
 	prAdapter->rMib.dot11RSNAConfigPairwiseCiphersTable[6].dot11RSNAConfigPairwiseCipher = RSN_CIPHER_SUITE_CCMP;
 	prAdapter->rMib.dot11RSNAConfigPairwiseCiphersTable[7].dot11RSNAConfigPairwiseCipher = RSN_CIPHER_SUITE_WEP104;
-#if CFG_SUPPORT_CFG80211_AUTH
-	prAdapter->rMib.dot11RSNAConfigPairwiseCiphersTable[8]
-		.dot11RSNAConfigPairwiseCipher =
-		RSN_CIPHER_SUITE_GROUP_NOT_USED;
-	prAdapter->rMib.dot11RSNAConfigPairwiseCiphersTable[9]
-		.dot11RSNAConfigPairwiseCipher = RSN_CIPHER_SUITE_GCMP_256;
-#endif
 
 	for (i = 0; i < MAX_NUM_SUPPORTED_CIPHER_SUITES; i++)
 		prAdapter->rMib.dot11RSNAConfigPairwiseCiphersTable[i].dot11RSNAConfigPairwiseCipherEnabled = FALSE;
@@ -193,21 +186,6 @@ VOID secInit(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBssIndex)
 	prAdapter->rMib.dot11RSNAConfigAuthenticationSuitesTable[7].dot11RSNAConfigAuthenticationSuite =
 	    RSN_AKM_SUITE_PSK_SHA256;
 #endif
-#if CFG_SUPPORT_CFG80211_AUTH
-	prAdapter->rMib.dot11RSNAConfigAuthenticationSuitesTable[8]
-		.dot11RSNAConfigAuthenticationSuite
-		= RSN_AKM_SUITE_8021X_SUITE_B;
-	prAdapter->rMib.dot11RSNAConfigAuthenticationSuitesTable[9]
-		.dot11RSNAConfigAuthenticationSuite
-		= RSN_AKM_SUITE_8021X_SUITE_B_192;
-	prAdapter->rMib.dot11RSNAConfigAuthenticationSuitesTable[10]
-		.dot11RSNAConfigAuthenticationSuite
-		= RSN_AKM_SUITE_SAE;
-	prAdapter->rMib.dot11RSNAConfigAuthenticationSuitesTable[11]
-		.dot11RSNAConfigAuthenticationSuite
-		= RSN_AKM_SUITE_OWE;
-#endif
-
 
 	for (i = 0; i < MAX_NUM_SUPPORTED_AKM_SUITES; i++) {
 		prAdapter->rMib.dot11RSNAConfigAuthenticationSuitesTable[i].dot11RSNAConfigAuthenticationSuiteEnabled =
@@ -265,9 +243,7 @@ BOOL secCheckClassError(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb, IN P_ST
 	if (!prStaRec || (prRxStatus->u2StatusFlag & RXS_DW2_RX_CLASSERR_BITMAP) == RXS_DW2_RX_CLASSERR_VALUE) {
 
 		DBGLOG(RSN, TRACE,
-		       "prStaRec=%p RX Status = 0x%x RX_CLASSERR check!\n",
-			   prStaRec,
-			   prRxStatus->u2StatusFlag);
+		       "prStaRec=%x RX Status = %x RX_CLASSERR check!\n", prStaRec, prRxStatus->u2StatusFlag);
 
 		/* if (IS_NET_ACTIVE(prAdapter, ucBssIndex)) { */
 		authSendDeauthFrame(prAdapter,
@@ -478,16 +454,6 @@ VOID secSetCipherSuite(IN P_ADAPTER_T prAdapter, IN UINT_32 u4CipherSuitesFlags)
 		prEntry = &prMib->dot11RSNAConfigPairwiseCiphersTable[i];
 
 		switch (prEntry->dot11RSNAConfigPairwiseCipher) {
-#if CFG_SUPPORT_SUITB
-		case RSN_CIPHER_SUITE_GCMP_256:
-			if (u4CipherSuitesFlags & CIPHER_FLAG_GCMP256)
-				prEntry->dot11RSNAConfigPairwiseCipherEnabled
-					= TRUE;
-			else
-				prEntry->dot11RSNAConfigPairwiseCipherEnabled
-					= FALSE;
-			break;
-#endif
 		case WPA_CIPHER_SUITE_WEP40:
 		case RSN_CIPHER_SUITE_WEP40:
 			if (u4CipherSuitesFlags & CIPHER_FLAG_WEP40)
@@ -533,16 +499,6 @@ VOID secSetCipherSuite(IN P_ADAPTER_T prAdapter, IN UINT_32 u4CipherSuitesFlags)
 		prMib->dot11RSNAConfigGroupCipher = WPA_CIPHER_SUITE_WEP104;
 	else if (rsnSearchSupportedCipher(prAdapter, WPA_CIPHER_SUITE_WEP40, &i))
 		prMib->dot11RSNAConfigGroupCipher = WPA_CIPHER_SUITE_WEP40;
-#if CFG_SUPPORT_SUITB
-	else if (rsnSearchSupportedCipher(prAdapter,
-		RSN_CIPHER_SUITE_GROUP_NOT_USED, &i))
-		prMib->dot11RSNAConfigGroupCipher =
-		RSN_CIPHER_SUITE_GROUP_NOT_USED;
-	else if (rsnSearchSupportedCipher(prAdapter,
-		RSN_CIPHER_SUITE_GCMP_256, &i))
-		prMib->dot11RSNAConfigGroupCipher =
-		RSN_CIPHER_SUITE_GCMP_256;
-#endif
 	else
 		prMib->dot11RSNAConfigGroupCipher = WPA_CIPHER_SUITE_NONE;
 
@@ -584,26 +540,21 @@ BOOLEAN secEnabledInAis(IN P_ADAPTER_T prAdapter)
 {
 	DEBUGFUNC("secEnabledInAis");
 
-	ASSERT(prAdapter->rWifiVar.rConnSettings.eEncStatus <
-		ENUM_ENCRYPTION_NUM);
+	ASSERT(prAdapter->rWifiVar.rConnSettings.eEncStatus < ENUM_ENCRYPTION3_KEY_ABSENT);
 
-	if ((prAdapter->rWifiVar.rConnSettings.eEncStatus
-		== ENUM_ENCRYPTION1_ENABLED)
-		|| (prAdapter->rWifiVar.rConnSettings.eEncStatus
-		== ENUM_ENCRYPTION2_ENABLED)
-		|| (prAdapter->rWifiVar.rConnSettings.eEncStatus
-		== ENUM_ENCRYPTION3_ENABLED)
-#if CFG_SUPPORT_SUITB
-		|| (prAdapter->rWifiVar.rConnSettings.eEncStatus
-		== ENUM_ENCRYPTION4_ENABLED)
-#endif
-		)
+	switch (prAdapter->rWifiVar.rConnSettings.eEncStatus) {
+	case ENUM_ENCRYPTION_DISABLED:
+		return FALSE;
+	case ENUM_ENCRYPTION1_ENABLED:
+	case ENUM_ENCRYPTION2_ENABLED:
+	case ENUM_ENCRYPTION3_ENABLED:
 		return TRUE;
-	else if (prAdapter->rWifiVar.rConnSettings.eEncStatus
-		== ENUM_ENCRYPTION_DISABLED)
-		DBGLOG(RSN, TRACE, "Unknown encryption setting %d\n",
-			prAdapter->rWifiVar.rConnSettings.eEncStatus);
+	default:
+		DBGLOG(RSN, TRACE, "Unknown encryption setting %d\n", prAdapter->rWifiVar.rConnSettings.eEncStatus);
+		break;
+	}
 	return FALSE;
+
 }				/* secEnabledInAis */
 
 BOOLEAN secIsProtected1xFrame(IN P_ADAPTER_T prAdapter, IN P_STA_RECORD_T prStaRec)
@@ -694,24 +645,6 @@ BOOLEAN secIsProtectedBss(IN P_ADAPTER_T prAdapter, IN P_BSS_INFO_T prBssInfo)
 	return FALSE;
 }
 
-BOOLEAN secIsUsedByStaRecEntry(IN P_ADAPTER_T prAdapter, IN UINT_8 Index)
-{
-	P_STA_RECORD_T prStaRec = NULL;
-	UINT_8 i = 0;
-	BOOLEAN fgIsUsed = FALSE;
-
-	for (i = 0; i < CFG_STA_REC_NUM; i++) {
-		prStaRec = &prAdapter->arStaRec[i];
-		if (prStaRec->fgIsInUse && prStaRec->ucWlanIndex == Index) {
-			fgIsUsed = TRUE;
-			DBGLOG(RSN, INFO,
-				"[Wlan index]: Duplicated entry #%d\n", Index);
-			break;
-		}
-	}
-	return fgIsUsed;
-}
-
 /*----------------------------------------------------------------------------*/
 /*!
 * \brief This routine is used before add/update a WLAN entry.
@@ -762,12 +695,9 @@ BOOL secPrivacySeekForEntry(IN P_ADAPTER_T prAdapter, IN P_STA_RECORD_T prSta)
 	if (i == (ucMaxIDX + 1)) {
 		for (i = ucStartIDX; i <= ucMaxIDX; i++) {
 			if (prWtbl[i].ucUsed == FALSE) {
-				if (!secIsUsedByStaRecEntry(prAdapter, i)) {
-					ucEntry = i;
-					DBGLOG(RSN, INFO,
-					"[Wlan index]: Assign entry #%d\n", i);
-					break;
-				}
+				ucEntry = i;
+				DBGLOG(RSN, INFO, "[Wlan index]: Assign entry #%d\n", i);
+				break;
 			}
 		}
 	}
@@ -873,7 +803,7 @@ VOID secPrivacyFreeSta(IN P_ADAPTER_T prAdapter, IN P_STA_RECORD_T prStaRec)
 		if (prWtbl[entry].ucUsed &&
 		    EQUAL_MAC_ADDR(prStaRec->aucMacAddr, prWtbl[entry].aucMacAddr) && prWtbl[entry].ucPairwise) {
 #if 1				/* DBG */
-			DBGLOG(RSN, INFO, "Free STA entry (%d)!\n", entry);
+			DBGLOG(RSN, INFO, "Free STA entry (%lu)!\n", entry);
 #endif
 			secPrivacyFreeForEntry(prAdapter, entry);
 			prStaRec->ucWlanIndex = WTBL_RESERVED_ENTRY;
@@ -910,40 +840,21 @@ VOID secRemoveBssBcEntry(IN P_ADAPTER_T prAdapter, IN P_BSS_INFO_T prBssInfo, IN
 			for (i = 0; i < MAX_KEY_NUM; i++) {
 				if (prBssInfo->ucBMCWlanIndexSUsed[i])
 					secPrivacyFreeForEntry(prAdapter, prBssInfo->ucBMCWlanIndexS[i]);
-
-#if 0
-				/* move to cfg delete cb function for sync. */
 				prBssInfo->ucBMCWlanIndexSUsed[i] = FALSE;
 				prBssInfo->ucBMCWlanIndexS[i] = WTBL_RESERVED_ENTRY;
-#endif
 			}
-
 			prBssInfo->fgBcDefaultKeyExist = FALSE;
 			prBssInfo->ucBcDefaultKeyIdx = 0xff;
 		}
 	} else {
-		/* According to wh.su's comment, it's ok to change to
-		 * reserved_entry here so that the entry is _NOT_ freed at all.
-		 * In this way, the same BSS(ucBssIndex) could reuse the same
-		 * entry next time in secPrivacySeekForBcEntry(), and we could
-		 * see the following log: "[Wlan index]: Reuse entry ...".
-		 */
 		prBssInfo->ucBMCWlanIndex = WTBL_RESERVED_ENTRY;
 		secPrivacyFreeForEntry(prAdapter, prBssInfo->ucBMCWlanIndex);
 
 		for (i = 0; i < MAX_KEY_NUM; i++) {
-		/* Not to remove BMC WTBL entries to
-		 *   sync with FW's behavior
-		 *
-		 *	if (prBssInfo->ucBMCWlanIndexSUsed[i])
-		 *		secPrivacyFreeForEntry(prAdapter,
-		 *				prBssInfo->ucBMCWlanIndexS[i]);
-		 */
-#if 0
-			/* move to cfg delete cb function for sync. */
+			if (prBssInfo->ucBMCWlanIndexSUsed[i])
+				secPrivacyFreeForEntry(prAdapter, prBssInfo->ucBMCWlanIndexS[i]);
 			prBssInfo->ucBMCWlanIndexSUsed[i] = FALSE;
 			prBssInfo->ucBMCWlanIndexS[i] = WTBL_RESERVED_ENTRY;
-#endif
 		}
 		for (i = 0; i < MAX_KEY_NUM; i++) {
 			if (prBssInfo->wepkeyUsed[i])

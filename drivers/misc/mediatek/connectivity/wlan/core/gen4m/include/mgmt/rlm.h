@@ -379,6 +379,17 @@ struct RADIO_MEASUREMENT_REPORT_PARAMS {
 	((_prBssInfo)->ucPhyTypeSet & PHY_TYPE_SET_802_11AC)
 #endif
 
+/* The bandwidth modes are not used anymore. They represent if AP
+ * can use 20/40 bandwidth, not all modes. (20110411)
+ */
+#define RLM_AP_IS_BW_40_ALLOWED(_prAdapter, _prBssInfo) \
+	(((_prBssInfo)->eBand == BAND_2G4 && \
+	(_prAdapter)->rWifiVar.rConnSettings.uc2G4BandwidthMode \
+	== CONFIG_BW_20_40M) || \
+	((_prBssInfo)->eBand == BAND_5G && \
+	(_prAdapter)->rWifiVar.rConnSettings.uc5GBandwidthMode \
+	== CONFIG_BW_20_40M))
+
 /*******************************************************************************
  *                   F U N C T I O N   D E C L A R A T I O N S
  *******************************************************************************
@@ -535,8 +546,7 @@ rlmChangeOperationMode(
 	struct ADAPTER *prAdapter,
 	uint8_t ucBssIndex,
 	uint8_t ucChannelWidth,
-	uint8_t ucOpRxNss,
-	uint8_t ucOpTxNss,
+	uint8_t ucNss,
 	PFN_OPMODE_NOTIFY_DONE_FUNC pfOpChangeHandler
 );
 
@@ -573,8 +583,7 @@ void rlmReviseMaxBw(
 
 void rlmProcessNeighborReportResonse(struct ADAPTER *prAdapter,
 				     struct WLAN_ACTION_FRAME *prAction,
-				     struct SW_RFB *prSwRfb);
-
+				     uint16_t u2PacketLen);
 void rlmTxNeighborReportRequest(struct ADAPTER *prAdapter,
 				struct STA_RECORD *prStaRec,
 				struct SUB_ELEMENT_LIST *prSubIEs);
@@ -591,16 +600,18 @@ void rlmProcessRadioMeasurementRequest(struct ADAPTER *prAdapter,
 void rlmProcessLinkMeasurementRequest(struct ADAPTER *prAdapter,
 				      struct WLAN_ACTION_FRAME *prAction);
 
+void rlmProcessNeighborReportResonse(struct ADAPTER *prAdapter,
+				     struct WLAN_ACTION_FRAME *prAction,
+				     uint16_t u2PacketLen);
+
 void rlmFillRrmCapa(uint8_t *pucCapa);
 
 void rlmSetMaxTxPwrLimit(IN struct ADAPTER *prAdapter, int8_t cLimit,
 			 uint8_t ucEnable);
 
-void rlmStartNextMeasurement(struct ADAPTER *prAdapter, u_int8_t fgNewStarted,
-	uint8_t ucBssIndex);
+void rlmStartNextMeasurement(struct ADAPTER *prAdapter, u_int8_t fgNewStarted);
 
-u_int8_t rlmBcnRmRunning(struct ADAPTER *prAdapter,
-	uint8_t ucBssIndex);
+u_int8_t rlmBcnRmRunning(struct ADAPTER *prAdapter);
 
 u_int8_t rlmFillScanMsg(struct ADAPTER *prAdapter,
 			struct MSG_SCN_SCAN_REQ_V2 *prMsg);
@@ -611,22 +622,19 @@ void rlmTxNeighborReportRequest(struct ADAPTER *prAdapter,
 				struct STA_RECORD *prStaRec,
 				struct SUB_ELEMENT_LIST *prSubIEs);
 
-void rlmTxRadioMeasurementReport(struct ADAPTER *prAdapter,
-	uint8_t ucBssIndex);
+void rlmTxRadioMeasurementReport(struct ADAPTER *prAdapter);
 
-void rlmFreeMeasurementResources(struct ADAPTER *prAdapter,
-	uint8_t ucBssIndex);
+void rlmFreeMeasurementResources(struct ADAPTER *prAdapter);
 
 enum RM_REQ_PRIORITY rlmGetRmRequestPriority(uint8_t *pucDestAddr);
 
 void rlmRunEventProcessNextRm(struct ADAPTER *prAdapter,
 			      struct MSG_HDR *prMsgHdr);
 
-void rlmScheduleNextRm(struct ADAPTER *prAdapter,
-	uint8_t ucBssIndex);
+void rlmScheduleNextRm(struct ADAPTER *prAdapter);
 
 void rlmProcessBeaconAndProbeResp(struct ADAPTER *prAdapter,
-	IN struct SW_RFB *prSwRfb, uint8_t ucBssIndex);
+				  IN struct SW_RFB *prSwRfb);
 
 void rlmUpdateBssTimeTsf(struct ADAPTER *prAdapter, struct BSS_DESC *prBssDesc);
 

@@ -52,7 +52,6 @@ wmt_wlan_remove_cb mtk_wcn_wlan_remove;
 wmt_wlan_bus_cnt_get_cb mtk_wcn_wlan_bus_tx_cnt;
 wmt_wlan_bus_cnt_clr_cb mtk_wcn_wlan_bus_tx_cnt_clr;
 wmt_wlan_emi_mpu_set_protection_cb mtk_wcn_wlan_emi_mpu_set_protection;
-wmt_wlan_is_wifi_drv_own_cb mtk_wcn_wlan_is_wifi_drv_own;
 
 /*******************************************************************************
 *                             D A T A   T Y P E S
@@ -61,7 +60,7 @@ wmt_wlan_is_wifi_drv_own_cb mtk_wcn_wlan_is_wifi_drv_own;
 OSAL_BIT_OP_VAR gBtWifiGpsState;
 OSAL_BIT_OP_VAR gGpsFmState;
 UINT32 gWifiProbed;
-INT32 gWmtDbgLvl = WMT_LOG_INFO;
+UINT32 gWmtDbgLvl = WMT_LOG_INFO;
 MTK_WCN_BOOL g_pwr_off_flag = MTK_WCN_BOOL_TRUE;
 
 /*******************************************************************************
@@ -229,14 +228,10 @@ EXPORT_SYMBOL(mtk_wcn_wmt_func_on);
 */
 VOID mtk_wcn_wmt_func_ctrl_for_plat(UINT32 on, ENUM_WMTDRV_TYPE_T type)
 {
-	MTK_WCN_BOOL ret;
-
 	if (on)
-		ret = mtk_wcn_wmt_func_on(type);
+		mtk_wcn_wmt_func_on(type);
 	else
-		ret = mtk_wcn_wmt_func_off(type);
-
-	WMT_INFO_FUNC("on=%d type=%d ret=%d\n", on, type, ret);
+		mtk_wcn_wmt_func_off(type);
 }
 
 INT8 mtk_wcn_wmt_therm_ctrl(ENUM_WMTTHERM_TYPE_T eType)
@@ -580,7 +575,6 @@ INT32 mtk_wcn_wmt_wlan_reg(P_MTK_WCN_WMT_WLAN_CB_INFO pWmtWlanCbInfo)
 	mtk_wcn_wlan_bus_tx_cnt = pWmtWlanCbInfo->wlan_bus_cnt_get_cb;
 	mtk_wcn_wlan_bus_tx_cnt_clr = pWmtWlanCbInfo->wlan_bus_cnt_clr_cb;
 	mtk_wcn_wlan_emi_mpu_set_protection = pWmtWlanCbInfo->wlan_emi_mpu_set_protection_cb;
-	mtk_wcn_wlan_is_wifi_drv_own = pWmtWlanCbInfo->wlan_is_wifi_drv_own_cb;
 
 	if (gWifiProbed) {
 		WMT_INFO_FUNC("wlan has been done power on,call probe directly\n");
@@ -605,7 +599,6 @@ INT32 mtk_wcn_wmt_wlan_unreg(void)
 	mtk_wcn_wlan_bus_tx_cnt = NULL;
 	mtk_wcn_wlan_bus_tx_cnt_clr = NULL;
 	mtk_wcn_wlan_emi_mpu_set_protection = NULL;
-	mtk_wcn_wlan_is_wifi_drv_own = NULL;
 
 	return 0;
 }
@@ -769,52 +762,3 @@ INT32 mtk_wmt_gps_mcu_ctrl(PUINT8 p_tx_data_buf, UINT32 tx_data_len, PUINT8 p_rx
 				    p_rx_data_len);
 }
 EXPORT_SYMBOL(mtk_wmt_gps_mcu_ctrl);
-
-VOID mtk_wcn_wmt_set_mcif_mpu_protection(MTK_WCN_BOOL enable)
-{
-	mtk_consys_set_mcif_mpu_protection(enable);
-}
-EXPORT_SYMBOL(mtk_wcn_wmt_set_mcif_mpu_protection);
-
-MTK_WCN_BOOL mtk_wmt_gps_suspend_ctrl(MTK_WCN_BOOL suspend)
-{
-	P_OSAL_OP pOp;
-	MTK_WCN_BOOL bRet;
-	P_OSAL_SIGNAL pSignal;
-
-	pOp = wmt_lib_get_free_op();
-	if (!pOp) {
-		WMT_DBG_FUNC("get_free_lxop fail\n");
-		return MTK_WCN_BOOL_FALSE;
-	}
-
-	pSignal = &pOp->signal;
-
-	pOp->op.opId = WMT_OPID_GPS_SUSPEND;
-	pOp->op.au4OpData[0] = (MTK_WCN_BOOL_FALSE == suspend ? 0 : 1);
-	pSignal->timeoutValue = (MTK_WCN_BOOL_FALSE == suspend) ? MAX_FUNC_ON_TIME : MAX_FUNC_OFF_TIME;
-
-	WMT_INFO_FUNC("wmt-exp: OPID(%d) type(%zu) start\n", pOp->op.opId, pOp->op.au4OpData[0]);
-
-	/*do not check return value, we will do this either way */
-	wmt_lib_host_awake_get();
-	/* wake up chip first */
-	if (DISABLE_PSM_MONITOR()) {
-		WMT_ERR_FUNC("wake up failed,OPID(%d) type(%zu) abort\n", pOp->op.opId, pOp->op.au4OpData[0]);
-		wmt_lib_put_op_to_free_queue(pOp);
-		wmt_lib_host_awake_put();
-		return MTK_WCN_BOOL_FALSE;
-	}
-
-	bRet = wmt_lib_put_act_op(pOp);
-	ENABLE_PSM_MONITOR();
-	wmt_lib_host_awake_put();
-
-	if (bRet == MTK_WCN_BOOL_FALSE)
-		WMT_WARN_FUNC("OPID(%d) type(%zu) fail\n", pOp->op.opId, pOp->op.au4OpData[0]);
-	else
-		WMT_INFO_FUNC("OPID(%d) type(%zu) ok\n", pOp->op.opId, pOp->op.au4OpData[0]);
-
-	return bRet;
-}
-EXPORT_SYMBOL(mtk_wmt_gps_suspend_ctrl);

@@ -236,9 +236,6 @@ struct MSDU_INFO *nicGetPendingTxMsduInfo(
 	IN struct ADAPTER *prAdapter, IN uint8_t ucWlanIndex,
 	IN uint8_t ucSeqNum);
 
-void nicFreePendingTxMsduInfoByWlanIdx(IN struct ADAPTER
-				      *prAdapter, IN uint8_t ucWlanIndex);
-
 void nicFreePendingTxMsduInfoByBssIdx(IN struct ADAPTER
 				      *prAdapter, IN uint8_t ucBssIndex);
 
@@ -319,8 +316,7 @@ void nicSetAvailablePhyTypeSet(IN struct ADAPTER
 /*----------------------------------------------------------------------------*/
 /* MGMT and System Service Control                                            */
 /*----------------------------------------------------------------------------*/
-void nicInitSystemService(IN struct ADAPTER *prAdapter,
-				   IN const u_int8_t bAtResetFlow);
+void nicInitSystemService(IN struct ADAPTER *prAdapter);
 
 void nicResetSystemService(IN struct ADAPTER *prAdapter);
 
@@ -343,7 +339,7 @@ nicConfigPowerSaveProfile(IN struct ADAPTER *prAdapter,
 
 uint32_t
 nicConfigProcSetCamCfgWrite(IN struct ADAPTER *prAdapter,
-		IN u_int8_t enabled, IN uint8_t ucBssIndex);
+		IN u_int8_t enabled);
 
 uint32_t nicEnterCtiaMode(IN struct ADAPTER *prAdapter,
 		u_int8_t fgEnterCtia, u_int8_t fgEnCmdEvent);
@@ -412,6 +408,12 @@ nicRlmArUpdateParms(IN struct ADAPTER *prAdapter,
 		    IN uint32_t u4ArSysParam0,
 		    IN uint32_t u4ArSysParam1, IN uint32_t u4ArSysParam2,
 		    IN uint32_t u4ArSysParam3);
+
+/*----------------------------------------------------------------------------*/
+/* Enable/Disable Roaming                                                     */
+/*----------------------------------------------------------------------------*/
+uint32_t nicRoamingUpdateParams(IN struct ADAPTER
+				*prAdapter, IN uint32_t u4EnableRoaming);
 
 /*----------------------------------------------------------------------------*/
 /* Link Quality Updating                                                      */

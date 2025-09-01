@@ -168,9 +168,6 @@ uint32_t authCalculateRSNIELen(struct ADAPTER *prAdapter, uint8_t ucBssIdx,
 void authAddRSNIE(IN struct ADAPTER *prAdapter,
 		  IN OUT struct MSDU_INFO *prMsduInfo);
 
-uint32_t authAddRSNIE_impl(IN struct ADAPTER *prAdapter,
-		  IN OUT struct MSDU_INFO *prMsduInfo);
-
 void authHandleFtIEs(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb,
 		     struct IE_HDR *prIEHdr);
 

@@ -136,17 +136,11 @@ typedef enum {
 typedef enum {
 	WIFI_SUBCMD_GET_CHANNEL_LIST = ANDROID_NL80211_SUBCMD_WIFI_RANGE_START,
 
-	WIFI_SUBCMD_GET_FEATURE_SET,                     /* 0x0002 */
-	WIFI_SUBCMD_GET_FEATURE_SET_MATRIX,              /* 0x0003 */
-	WIFI_SUBCMD_SET_PNO_RANDOM_MAC_OUI,              /* 0x0004 */
-	WIFI_SUBCMD_NODFS_SET,                           /* 0x0005 */
-	WIFI_SUBCMD_SET_COUNTRY_CODE,                    /* 0x0006 */
-	WIFI_SUBCMD_SET_RSSI_MONITOR,			 /* 0x0007 */
-
-	WIFI_SUBCMD_GET_ROAMING_CAPABILITIES,            /* 0x0008 */
-	WIFI_SUBCMD_CONFIG_ROAMING = 0x000a,		 /* 0x000a */
-	WIFI_SUBCMD_ENABLE_ROAMING = 0x000b,		 /* 0x000b */
-	WIFI_SUBCMD_SELECT_TX_POWER_SCENARIO,		 /* 0x000c */
+	WIFI_SUBCMD_GET_FEATURE_SET,					 /* 0x0001 */
+	WIFI_SUBCMD_GET_FEATURE_SET_MATRIX,			 /* 0x0002 */
+	WIFI_SUBCMD_SET_PNO_RANDOM_MAC_OUI,			 /* 0x0003 */
+	WIFI_SUBCMD_NODFS_SET,							 /* 0x0004 */
+	WIFI_SUBCMD_SET_COUNTRY_CODE,					 /* 0x0005 */
 	/* Add more sub commands here */
 
 } WIFI_SUB_COMMAND;
@@ -172,19 +166,6 @@ typedef enum {
 	LSTATS_SUBCMD_GET_INFO = ANDROID_NL80211_SUBCMD_LSTATS_RANGE_START,
 } LSTATS_SUB_COMMAND;
 
-
-/* moved from wifi_logger.cpp */
-enum DEBUG_SUB_COMMAND {
-	LOGGER_START_LOGGING = ANDROID_NL80211_SUBCMD_DEBUG_RANGE_START,
-	LOGGER_GET_VER
-};
-
-/* moved from wifi_logger.cpp */
-enum LOGGER_ATTRIBUTE {
-	LOGGER_ATTRIBUTE_DRIVER_VER,
-	LOGGER_ATTRIBUTE_FW_VER
-};
-
 typedef enum {
 	GSCAN_EVENT_SIGNIFICANT_CHANGE_RESULTS,
 	GSCAN_EVENT_HOTLIST_RESULTS_FOUND,
@@ -196,7 +177,7 @@ typedef enum {
 } WIFI_VENDOR_EVENT;
 
 typedef enum {
-	WIFI_ATTRIBUTE_BAND = 1,
+	WIFI_ATTRIBUTE_BAND,
 	WIFI_ATTRIBUTE_NUM_CHANNELS,
 	WIFI_ATTRIBUTE_CHANNEL_LIST,
 
@@ -204,18 +185,7 @@ typedef enum {
 	WIFI_ATTRIBUTE_FEATURE_SET,
 	WIFI_ATTRIBUTE_PNO_RANDOM_MAC_OUI,
 	WIFI_ATTRIBUTE_NODFS_VALUE,
-	WIFI_ATTRIBUTE_COUNTRY_CODE,
-
-	WIFI_ATTRIBUTE_MAX_RSSI,
-	WIFI_ATTRIBUTE_MIN_RSSI,
-	WIFI_ATTRIBUTE_RSSI_MONITOR_START,
-
-	WIFI_ATTRIBUTE_ROAMING_CAPABILITIES,
-	WIFI_ATTRIBUTE_ROAMING_BLACKLIST_NUM,
-	WIFI_ATTRIBUTE_ROAMING_BLACKLIST_BSSID,
-	WIFI_ATTRIBUTE_ROAMING_WHITELIST_NUM,
-	WIFI_ATTRIBUTE_ROAMING_WHITELIST_SSID,
-	WIFI_ATTRIBUTE_ROAMING_STATE
+	WIFI_ATTRIBUTE_COUNTRY_CODE
 
 } WIFI_ATTRIBUTE;
 
@@ -312,8 +282,6 @@ typedef enum {
 
 #define MAX_BUFFERED_GSCN_RESULTS 5
 
-#define MAX_FW_ROAMING_BLACKLIST_SIZE	16
-#define MAX_FW_ROAMING_WHITELIST_SIZE	16
 /*******************************************************************************
 *                             D A T A   T Y P E S
 ********************************************************************************
@@ -334,8 +302,6 @@ typedef INT_32 wifi_rssi;
 *                           MACROS
 ********************************************************************************
 */
-
-#if KERNEL_VERSION(3, 5, 0) <= LINUX_VERSION_CODE
 /*
 * #define NLA_PUT(skb, attrtype, attrlen, data) \
 *	do { \
@@ -365,7 +331,6 @@ typedef INT_32 wifi_rssi;
 #define NLA_PUT_U64(skb, attrtype, value) \
 	NLA_PUT_TYPE(skb, NLA_PUT_DATE_U64, attrtype, value)
 
-#endif
 
 /********************************************************************************
 *				P R I V A T E   D A T A
@@ -709,18 +674,6 @@ int mtk_cfg80211_vendor_get_channel_list(struct wiphy *wiphy, struct wireless_de
 int mtk_cfg80211_vendor_set_country_code(struct wiphy *wiphy, struct wireless_dev *wdev,
 					 const void *data, int data_len);
 
-int mtk_cfg80211_vendor_get_roaming_capabilities(struct wiphy *wiphy,
-				 struct wireless_dev *wdev,
-				 const void *data, int data_len);
-
-int mtk_cfg80211_vendor_config_roaming(struct wiphy *wiphy,
-				 struct wireless_dev *wdev,
-				 const void *data, int data_len);
-
-int mtk_cfg80211_vendor_enable_roaming(struct wiphy *wiphy,
-				       struct wireless_dev *wdev,
-				       const void *data, int data_len);
-
 
 int mtk_cfg80211_vendor_llstats_get_info(struct wiphy *wiphy, struct wireless_dev *wdev,
 					const void *data, int data_len);
@@ -743,16 +696,4 @@ int mtk_cfg80211_vendor_event_hotlist_ap_found(struct wiphy *wiphy, struct wirel
 int mtk_cfg80211_vendor_event_hotlist_ap_lost(struct wiphy *wiphy, struct wireless_dev *wdev,
 					P_PARAM_WIFI_GSCAN_RESULT pdata, UINT_32 data_len);
 
-int mtk_cfg80211_vendor_get_supported_feature_set(
-	struct wiphy *wiphy, struct wireless_dev *wdev,
-	const void *data, int data_len);
-int mtk_cfg80211_vendor_set_tx_power_scenario(
-	struct wiphy *wiphy, struct wireless_dev *wdev,
-	const void *data, int data_len);
-int mtk_cfg80211_vendor_get_version(struct wiphy *wiphy,
-				    struct wireless_dev *wdev,
-				    const void *data, int data_len);
-int mtk_cfg80211_vendor_set_scan_mac_oui(struct wiphy *wiphy,
-				 struct wireless_dev *wdev,
-				 const void *data, int data_len);
 #endif				/* _GL_VENDOR_H */

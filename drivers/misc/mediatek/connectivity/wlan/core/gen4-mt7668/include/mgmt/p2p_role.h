@@ -416,7 +416,4 @@ VOID
 p2pProcessEvent_UpdateNOAParam(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBssIdx, IN P_EVENT_UPDATE_NOA_PARAMS_T
 			       prEventUpdateNoaParam);
 
-VOID
-p2pProcessPreSuspendFlow(IN P_ADAPTER_T prAdapter);
-
 #endif

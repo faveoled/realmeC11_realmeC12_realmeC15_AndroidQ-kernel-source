@@ -106,7 +106,7 @@ ENUM_STP_TX_IF_TYPE __weak wmt_plat_get_comm_if_type(VOID)
 	return STP_MAX_IF_TX;
 }
 
-MTK_WCN_BOOL mtk_wcn_stp_psm_dbg_level(INT32 dbglevel)
+MTK_WCN_BOOL mtk_wcn_stp_psm_dbg_level(UINT32 dbglevel)
 {
 	if (dbglevel >= 0 && dbglevel <= 4) {
 		gPsmDbgLevel = dbglevel;
@@ -961,9 +961,6 @@ static inline INT32 _stp_psm_wait_wmt_event_wq(MTKSTP_PSM_T *stp_psm)
 		STP_PSM_PR_DBG("sleep-wake_lock(%d)\n", osal_wake_lock_count(&stp_psm->wake_lock));
 		osal_wake_unlock(&stp_psm->wake_lock);
 		STP_PSM_PR_DBG("sleep-wake_lock#(%d)\n", osal_wake_lock_count(&stp_psm->wake_lock));
-
-		if (osal_wake_lock_count(&stp_psm->wake_lock) == 0 && stp_psm->update_wmt_fw_patch_chip_rst != NULL)
-			stp_psm->update_wmt_fw_patch_chip_rst();
 	} else if (osal_test_bit(STP_PSM_WMT_EVENT_ROLL_BACK_EN, &stp_psm->flag)) {
 		osal_clear_bit(STP_PSM_WMT_EVENT_ROLL_BACK_EN, &stp_psm->flag);
 		_stp_psm_dbg_dmp_in(g_stp_psm_dbg, stp_psm->flag.data, __LINE__);
@@ -1346,13 +1343,9 @@ static inline INT32 _stp_psm_do_wait(MTKSTP_PSM_T *stp_psm, MTKSTP_PSM_STATE_T s
 	osal_get_local_time(&sec, &usec);
 	while (_stp_psm_get_state(stp_psm) != state && i < limit && mtk_wcn_stp_is_enable()) {
 		i++;
-		#ifndef VENDOR_EDIT
-		//Pan.Zhang@PSW.CN.WiFi.Basic.Log.1120976, 2017/09/27,
-		//Remove for reduce useless log.
 		if (i < 3)
 			STP_PSM_PR_INFO("STP is waiting state for %s, i=%d, state = %d\n",
 					  g_psm_state[state], i, _stp_psm_get_state(stp_psm));
-		#endif /* VENDOR_EDIT */
 		osal_sleep_ms(POLL_WAIT);
 		if (i == 10) {
 			STP_PSM_PR_WARN("-Wait for %s takes %d msec\n", g_psm_state[state], i * POLL_WAIT);
@@ -1370,13 +1363,9 @@ static inline INT32 _stp_psm_do_wait(MTKSTP_PSM_T *stp_psm, MTKSTP_PSM_STATE_T s
 		_stp_psm_opid_dbg_out_printk(g_stp_psm_opid_dbg);
 		return STP_PSM_OPERATION_FAIL;
 	}
-	#ifndef VENDOR_EDIT
-	//Pan.Zhang@PSW.CN.WiFi.Basic.Log.1120976, 2017/09/27,
-	//Remove for reduce useless log.
 	if (i > 0)
 		STP_PSM_PR_INFO("+Total waits for %s takes %llu usec\n",
 					g_psm_state[state], osal_elapsed_us(sec, usec));
-	#endif /* VENDOR_EDIT */
 	return STP_PSM_OPERATION_SUCCESS;
 }
 
@@ -1948,7 +1937,6 @@ MTKSTP_PSM_T *stp_psm_init(VOID)
 	stp_psm->wmt_notify = wmt_lib_ps_stp_cb;
 	stp_psm->is_wmt_quick_ps_support = wmt_lib_is_quick_ps_support;
 	stp_psm->idle_time_to_sleep = STP_PSM_IDLE_TIME_SLEEP;
-	stp_psm->update_wmt_fw_patch_chip_rst = wmt_lib_update_fw_patch_chip_rst;
 	stp_psm->flag.data = 0;
 	stp_psm->stp_tx_cb = NULL;
 	stp_psm_set_sleep_enable(stp_psm);

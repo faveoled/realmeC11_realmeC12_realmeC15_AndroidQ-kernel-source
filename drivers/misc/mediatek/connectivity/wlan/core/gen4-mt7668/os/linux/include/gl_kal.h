@@ -73,6 +73,7 @@
 */
 #include "config.h"
 #include "gl_typedef.h"
+#include "gl_os.h"
 #include "gl_wext_priv.h"
 #include "link.h"
 #include "nic/mac.h"
@@ -95,7 +96,6 @@ extern struct semaphore g_halt_sem;
 extern int g_u4HaltFlag;
 
 extern struct delayed_work sched_workq;
-extern u_int8_t g_fgIsOid;
 
 /*******************************************************************************
 *                              C O N S T A N T S
@@ -206,8 +206,7 @@ typedef enum _ENUM_SPIN_LOCK_CATEGORY_E {
 	SPIN_LOCK_TX,
 	/* TX/RX Direct : BEGIN */
 	SPIN_LOCK_TX_DIRECT,
-	SPIN_LOCK_TX_DESC,
-	SPIN_LOCK_RX_DIRECT_REORDER,
+	SPIN_LOCK_RX_DIRECT,
 	/* TX/RX Direct : END */
 	SPIN_LOCK_IO_REQ,
 	SPIN_LOCK_INT,
@@ -215,8 +214,6 @@ typedef enum _ENUM_SPIN_LOCK_CATEGORY_E {
 	SPIN_LOCK_MGT_BUF,
 	SPIN_LOCK_MSG_BUF,
 	SPIN_LOCK_STA_REC,
-	SPIN_LOCK_STA_RECOFAP,
-	SPIN_LOCK_REQ_LIST,
 
 	SPIN_LOCK_MAILBOX,
 	SPIN_LOCK_TIMER,
@@ -225,7 +222,6 @@ typedef enum _ENUM_SPIN_LOCK_CATEGORY_E {
 
 	SPIN_LOCK_EHPI_BUS,	/* only for EHPI */
 	SPIN_LOCK_NET_DEV,
-	SPIN_LOCK_CHIP_RST,
 	SPIN_LOCK_NUM
 } ENUM_SPIN_LOCK_CATEGORY_E;
 
@@ -233,10 +229,7 @@ typedef enum _ENUM_MUTEX_CATEGORY_E {
 	MUTEX_TX_CMD_CLEAR,
 	MUTEX_TX_DATA_DONE_QUE,
 	MUTEX_DEL_INF,
-#if CFG_SUPPORT_CSI
-	MUTEX_CSI_BUFFER,
-#endif
-
+	MUTEX_CHIP_RST,
 	MUTEX_NUM
 } ENUM_MUTEX_CATEGORY_E;
 
@@ -678,9 +671,9 @@ static inline void kalCfg80211ScanDone(struct cfg80211_scan_request *request,
 /* Move memory block with specific size */
 #define kalMemMove(pvDst, pvSrc, u4Size)            memmove(pvDst, pvSrc, u4Size)
 
-#if KERNEL_VERSION(4, 0, 0) <= LINUX_VERSION_CODE
+
 #define strnicmp(s1, s2, n)                         strncasecmp(s1, s2, n)
-#endif
+
 
 /* string operation */
 #define kalStrCpy(dest, src)                        strcpy(dest, src)
@@ -780,8 +773,6 @@ static inline void kalCfg80211ScanDone(struct cfg80211_scan_request *request,
 
 #define WLAN_TAG                                    "[wlan]"
 #define kalPrint(_Fmt...)                           printk(WLAN_TAG _Fmt)
-#define limitedKalPrint(_Fmt...)\
-	pr_info_ratelimited(WLAN_TAG _Fmt)
 
 #define kalBreakPoint() \
 do { \
@@ -816,8 +807,6 @@ do { \
 	{ \
 		(_Interval) += KAL_GET_TIME_INTERVAL(); \
 	}
-
-#define KAL_GET_HOST_CLOCK()		local_clock()
 
 /*******************************************************************************
 *                  F U N C T I O N   D E C L A R A T I O N S
@@ -886,12 +875,6 @@ kalReadyOnChannel(IN P_GLUE_INFO_T prGlueInfo,
 VOID
 kalRemainOnChannelExpired(IN P_GLUE_INFO_T prGlueInfo,
 			  IN UINT_64 u8Cookie, IN ENUM_BAND_T eBand, IN ENUM_CHNL_EXT_T eSco, IN UINT_8 ucChannelNum);
-
-#if CFG_SUPPORT_DFS
-VOID
-kalIndicateChannelSwitch(IN P_GLUE_INFO_T prGlueInfo, IN ENUM_CHNL_EXT_T eSco,
-			     IN UINT_8 ucChannelNum);
-#endif
 
 VOID
 kalIndicateMgmtTxStatus(IN P_GLUE_INFO_T prGlueInfo,
@@ -1050,11 +1033,8 @@ VOID kalScanDone(IN P_GLUE_INFO_T prGlueInfo, IN ENUM_KAL_NETWORK_TYPE_INDEX_T e
 
 UINT_32 kalRandomNumber(VOID);
 
-#if KERNEL_VERSION(4, 14, 0) <= LINUX_VERSION_CODE
-void kalTimeoutHandler(struct timer_list *timer);
-#else
 VOID kalTimeoutHandler(unsigned long arg);
-#endif
+
 VOID kalSetEvent(P_GLUE_INFO_T pr);
 
 VOID kalSetIntEvent(P_GLUE_INFO_T pr);
@@ -1247,8 +1227,6 @@ WLAN_STATUS kalCloseCorDumpFile(BOOLEAN fgIsN9);
 #if CFG_WOW_SUPPORT
 VOID kalWowInit(IN P_GLUE_INFO_T prGlueInfo);
 VOID kalWowProcess(IN P_GLUE_INFO_T prGlueInfo, UINT_8 enable);
-void kalMdnsProcess(IN P_GLUE_INFO_T prGlueInfo,
-		IN struct MDNS_PARAM_T *prMdnsParam);
 #endif
 
 int main_thread(void *data);
@@ -1260,30 +1238,17 @@ int rx_thread(void *data);
 UINT_64 kalGetBootTime(VOID);
 
 int kalMetInitProcfs(IN P_GLUE_INFO_T prGlueInfo);
-int kalMetRemoveProcfs(IN P_GLUE_INFO_T prGlueInfo);
+int kalMetRemoveProcfs(void);
 
 VOID kalFreeTxMsduWorker(struct work_struct *work);
 VOID kalFreeTxMsdu(P_ADAPTER_T prAdapter, P_MSDU_INFO_T prMsduInfo);
 
-#if KERNEL_VERSION(3, 0, 0) <= LINUX_VERSION_CODE
+
 /* since: 0b5c9db1b11d3175bb42b80663a9f072f801edf5 */
 static inline void kal_skb_reset_mac_len(struct sk_buff *skb)
 {
 	skb_reset_mac_len(skb);
 }
-#else
-static inline void kal_skb_reset_mac_len(struct sk_buff *skb)
-{
-	skb->mac_len = skb->network_header - skb->mac_header;
-}
-#endif
-
-static inline UINT_64 kalDivU64(UINT_64 dividend, UINT_32 divisor)
-{
-	return div_u64(dividend, divisor);
-}
-
-VOID kalInitDevWakeup(P_ADAPTER_T prAdapter, struct device *prDev);
 
 
 #endif /* _GL_KAL_H */

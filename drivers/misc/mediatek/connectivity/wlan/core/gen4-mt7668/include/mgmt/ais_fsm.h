@@ -72,11 +72,6 @@
 *                    E X T E R N A L   R E F E R E N C E S
 ********************************************************************************
 */
-#if CFG_DISCONN_DEBUG_FEATURE
-extern struct AIS_DISCONN_INFO_T g_rDisconnInfoTemp;
-extern UINT_8 g_DisconnInfoIdx;
-extern struct AIS_DISCONN_INFO_T *g_prDisconnInfo;
-#endif
 
 /*******************************************************************************
 *                              C O N S T A N T S
@@ -104,18 +99,9 @@ extern struct AIS_DISCONN_INFO_T *g_prDisconnInfo;
 #define AIS_BMC_MIN_TIMEOUT_VALID           TRUE
 
 #define AIS_JOIN_CH_GRANT_THRESHOLD         10
-#if CFG_SUPPORT_CFG80211_AUTH
-/* expand 4000 to 6000 to improve SAE connection success probability */
-#define AIS_JOIN_CH_REQUEST_INTERVAL        6000
-#else
 #define AIS_JOIN_CH_REQUEST_INTERVAL        4000
-#endif
 #define AIS_SCN_DONE_TIMEOUT_SEC            15 /* 15 for 2.4G + 5G */	/* 5 */
-#define AIS_BLACKLIST_TIMEOUT               15 /* seconds */
 
-#ifdef CFG_SUPPORT_ADJUST_JOIN_CH_REQ_INTERVAL
-#define AIS_JOIN_CH_REQUEST_MAX_INTERVAL    4000
-#endif
 /*******************************************************************************
 *                             D A T A   T Y P E S
 ********************************************************************************
@@ -138,46 +124,6 @@ typedef enum _ENUM_AIS_STATE_T {
 	AIS_STATE_REMAIN_ON_CHANNEL,
 	AIS_STATE_NUM
 } ENUM_AIS_STATE_T;
-
-/* these name of reasons code are the same as name in FW */
-enum BEACON_TIME_OUT_REASON_CODE_T {
-	BEACON_TIMEOUT_DUE_2_HW_BEACON_LOST_NONADHOC,
-	BEACON_TIMEOUT_DUE_2_HW_BEACON_LOST_ADHOC,
-	BEACON_TIMEOUT_DUE_2_HW_TSF_DRIFT,
-	BEACON_TIMEOUT_DUE_2_NULL_FRAME_THRESHOLD,
-	BEACON_TIMEOUT_DUE_2_AGING_THRESHOLD,
-	BEACON_TIMEOUT_DUE_2_BSSID_BEACON_PEIROD_NOT_ILLIGAL,
-	BEACON_TIMEOUT_DUE_2_CONNECTION_FAIL,
-	BEACON_TIMEOUT_DUE_2_ALLOCAT_NULL_PKT_FAIL_THRESHOLD,
-	BEACON_TIMEOUT_DUE_2_NO_TX_DONE_EVENT,
-	BEACON_TIMEOUT_DUE_2_UNSPECIF_REASON,
-	BEACON_TIMEOUT_DUE_2_SET_CHIP,
-	BEACON_TIMEOUT_DUE_2_RESERVED = 0xF,
-};
-
-#if CFG_SUPPORT_CSI
-enum CSI_DATA_TLV_TAG {
-	CSI_DATA_VER,
-	CSI_DATA_TYPE,
-	CSI_DATA_TS,
-	CSI_DATA_RSSI,
-	CSI_DATA_SNR,
-	CSI_DATA_DBW,
-	CSI_DATA_CH_IDX,
-	CSI_DATA_TA,
-	CSI_DATA_I,
-	CSI_DATA_Q,
-	CSI_DATA_EXTRA_INFO,
-	CSI_DATA_RSVD1,
-	CSI_DATA_RSVD2,
-	CSI_DATA_RSVD3,
-	CSI_DATA_RSVD4,
-	CSI_DATA_TX_IDX,
-	CSI_DATA_RX_IDX,
-	CSI_DATA_FRAME_MODE,
-	CSI_DATA_TLV_TAG_NUM,
-};
-#endif
 
 typedef struct _MSG_AIS_ABORT_T {
 	MSG_HDR_T rMsgHdr;	/* Must be the first member */
@@ -219,27 +165,6 @@ typedef struct _AIS_MGMT_TX_REQ_INFO_T {
 	P_MSDU_INFO_T prMgmtTxMsdu;
 	UINT_64 u8Cookie;
 } AIS_MGMT_TX_REQ_INFO_T, *P_AIS_MGMT_TX_REQ_INFO_T;
-
-struct AIS_BLACKLIST_ITEM {
-	LINK_ENTRY_T rLinkEntry;
-
-	UINT_8 aucBSSID[MAC_ADDR_LEN];
-	UINT_16 u2DeauthReason;
-	UINT_16 u2AuthStatus;
-	UINT_8 ucCount;
-	UINT_8 ucSSIDLen;
-	UINT_8 aucSSID[32];
-	OS_SYSTIME rAddTime;
-	UINT_64 u8DisapperTime;
-	UINT_8 blackListSource;
-};
-
-enum _BLACK_LIST_SOURCE {
-	AIS_BLACK_LIST_FROM_DRIVER = 1,
-	AIS_BLACK_LIST_FROM_FWK = 2,
-
-	AIS_BLACK_LIST_MAX = 1 << 7
-};
 
 typedef struct _AIS_FSM_INFO_T {
 	ENUM_AIS_STATE_T ePreviousState;
@@ -314,22 +239,6 @@ typedef struct _AIS_FSM_INFO_T {
 	/* for roaming target */
 	PARAM_SSID_T rRoamingSSID;
 } AIS_FSM_INFO_T, *P_AIS_FSM_INFO_T;
-
-#if CFG_DISCONN_DEBUG_FEATURE
-struct AIS_DISCONN_INFO_T {
-	struct timeval tv;
-	UINT_8 ucTrigger;
-	UINT_8 ucDisConnReason;
-	UINT_8 ucBcnTimeoutReason;
-	UINT_8 ucDisassocReason;
-	UINT_16 u2DisassocSeqNum;
-	STA_RECORD_T rStaRec;
-	PARAM_RSSI rBcnRssi;
-	struct CMD_NOISE_HISTOGRAM_REPORT rNoise;
-	PARAM_HW_WLAN_INFO_T rHwInfo;
-	PARAM_GET_STA_STA_STATISTICS rStaStatistics;
-};
-#endif
 
 /*******************************************************************************
 *                            P U B L I C   D A T A
@@ -437,9 +346,7 @@ aisFsmRunEventMgmtFrameTxDone(IN P_ADAPTER_T prAdapter,
 /* Disconnection Handling                                                     */
 /*----------------------------------------------------------------------------*/
 VOID aisFsmDisconnect(IN P_ADAPTER_T prAdapter, IN BOOLEAN fgDelayIndication);
-#if CFG_DISCONN_DEBUG_FEATURE
-VOID aisCollectDisconnInfo(IN P_ADAPTER_T prAdapter);
-#endif
+
 /*----------------------------------------------------------------------------*/
 /* Event Handling                                                             */
 /*----------------------------------------------------------------------------*/
@@ -472,10 +379,6 @@ VOID aisFsmRunEventJoinTimeout(IN P_ADAPTER_T prAdapter, ULONG ulParamPtr);
 VOID aisFsmRunEventChannelTimeout(IN P_ADAPTER_T prAdapter, ULONG ulParamPtr);
 
 VOID aisFsmRunEventDeauthTimeout(IN P_ADAPTER_T prAdapter, ULONG ulParamPtr);
-
-#if CFG_SUPPORT_LAST_SEC_MCS_INFO
-VOID aisRxMcsCollectionTimeout(IN P_ADAPTER_T prAdapter, ULONG ulParamPtr);
-#endif
 
 /*----------------------------------------------------------------------------*/
 /* OID/IOCTL Handling                                                         */
@@ -511,22 +414,6 @@ enum _ENUM_AIS_STATE_T aisFsmStateSearchAction(IN struct _ADAPTER_T *prAdapter, 
 #if defined(CFG_TEST_MGMT_FSM) && (CFG_TEST_MGMT_FSM != 0)
 VOID aisTest(VOID);
 #endif /* CFG_TEST_MGMT_FSM */
-
-VOID aisRemoveBlacklistBySource(P_ADAPTER_T prAdapter, enum
-_BLACK_LIST_SOURCE source);
-struct AIS_BLACKLIST_ITEM *aisAddBlacklist(P_ADAPTER_T prAdapter,
-P_BSS_DESC_T prBssDesc,
-						enum _BLACK_LIST_SOURCE source);
-struct AIS_BLACKLIST_ITEM *aisAddBlacklistByBssid(P_ADAPTER_T prAdapter,
-UINT_8 aucBSSID[],
-						enum _BLACK_LIST_SOURCE source);
-VOID aisRemoveBlackList(P_ADAPTER_T prAdapter, P_BSS_DESC_T prBssDesc, enum
-_BLACK_LIST_SOURCE source);
-VOID aisRemoveTimeoutBlacklist(P_ADAPTER_T prAdapter);
-struct AIS_BLACKLIST_ITEM *aisQueryBlackList(P_ADAPTER_T prAdapter,
-P_BSS_DESC_T prBssDesc);
-struct AIS_BLACKLIST_ITEM *aisQueryBlackListByBssid(P_ADAPTER_T prAdapter,
-UINT_8 aucBSSID[]);
 /*******************************************************************************
 *                              F U N C T I O N S
 ********************************************************************************

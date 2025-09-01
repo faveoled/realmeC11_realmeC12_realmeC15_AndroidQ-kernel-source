@@ -336,10 +336,8 @@ static int32_t ResponseToQA(struct HQA_CMD_FRAME
 			    IN union iwreq_data *prIwReqData, int32_t i4Length,
 			    int32_t i4Status)
 {
-	if (!prIwReqData)
-		return -EINVAL;
-
 	HqaCmdFrame->Length = ntohs((i4Length));
+
 	i4Status = ntohs((i4Status));
 	memcpy(HqaCmdFrame->Data, &i4Status, 2);
 
@@ -349,9 +347,6 @@ static int32_t ResponseToQA(struct HQA_CMD_FRAME
 				   sizeof((HqaCmdFrame)->Length) +
 				   sizeof((HqaCmdFrame)->Sequence) +
 				   ntohs((HqaCmdFrame)->Length);
-
-	if (prIwReqData->data.length == 0)
-		return -EFAULT;
 
 	if (copy_to_user(prIwReqData->data.pointer,
 			 (uint8_t *) (HqaCmdFrame), prIwReqData->data.length)) {
@@ -1381,89 +1376,6 @@ static int32_t HQA_LowPower(struct net_device *prNetDev,
 	return i4Ret;
 }
 
-#if CFG_SUPPORT_ANT_SWAP
-/*----------------------------------------------------------------------------*/
-/*!
- * \brief  QA Agent For query ant swap capablity
- *
- * \param[in] prNetDev		Pointer to the Net Device
- * \param[in] prIwReqData
- * \param[in] HqaCmdFrame	Ethernet Frame Format receive from QA Tool DLL
- * \param[out] None
- *
- * \retval 0			On success.
- */
-/*----------------------------------------------------------------------------*/
-static int32_t HQA_GetAntSwapCapability(struct net_device *prNetDev,
-			    IN union iwreq_data *prIwReqData,
-			    struct HQA_CMD_FRAME *HqaCmdFrame)
-{
-	int32_t i4Ret = 0;
-	uint32_t value = 0;
-	struct GLUE_INFO *prGlueInfo = NULL;
-	struct mt66xx_chip_info *prChipInfo = NULL;
-
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-	if (!prGlueInfo || !prGlueInfo->prAdapter) {
-		DBGLOG(RFTEST, ERROR, "prGlueInfo or prAdapter is NULL\n");
-		return -EFAULT;
-	}
-
-	prChipInfo = prGlueInfo->prAdapter->chip_info;
-	if (!prChipInfo) {
-		DBGLOG(RFTEST, ERROR, "prChipInfo is NULL\n");
-		return -EFAULT;
-	}
-
-	DBGLOG(RFTEST, INFO, "HQA_GetAntSwapCapability [%d]\n",
-				prGlueInfo->prAdapter->fgIsSupportAntSwp);
-
-	if (prGlueInfo->prAdapter->fgIsSupportAntSwp)
-		value = ntohl(prChipInfo->ucMaxSwapAntenna);
-	else
-		value = 0;
-
-	memcpy(HqaCmdFrame->Data + 2, &value, sizeof(value));
-	ResponseToQA(HqaCmdFrame, prIwReqData, 2 + sizeof(value), i4Ret);
-	return i4Ret;
-}
-
-/*----------------------------------------------------------------------------*/
-/*!
- * \brief  QA Agent For setting antenna swap
- *
- * \param[in] prNetDev		Pointer to the Net Device
- * \param[in] prIwReqData
- * \param[in] HqaCmdFrame	Ethernet Frame Format receive from QA Tool DLL
- * \param[out] None
- *
- * \retval 0			On success.
- */
-/*----------------------------------------------------------------------------*/
-static int32_t HQA_SetAntSwap(struct net_device *prNetDev,
-			    IN union iwreq_data *prIwReqData,
-			    struct HQA_CMD_FRAME *HqaCmdFrame)
-{
-	int32_t i4Ret = 0;
-	uint32_t u4Ant = 0, u4Band = 0;
-
-	memcpy(&u4Band, HqaCmdFrame->Data, sizeof(uint32_t));
-	memcpy(&u4Ant, HqaCmdFrame->Data +  sizeof(uint32_t), sizeof(uint32_t));
-	u4Ant = ntohl(u4Ant);
-
-	DBGLOG(RFTEST, INFO, "Band = %d, Ant = %d\n", u4Band, u4Ant);
-
-	i4Ret = MT_ATESetAntSwap(prNetDev, u4Ant);
-	if (i4Ret != WLAN_STATUS_SUCCESS)
-		return -EFAULT;
-
-	ResponseToQA(HqaCmdFrame, prIwReqData, 2, i4Ret);
-	return i4Ret;
-
-}
-#endif
-
-
 static HQA_CMD_HANDLER HQA_CMD_SET1[] = {
 	/* cmd id start from 0x1100 */
 	HQA_SetChannel,		/* 0x1100 */
@@ -1478,9 +1390,6 @@ static HQA_CMD_HANDLER HQA_CMD_SET1[] = {
 	HQA_SetTssiOnOff,	/* 0x1109 */
 	HQA_SetRxHighLowTemperatureCompensation,	/* 0x110A */
 	HQA_LowPower,		/* 0x110B */
-	NULL,			/* 0x110C */
-	HQA_GetAntSwapCapability,	/* 0x110D */
-	HQA_SetAntSwap,		/* 0x110E */
 };
 
 /*----------------------------------------------------------------------------*/
@@ -2071,8 +1980,6 @@ static int32_t HQA_RfRegBulkRead(struct net_device
 		u4Offset = u4Offset | 0x99900000;
 	else if (u4WfSel == 1)
 		u4Offset = u4Offset | 0x99910000;
-	else if (u4WfSel == 15)
-		u4Offset = u4Offset | 0x999F0000;
 
 
 	for (u4Index = 0; u4Index < u4Length; u4Index++) {
@@ -2195,12 +2102,7 @@ static int32_t HQA_ReadEEPROM(struct net_device *prNetDev,
 
 #if  (CFG_EEPROM_PAGE_ACCESS == 1)
 	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-	if (!prGlueInfo) {
-		log_dbg(RFTEST, ERROR, "prGlueInfo is NULL\n");
-		ResponseToQA(HqaCmdFrame, prIwReqData, 2, rStatus);
-		return rStatus;
-	}
-
+	ASSERT(prGlueInfo);
 	if (prGlueInfo->prAdapter &&
 	    prGlueInfo->prAdapter->chip_info &&
 	    !prGlueInfo->prAdapter->chip_info->is_support_efuse) {
@@ -3163,36 +3065,6 @@ static int32_t HQA_DBDCTXTone(struct net_device *prNetDev,
 	return i4Ret;
 }
 
-static uint8_t _whPhyGetPrimChOffset(uint32_t u4BW,
-						   uint32_t u4Pri_Ch,
-						   uint32_t u4Cen_ch)
-{
-	 uint8_t ucPrimChOffset = 0;
-
-	/* BW Mapping in QA Tool
-	 * 0: BW20
-	 * 1: BW40
-	 * 2: BW80
-	 * 3: BW10
-	 * 4: BW5
-	 * 5: BW160C
-	 * 6: BW160NC
-	 */
-	u4Pri_Ch &= 0xFF;
-	u4Cen_ch &= 0xFF;
-	switch (u4BW) {
-	case 1:
-		ucPrimChOffset = (u4Pri_Ch < u4Cen_ch) ? 0 : 1;
-		break;
-	case 2:
-		ucPrimChOffset = (((u4Pri_Ch - u4Cen_ch) + 6) >> 2);
-		break;
-	default:
-		break;
-	}
-	return ucPrimChOffset;
-}
-
 /*----------------------------------------------------------------------------*/
 /*!
  * \brief  QA Agent For
@@ -3216,7 +3088,6 @@ static int32_t HQA_DBDCContinuousTX(struct net_device
 	uint32_t u4Pri_Ch = 0, u4Rate = 0, u4Central_Ch = 0,
 		 u4TxfdMode = 0, u4Freq = 0;
 	uint32_t u4BufLen = 0;
-	uint8_t ucPriChOffset = 0;
 	struct GLUE_INFO *prGlueInfo = NULL;
 	uint32_t rStatus = WLAN_STATUS_SUCCESS;
 	struct PARAM_MTK_WIFI_TEST_STRUCT rRfATInfo;
@@ -3273,13 +3144,7 @@ static int32_t HQA_DBDCContinuousTX(struct net_device
 		MT_ATESetDBDCBandIndex(prNetDev, u4Band);
 		u4Freq = nicChannelNum2Freq(u4Central_Ch);
 		MT_ATESetChannel(prNetDev, 0, u4Freq);
-		ucPriChOffset = _whPhyGetPrimChOffset(u4BW,
-						      u4Pri_Ch,
-						      u4Central_Ch);
-		DBGLOG(RFTEST, INFO,
-		       "QA_AGENT HQA_DBDCContinuousTX ucPriChOffset : %d\n",
-		       ucPriChOffset);	/* ok */
-		MT_ATEPrimarySetting(prNetDev, ucPriChOffset);
+		MT_ATEPrimarySetting(prNetDev, u4Pri_Ch);
 
 		if (u4Phymode == 1) {
 			u4Phymode = 0;
@@ -4346,23 +4211,10 @@ static int32_t HQA_GetChipID(struct net_device *prNetDev,
 	prAdapter = prGlueInfo->prAdapter;
 	prChipInfo = prAdapter->chip_info;
 	g_u4Chip_ID = prChipInfo->chip_id;
-	DBGLOG(RFTEST, INFO,
-	       "QA_AGENT IPVer= 0x%08x, Adie = 0x%08x\n",
-		prChipInfo->u4ChipIpVersion,
-		prChipInfo->u2ADieChipVersion);
-
-	/* Check A-Die information for mobile solution */
-	switch (prChipInfo->u2ADieChipVersion) {
-	case 0x6631:
-		u4ChipId = 0x00066310;	/* use 66310 to diff from gen3 6631 */
-		break;
-	case 0x6635:
-		u4ChipId = 0x0006635;	/* return A die directly */
-		break;
-	default:
-		u4ChipId = g_u4Chip_ID;
-		break;
-	}
+	if (prChipInfo->u4ChipIpVersion == CONNAC_CHIP_IP_VERSION)
+		u4ChipId = 0x00066310;
+	else
+		u4ChipId = 0x00006632;
 
 	DBGLOG(RFTEST, INFO,
 	       "QA_AGENT HQA_GetChipID ChipId = 0x%08x\n", u4ChipId);
@@ -7632,7 +7484,7 @@ int32_t connacSetICapStart(struct GLUE_INFO *prGlueInfo,
 	prICapInfo->u4EnBitWidth = 0;
 	prICapInfo->u4Architech = 1;
 	prICapInfo->u4PhyIdx = 0;
-#if 1
+#ifdef CONFIG_MTK_EMI
 	prICapInfo->u4EmiStartAddress =
 		(uint32_t) (gConEmiPhyBase & 0xFFFFFFFF);
 	prICapInfo->u4EmiEndAddress =
@@ -8877,18 +8729,15 @@ int priv_qa_agent(IN struct net_device *prNetDev,
 	struct HQA_CMD_FRAME *HqaCmdFrame;
 	uint32_t u4ATEMagicNum, u4ATEId, u4ATEData;
 
-	if (!prIwReqData || prIwReqData->data.length == 0) {
-		i4Status = -EINVAL;
-		goto ERROR0;
-	}
-
 	HqaCmdFrame = kmalloc(sizeof(*HqaCmdFrame), GFP_KERNEL);
+
 	if (!HqaCmdFrame) {
 		i4Status = -ENOMEM;
 		goto ERROR0;
 	}
 
 	memset(HqaCmdFrame, 0, sizeof(*HqaCmdFrame));
+
 	if (copy_from_user(HqaCmdFrame, prIwReqData->data.pointer,
 			   prIwReqData->data.length)) {
 		i4Status = -EFAULT;

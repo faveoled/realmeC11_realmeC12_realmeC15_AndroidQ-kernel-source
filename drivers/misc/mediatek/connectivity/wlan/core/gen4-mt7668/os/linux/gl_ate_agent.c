@@ -50,6 +50,17 @@
  *
  *****************************************************************************/
 /*
+ ***************************************************************************
+ * MediaTek Inc.
+ *
+ * All rights reserved. source code is an unpublished work and the
+ * use of a copyright notice does not imply otherwise. This source code
+ * contains confidential trade secret material of MediaTek. Any attemp
+ * or participation in deciphering, decoding, reverse engineering or in any
+ * way altering the source code is stricitly prohibited, unless the prior
+ * written consent of MediaTek, Inc. is obtained.
+ ***************************************************************************
+
 	Module Name:
 	gl_ate_agent.c
 */
@@ -1118,16 +1129,14 @@ int Set_TxBfProfilePnWrite(struct net_device *prNetDev, UINT_8 *prInBuf)
 
 	DBGLOG(RFTEST, ERROR, "MT6632 TxBfProfilePnWrite\n");
 
-	rv = sscanf(prInBuf,
-		   "%d:%hd:%hd:%hd:%hd:%hd:%hd:%hd:%hd:%hd:%hd:%hd:%hd:%hd",
+	rv = sscanf(prInBuf, "%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d",
 		   &ucProfileIdx, &u2bw, &au2XSTS[0], &au2XSTS[1], &au2XSTS[2], &au2XSTS[3],
 		   &au2XSTS[4], &au2XSTS[5], &au2XSTS[6], &au2XSTS[7], &au2XSTS[8], &au2XSTS[9], &au2XSTS[10],
 		   &au2XSTS[11]);
 	if (rv == 14) {
 		DBGLOG(RFTEST, ERROR,
 			"MT6632 TxBfProfilePnWrite prInBuf = %s, ucProfileIdx = %d, u2bw = %dau2XSTS[0]:%d, au2XSTS[1]:%d, au2XSTS[2]:%d, au2XSTS[3]:%d, au2XSTS[4]:%d, au2XSTS[5]:%d, au2XSTS[6]:%d, au2XSTS[7]:%d, au2XSTS[8]:%d, au2XSTS[9]:%d, au2XSTS[10]:%d, au2XSTS[11]:%d\n",
-		       prInBuf, ucProfileIdx, u2bw, au2XSTS[0], au2XSTS[1],
-		       au2XSTS[2], au2XSTS[3], au2XSTS[4], au2XSTS[5],
+		       ucProfileIdx, u2bw, au2XSTS[0], au2XSTS[1], au2XSTS[2], au2XSTS[3], au2XSTS[4], au2XSTS[5],
 		       au2XSTS[6], au2XSTS[7], au2XSTS[8], au2XSTS[9], au2XSTS[10], au2XSTS[11]);
 		i4Status = TxBfProfilePnWrite(prNetDev, ucProfileIdx, u2bw, au2XSTS);
 	} else
@@ -1151,8 +1160,7 @@ int Set_Trigger_Sounding_Proc(struct net_device *prNetDev, UINT_8 *prInBuf)
 	if (rv == 7) {
 		DBGLOG(RFTEST, ERROR,
 		       "MT6632 Set_Trigger_Sounding_Proc prInBuf = %s, ucSuMu = %d, ucNumSta = %d, ucSndInterval = %d, ucWLan0 = %d, ucWLan1 = %d, ucWLan2:%d, ucWLan3:%d\n",
-		       prInBuf, ucSuMu, ucNumSta, ucSndInterval, ucWLan0,
-		       ucWLan1, ucWLan2, ucWLan3);
+		       ucSuMu, ucNumSta, ucSndInterval, ucWLan0, ucWLan1, ucWLan2, ucWLan3);
 		i4Status = TxBfSounding(prNetDev, ucSuMu, ucNumSta, ucSndInterval, ucWLan0, ucWLan1, ucWLan2, ucWLan3);
 	} else
 		return -EINVAL;
@@ -1486,8 +1494,7 @@ int Set_MUCalLQ(struct net_device *prNetDev, UINT_8 *prInBuf)
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
 
 	rv = sscanf
-	    (prInBuf, "%x:%x:%x:%x:%x:%x:%x:%x:%x",
-	     &u4NumOfUser, &u4Bandwidth, &u4NssOfUser0, &u4NssOfUser1,
+	    (prInBuf, "%x:%x:%x:%x:%x:%x:%x:%x:%x:%x", &u4NumOfUser, &u4Bandwidth, &u4NssOfUser0, &u4NssOfUser1,
 	     &u4PfMuIdOfUser0, &u4PfMuIdOfUser1, &u4NumOfTxer, &u4SpeIndex, &u4GroupIndex);
 	if (rv == 9) {
 		DBGLOG(RFTEST, ERROR,

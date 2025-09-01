@@ -741,7 +741,7 @@ bool rlmDomainIsSameCountryCode(char *alpha2, u8 size_of_alpha2);
 const struct ieee80211_regdomain *rlmDomainSearchRegdomainFromLocalDataBase(char *alpha2);
 P_GLUE_INFO_T rlmDomainGetGlueInfo(void);
 bool rlmDomainIsEfuseUsed(void);
-UINT_8 rlmDomainGetChannelBw(UINT_8 channelNum);
+
 
 #if (CFG_SUPPORT_SINGLE_SKU_LOCAL_DB == 1)
 extern const struct mtk_regdomain *g_prRegRuleTable[];

@@ -17,8 +17,6 @@ ifeq ($(HIF),)
     HIF=sdio
 endif
 
-export CONFIG_MTK_PREALLOC_MEMORY=y
-
 export CONFIG_MTK_COMBO_WIFI_HIF=$(HIF)
 #MODULE_NAME := wlan_$(WIFI_TARGET)_$(HIF)
 #WLAN_CHIP_ID=$(MTK_COMBO_CHIP)
@@ -33,8 +31,6 @@ ccflags-y += -DCFG_SUPPORT_TSF_USING_BOOTTIME=1
 ccflags-y += -Werror
 ccflags-y:=$(filter-out -U$(WLAN_CHIP_ID),$(ccflags-y))
 ccflags-y += -DLINUX -D$(WLAN_CHIP_ID)
-
-
 
 #define log level
 CFG_DEFAULT_DBG_LEVEL=0x7
@@ -70,18 +66,6 @@ ifeq ($(CONFIG_MTK_AEE_FEATURE), y)
 else
     ccflags-y += -DCFG_SUPPORT_AEE=0
     $(info DCFG_SUPPORT_AEE=0)
-endif
-
-ifeq ($(CONFIG_MTK_WPA3_SUPPORT), y)
-    ccflags-y += -DCFG_SUPPORT_CFG80211_AUTH=1
-    ccflags-y += -DCFG_SUPPORT_SAE=1
-    ccflags-y += -DCFG_SUPPORT_OWE=1
-    ccflags-y += -DCFG_SUPPORT_SUITB=1
-else
-    ccflags-y += -DCFG_SUPPORT_CFG80211_AUTH=0
-    ccflags-y += -DCFG_SUPPORT_SAE=0
-    ccflags-y += -DCFG_SUPPORT_OWE=0
-    ccflags-y += -DCFG_SUPPORT_SUITB=0
 endif
 
 # Disable ASSERT() for user load, enable for others
@@ -176,7 +160,7 @@ endif
 #obj-y += $(MODULE_NAME).o
 #endif
 MODULE_NAME := wlan_drv_gen4_mt7668
-obj-m += $(MODULE_NAME).o
+obj-y += $(MODULE_NAME).o
 
 # ---------------------------------------------------
 # Directory List
@@ -287,7 +271,9 @@ MGMT_OBJS += $(MGMT_DIR)wapi.o
 
 ifeq ($(CONFIG_MTK_COMBO_WIFI_HIF), sdio)
 HIF_OBJS :=  $(HIF_DIR)arm.o \
-             $(HIF_DIR)sdio.o
+             $(HIF_DIR)sdio.o \
+             $(HIF_DIR)sdio_test_driver_core.o \
+             $(HIF_DIR)sdio_test_driver_ops.o
 else ifeq ($(CONFIG_MTK_COMBO_WIFI_HIF), pcie)
 HIF_OBJS :=  $(HIF_DIR)arm.o \
              $(HIF_DIR)pcie.o
@@ -304,17 +290,4 @@ $(MODULE_NAME)-objs  += $(HIF_OBJS)
 $(MODULE_NAME)-objs  += $(MGMT_OBJS)
 $(MODULE_NAME)-objs  += $(CHIPS_OBJS)
 
-#
-# mtprealloc
-#
-ifeq ($(CONFIG_MTK_PREALLOC_MEMORY), y)
-ccflags-y += -DCFG_PREALLOC_MEMORY
-ccflags-y += -I$(src)/prealloc/include
-MODULE_NAME_PREALLOC = $(MODULE_NAME)_prealloc
-PREALLOC_OBJS := prealloc/prealloc.o
-$(MODULE_NAME_PREALLOC)-objs += $(PREALLOC_OBJS)
-obj-m += $(MODULE_NAME_PREALLOC).o
-endif
 
-DRIVER_BUILD_DATE=$(shell date +%Y%m%d%H%M%S)
-ccflags-y += -DDRIVER_BUILD_DATE='"$(DRIVER_BUILD_DATE)"'

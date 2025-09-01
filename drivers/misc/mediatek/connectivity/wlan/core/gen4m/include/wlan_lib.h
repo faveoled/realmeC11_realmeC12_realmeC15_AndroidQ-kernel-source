@@ -76,89 +76,12 @@
 #include "rlm_domain.h"
 #include "nic_init_cmd_event.h"
 #include "fw_dl.h"
-#include "queue.h"
+
+
 /*******************************************************************************
  *                              C O N S T A N T S
  *******************************************************************************
  */
-/* These values must sync from Wifi HAL
- * /hardware/libhardware_legacy/include/hardware_legacy/wifi_hal.h
- */
-/* Basic infrastructure mode */
-#define WIFI_FEATURE_INFRA              (0x0001)
-/* Support for 5 GHz Band */
-#define WIFI_FEATURE_INFRA_5G           (0x0002)
-/* Support for GAS/ANQP */
-#define WIFI_FEATURE_HOTSPOT            (0x0004)
-/* Wifi-Direct */
-#define WIFI_FEATURE_P2P                (0x0008)
-/* Soft AP */
-#define WIFI_FEATURE_SOFT_AP            (0x0010)
-/* Google-Scan APIs */
-#define WIFI_FEATURE_GSCAN              (0x0020)
-/* Neighbor Awareness Networking */
-#define WIFI_FEATURE_NAN                (0x0040)
-/* Device-to-device RTT */
-#define WIFI_FEATURE_D2D_RTT            (0x0080)
-/* Device-to-AP RTT */
-#define WIFI_FEATURE_D2AP_RTT           (0x0100)
-/* Batched Scan (legacy) */
-#define WIFI_FEATURE_BATCH_SCAN         (0x0200)
-/* Preferred network offload */
-#define WIFI_FEATURE_PNO                (0x0400)
-/* Support for two STAs */
-#define WIFI_FEATURE_ADDITIONAL_STA     (0x0800)
-/* Tunnel directed link setup */
-#define WIFI_FEATURE_TDLS               (0x1000)
-/* Support for TDLS off channel */
-#define WIFI_FEATURE_TDLS_OFFCHANNEL    (0x2000)
-/* Enhanced power reporting */
-#define WIFI_FEATURE_EPR                (0x4000)
-/* Support for AP STA Concurrency */
-#define WIFI_FEATURE_AP_STA             (0x8000)
-/* Link layer stats collection */
-#define WIFI_FEATURE_LINK_LAYER_STATS   (0x10000)
-/* WiFi Logger */
-#define WIFI_FEATURE_LOGGER             (0x20000)
-/* WiFi PNO enhanced */
-#define WIFI_FEATURE_HAL_EPNO           (0x40000)
-/* RSSI Monitor */
-#define WIFI_FEATURE_RSSI_MONITOR       (0x80000)
-/* WiFi mkeep_alive */
-#define WIFI_FEATURE_MKEEP_ALIVE        (0x100000)
-/* ND offload configure */
-#define WIFI_FEATURE_CONFIG_NDO         (0x200000)
-/* Capture Tx transmit power levels */
-#define WIFI_FEATURE_TX_TRANSMIT_POWER  (0x400000)
-/* Enable/Disable firmware roaming */
-#define WIFI_FEATURE_CONTROL_ROAMING    (0x800000)
-/* Support Probe IE white listing */
-#define WIFI_FEATURE_IE_WHITELIST       (0x1000000)
-/* Support MAC & Probe Sequence Number randomization */
-#define WIFI_FEATURE_SCAN_RAND          (0x2000000)
-/* Support Tx Power Limit setting */
-#define WIFI_FEATURE_SET_TX_POWER_LIMIT (0x4000000)
-/* Support Using Body/Head Proximity for SAR */
-#define WIFI_FEATURE_USE_BODY_HEAD_SAR  (0x8000000)
-/* Support Random P2P MAC */
-#define WIFI_FEATURE_P2P_RAND_MAC  (0x100000000L)
-
-#ifdef VENDOR_EDIT
-//Laixin@PSW.CN.WiFi.Basic.Custom.1130116, 2019/03/22
-/* Support DBDC */
-#define WIFI_FEATURE_DBDC               (0x10000000)
-#endif /* VENDOR_EDIT */
-
-/* note: WIFI_FEATURE_GSCAN be enabled just for ACTS test item: scanner */
-#define WIFI_HAL_FEATURE_SET ((WIFI_FEATURE_P2P) |\
-			      (WIFI_FEATURE_SOFT_AP) |\
-			      (WIFI_FEATURE_PNO) |\
-			      (WIFI_FEATURE_TDLS) |\
-			      (WIFI_FEATURE_RSSI_MONITOR) |\
-			      (WIFI_FEATURE_CONTROL_ROAMING) |\
-			      (WIFI_FEATURE_SET_TX_POWER_LIMIT) |\
-			      (WIFI_FEATURE_P2P_RAND_MAC)\
-			      )
 
 #define MAX_NUM_GROUP_ADDR		32 /* max number of group addresses */
 #define AUTO_RATE_NUM			8
@@ -211,14 +134,9 @@
 #define WLAN_CFG_ARGV_MAX_LONG	22	/* for WOW, 2+20 */
 #define WLAN_CFG_ENTRY_NUM_MAX	200	/* 128 */
 #define WLAN_CFG_KEY_LEN_MAX	32	/* include \x00  EOL */
-#define WLAN_CFG_VALUE_LEN_MAX	128	/* include \x00 EOL */
+#define WLAN_CFG_VALUE_LEN_MAX	32	/* include \x00 EOL */
 #define WLAN_CFG_FLAG_SKIP_CB	BIT(0)
-//#ifdef OPLUS_BUG_STABILITY
-/* Fuchun.Liao@BSP.Kernel.Stability 2020/08/31 modify for memory out of bounds */
-//#define WLAN_CFG_FILE_BUF_SIZE	2048
-//#else
-#define WLAN_CFG_FILE_BUF_SIZE	3072
-//#endif
+#define WLAN_CFG_FILE_BUF_SIZE	2048
 
 #define WLAN_CFG_REC_ENTRY_NUM_MAX 200
 #define WLAN_CFG_REC_FLAG_BIT BIT(0)
@@ -283,11 +201,13 @@
 #define ED_VALUE_SITE		2
 #endif
 
+#if CFG_AUTO_CHANNEL_SEL_SUPPORT
 #define ACS_AP_RSSI_LEVEL_HIGH		-50
 #define ACS_AP_RSSI_LEVEL_LOW		-80
 #define ACS_DIRTINESS_LEVEL_HIGH	52
 #define ACS_DIRTINESS_LEVEL_MID		40
 #define ACS_DIRTINESS_LEVEL_LOW		32
+#endif
 
 enum CMD_VER {
 	CMD_VER_1,	/* Type[2]+String[32]+Value[32] */
@@ -648,10 +568,18 @@ struct REG_INFO {
 	uint16_t u2Part1PeerVersion;
 #endif
 	uint8_t aucMacAddr[6];
+
 	/* Country code (in ISO 3166-1 expression, ex: "US", "TW")  */
 	uint16_t au2CountryCode[4];
-	uint8_t ucSupport5GBand;
 
+	struct TX_PWR_PARAM rTxPwr;
+	uint8_t aucEFUSE[144];
+	uint8_t ucTxPwrValid;
+	uint8_t ucSupport5GBand;
+	uint8_t fg2G4BandEdgePwrUsed;
+	int8_t cBandEdgeMaxPwrCCK;
+	int8_t cBandEdgeMaxPwrOFDM20;
+	int8_t cBandEdgeMaxPwrOFDM40;
 	enum ENUM_REG_CH_MAP eRegChannelListMap;
 	uint8_t ucRegChannelListIndex;
 	struct DOMAIN_INFO_ENTRY rDomainInfo;
@@ -660,7 +588,11 @@ struct REG_INFO {
 	/* NVRAM - MP Data -END- */
 
 	/* NVRAM - Functional Data -START- */
+	uint8_t uc2G4BwFixed20M;
+	uint8_t uc5GBwFixed20M;
 	uint8_t ucEnable5GBand;
+	uint8_t ucGpsDesense;
+	uint8_t ucRxDiversity;
 	/* NVRAM - Functional Data -END- */
 
 	struct NEW_EFUSE_MAPPING2NVRAM *prOldEfuseMapping;
@@ -1003,8 +935,7 @@ enum ENUM_MAX_BANDWIDTH_SETTING {
 	MAX_BW_40MHZ,
 	MAX_BW_80MHZ,
 	MAX_BW_160MHZ,
-	MAX_BW_80_80_MHZ,
-	MAX_BW_UNKNOWN
+	MAX_BW_80_80_MHZ
 };
 
 struct TX_PACKET_INFO {
@@ -1032,16 +963,6 @@ enum ENUM_TX_PROFILING_TAG {
 	TX_PROF_TAG_MAC_TX_DONE
 };
 
-#if (CFG_SUPPORT_SPE_IDX_CONTROL == 1)
-enum ENUM_WF_PATH_FAVOR_T {
-	ENUM_WF_NON_FAVOR = 0xff,
-	ENUM_WF_0_ONE_STREAM_PATH_FAVOR = 0,
-	ENUM_WF_1_ONE_STREAM_PATH_FAVOR = 1,
-	ENUM_WF_0_1_TWO_STREAM_PATH_FAVOR = 2,
-	ENUM_WF_0_1_DUP_STREAM_PATH_FAVOR = 3,
-};
-#endif
-
 struct PARAM_GET_CNM_T {
 	uint8_t	fgIsDbdcEnable;
 
@@ -1067,67 +988,6 @@ struct PARAM_GET_CNM_T {
 	uint8_t	au4Reserved[65]; /*Total 160 byte*/
 };
 
-#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
-struct WIFI_LINK_QUALITY_INFO {
-	uint32_t u4CurTxRate;		/* current tx link speed */
-	uint32_t u4TxTotalCount;	/* tx total accumulated count */
-	uint32_t u4TxRetryCount;	/* tx retry count */
-	uint32_t u4TxFailCount;		/* tx fail count */
-	uint32_t u4TxRtsFailCount;	/* tx RTS fail count */
-	uint32_t u4TxAckFailCount;	/* tx ACK fail count */
-
-	uint32_t u4CurRxRate;		/* current rx link speed */
-	uint32_t u4RxTotalCount;	/* rx total packages */
-	uint32_t u4RxDupCount;		/* rx duplicate package count */
-	uint32_t u4RxErrCount;		/* rx fcs fail count */
-
-	uint32_t u4CurTxPer;		/* current Tx PER */
-	uint32_t u4IdleSlotCount;	/* congestion stats: idle slot */
-
-	uint32_t u4DiffIdleSlotCount;
-	uint32_t u4LastTxTotalCount;
-	uint32_t u4LastTxFailCount;
-	uint32_t u4LastIdleSlotCount;
-};
-#endif /* CFG_SUPPORT_LINK_QUALITY_MONITOR */
-
-#if CFG_SUPPORT_IOT_AP_BLACKLIST
-enum ENUM_WLAN_IOT_AP_FLAG_T {
-	WLAN_IOT_AP_FG_VERSION = 0,
-	WLAN_IOT_AP_FG_OUI,
-	WLAN_IOT_AP_FG_DATA,
-	WLAN_IOT_AP_FG_DATA_MASK,
-	WLAN_IOT_AP_FG_BSSID,
-	WLAN_IOT_AP_FG_BSSID_MASK,
-	WLAN_IOT_AP_FG_NSS,
-	WLAN_IOT_AP_FG_HT,
-	WLAN_IOT_AP_FG_BAND,
-	WLAN_IOT_AP_FG_ACTION,
-	WLAN_IOT_AP_FG_MAX
-};
-
-enum ENUM_WLAN_IOT_AP_HANDLE_ACTION {
-	WLAN_IOT_AP_VOID = 0,
-	WLAN_IOT_AP_DBDC_1SS,
-	WLAN_IOT_AP_ACT_MAX
-};
-
-struct WLAN_IOT_AP_RULE_T {
-	uint16_t u2MatchFlag;
-	uint8_t  ucDataLen;
-	uint8_t  ucDataMaskLen;
-	uint8_t  ucVersion;
-	uint8_t  aVendorOui[MAC_OUI_LEN];
-	uint8_t  aVendorData[CFG_IOT_AP_DATA_MAX_LEN];
-	uint8_t  aVendorDataMask[CFG_IOT_AP_DATA_MAX_LEN];
-	uint8_t  aBssid[MAC_ADDR_LEN];
-	uint8_t  aBssidMask[MAC_ADDR_LEN];
-	uint8_t  ucNss;
-	uint8_t  ucHtType;
-	uint8_t  ucBand;
-	uint8_t  ucAction;
-};
-#endif
 /*******************************************************************************
  *                            P U B L I C   D A T A
  *******************************************************************************
@@ -1204,8 +1064,6 @@ void wlanClearDataQueue(IN struct ADAPTER *prAdapter);
 void wlanClearRxToOsQueue(IN struct ADAPTER *prAdapter);
 #endif
 
-void wlanClearPendingCommandQueue(IN struct ADAPTER *prAdapter);
-
 void wlanReleaseCommand(IN struct ADAPTER *prAdapter,
 			IN struct CMD_INFO *prCmdInfo,
 			IN enum ENUM_TX_RESULT_CODE rTxDoneStatus);
@@ -1234,13 +1092,16 @@ wlanSetInformation(IN struct ADAPTER *prAdapter,
 		   OUT uint32_t *pu4SetInfoLen);
 
 uint32_t wlanAdapterStart(IN struct ADAPTER *prAdapter,
-			  IN struct REG_INFO *prRegInfo,
-			  IN const u_int8_t bAtResetFlow);
+			  IN struct REG_INFO *prRegInfo);
 
 uint32_t wlanAdapterStop(IN struct ADAPTER *prAdapter);
 
 uint32_t wlanCheckWifiFunc(IN struct ADAPTER *prAdapter,
 			   IN u_int8_t fgRdyChk);
+
+#if CFG_SUPPORT_WAPI
+u_int8_t wlanQueryWapiMode(IN struct ADAPTER *prAdapter);
+#endif
 
 void wlanReturnRxPacket(IN void *pvAdapter, IN void *pvPacket);
 
@@ -1286,25 +1147,17 @@ u_int8_t wlanProcessTxFrame(IN struct ADAPTER *prAdapter,
 u_int8_t wlanProcessSecurityFrame(IN struct ADAPTER *prAdapter,
 				  IN void *prPacket);
 
-uint32_t wlanProcessCmdDataFrame(IN struct ADAPTER
-				  *prAdapter, IN void *prPacket);
-
 void wlanSecurityFrameTxDone(IN struct ADAPTER *prAdapter,
 			     IN struct CMD_INFO *prCmdInfo,
 			     IN uint8_t *pucEventBuf);
 
-void wlanSecurityAndCmdDataFrameTxTimeout(IN struct ADAPTER *prAdapter,
+void wlanSecurityFrameTxTimeout(IN struct ADAPTER *prAdapter,
 				IN struct CMD_INFO *prCmdInfo);
-
-void wlanCmdDataFrameTxDone(IN struct ADAPTER *prAdapter,
-			     IN struct CMD_INFO *prCmdInfo,
-			     IN uint8_t *pucEventBuf);
 
 /*----------------------------------------------------------------------------*/
 /* OID/IOCTL Handling                                                         */
 /*----------------------------------------------------------------------------*/
-void wlanClearScanningResult(IN struct ADAPTER *prAdapter,
-	IN uint8_t ucBssIndex);
+void wlanClearScanningResult(IN struct ADAPTER *prAdapter);
 
 void wlanClearBssInScanningResult(IN struct ADAPTER *prAdapter,
 				  IN uint8_t *arBSSID);
@@ -1378,6 +1231,7 @@ enum ENUM_ACPI_STATE wlanGetAcpiState(IN struct ADAPTER *prAdapter);
 void wlanSetAcpiState(IN struct ADAPTER *prAdapter,
 		      IN enum ENUM_ACPI_STATE ePowerState);
 
+void wlanDefTxPowerCfg(IN struct ADAPTER *prAdapter);
 
 /*----------------------------------------------------------------------------*/
 /* get ECO version from Revision ID register (for Win32)                      */
@@ -1456,6 +1310,7 @@ void *wlanGetNetInterfaceByBssIdx(IN struct GLUE_INFO *prGlueInfo,
 				  IN uint8_t ucBssIndex);
 
 /* for windows as windows glue cannot see through P_ADAPTER_T */
+uint8_t wlanGetAisBssIndex(IN struct ADAPTER *prAdapter);
 
 void wlanInitFeatureOption(IN struct ADAPTER *prAdapter);
 
@@ -1466,9 +1321,6 @@ void wlanCfgSetChip(IN struct ADAPTER *prAdapter);
 void wlanCfgSetDebugLevel(IN struct ADAPTER *prAdapter);
 
 void wlanCfgSetCountryCode(IN struct ADAPTER *prAdapter);
-
-struct net_device *wlanGetNetDev(IN struct GLUE_INFO *prGlueInfo,
-				 IN uint8_t ucBssIndex);
 
 struct WLAN_CFG_ENTRY *wlanCfgGetEntry(IN struct ADAPTER *prAdapter,
 				       const int8_t *pucKey,
@@ -1495,7 +1347,6 @@ uint32_t wlanCfgSetCb(IN struct ADAPTER *prAdapter, const int8_t *pucKey,
 		      uint32_t u4Flags);
 
 #if CFG_SUPPORT_EASY_DEBUG
-int8_t atoi(uint8_t ch);
 
 uint32_t wlanCfgParse(IN struct ADAPTER *prAdapter, uint8_t *pucConfigBuf,
 		      uint32_t u4ConfigBufLen, u_int8_t isFwConfig);
@@ -1514,18 +1365,9 @@ uint32_t wlanCfgParseArgumentLong(int8_t *cmdLine, int32_t *argc,
 				  int8_t *argv[]);
 #endif
 
-#if CFG_SUPPORT_IOT_AP_BLACKLIST
-void wlanCfgLoadIotApRule(IN struct ADAPTER *prAdapter);
-void wlanCfgDumpIotApRule(IN struct ADAPTER *prAdapter);
-#endif
-
 int32_t wlanHexToNum(int8_t c);
 
 int32_t wlanHexToByte(int8_t *hex);
-
-int32_t wlanHexToArray(int8_t *hexString, int8_t *hexArray, uint8_t arrayLen);
-int32_t wlanHexToArrayR(int8_t *hexString, int8_t *hexArray, uint8_t arrayLen);
-
 
 int32_t wlanHwAddrToBin(int8_t *txt, uint8_t *addr);
 
@@ -1573,15 +1415,6 @@ struct WLAN_CFG_ENTRY *wlanCfgGetEntryByIndex(IN struct ADAPTER *prAdapter,
 uint32_t wlanGetStaIdxByWlanIdx(IN struct ADAPTER *prAdapter,
 				IN uint8_t ucIndex, OUT uint8_t *pucStaIdx);
 
-uint8_t wlanGetBssIdx(struct net_device *ndev);
-
-struct net_device *wlanGetNetDev(IN struct GLUE_INFO *prGlueInfo,
-	IN uint8_t ucBssIndex);
-
-struct wiphy *wlanGetWiphy(void);
-
-u_int8_t wlanIsAisDev(struct net_device *prDev);
-
 /*----------------------------------------------------------------------------*/
 /* update per-AC statistics for LLS                */
 /*----------------------------------------------------------------------------*/
@@ -1619,31 +1452,16 @@ void wlanNotifyFwSuspend(struct GLUE_INFO *prGlueInfo,
 
 void wlanClearPendingInterrupt(IN struct ADAPTER *prAdapter);
 
-#if CFG_WMT_WIFI_PATH_SUPPORT
+#if (MTK_WCN_HIF_SDIO && CFG_WMT_WIFI_PATH_SUPPORT)
 extern int32_t mtk_wcn_wmt_wifi_fem_cfg_report(void *pvInfoBuf);
 #endif
 
-#if ((CFG_SISO_SW_DEVELOP == 1) || (CFG_SUPPORT_SPE_IDX_CONTROL == 1))
-uint8_t wlanGetAntPathType(IN struct ADAPTER *prAdapter,
-			   IN enum ENUM_WF_PATH_FAVOR_T eWfPathFavor);
-#endif
-
-uint8_t wlanGetSpeIdx(IN struct ADAPTER *prAdapter,
-		      IN uint8_t ucBssIndex,
-		      IN enum ENUM_WF_PATH_FAVOR_T eWfPathFavor);
+uint8_t wlanGetSpeIdx(IN struct ADAPTER *prAdapter, IN uint8_t ucBssIndex);
 
 uint8_t wlanGetSupportNss(IN struct ADAPTER *prAdapter, IN uint8_t ucBssIndex);
 
 #if CFG_SUPPORT_LOWLATENCY_MODE
 uint32_t wlanAdapterStartForLowLatency(IN struct ADAPTER *prAdapter);
-uint32_t wlanProbeSuccessForLowLatency(IN struct ADAPTER *prAdapter);
-uint32_t wlanConnectedForLowLatency(IN struct ADAPTER *prAdapter);
-uint32_t wlanSetLowLatencyCommand(IN struct ADAPTER *prAdapter,
-				     IN u_int8_t fgEnLowLatencyMode,
-				     IN u_int8_t fgEnTxDupDetect,
-				     IN u_int8_t fgTxDupCertQuery);
-uint32_t wlanSetLowLatencyMode(IN struct ADAPTER *prAdapter,
-				IN uint32_t u4Events);
 #endif /* CFG_SUPPORT_LOWLATENCY_MODE */
 
 #if CFG_SUPPORT_EASY_DEBUG
@@ -1653,56 +1471,4 @@ uint32_t wlanFwCfgParse(IN struct ADAPTER *prAdapter, uint8_t *pucConfigBuf);
 void wlanReleasePendingCmdById(struct ADAPTER *prAdapter, uint8_t ucCid);
 
 uint32_t wlanDecimalStr2Hexadecimals(uint8_t *pucDecimalStr, uint16_t *pu2Out);
-
-#if CFG_SUPPORT_REPORT_MISC
-void wlanGetReportMisc(IN struct ADAPTER *prAdapter);
-#endif
-
-u_int8_t wlanIsDriverReady(IN struct GLUE_INFO *prGlueInfo);
-void wlanOffUninitNicModule(IN struct ADAPTER *prAdapter,
-				IN const u_int8_t bAtResetFlow);
-void wlanOffClearAllQueues(IN struct ADAPTER *prAdapter);
-
-uint64_t wlanGetSupportedFeatureSet(IN struct GLUE_INFO *prGlueInfo);
-
-#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
-uint32_t wlanLinkQualityMonitor(struct GLUE_INFO *prGlueInfo, bool bFgIsOid);
-void wlanFinishCollectingLinkQuality(struct GLUE_INFO *prGlueInfo);
-#endif /* CFG_SUPPORT_LINK_QUALITY_MONITOR */
-#if CFG_SUPPORT_DATA_STALL
-void wlanCustomMonitorFunction(struct ADAPTER *prAdapter,
-	struct WIFI_LINK_QUALITY_INFO *prLinkQualityInfo);
-#endif /* CFG_SUPPORT_DATA_STALL */
-
-uint32_t
-wlanQueryLteSafeChannel(IN struct ADAPTER *prAdapter,
-		IN uint8_t ucRoleIndex);
-
-uint32_t
-wlanCalculateAllChannelDirtiness(IN struct ADAPTER *prAdapter);
-
-void
-wlanInitChnLoadInfoChannelList(IN struct ADAPTER *prAdapter);
-
-uint8_t
-wlanGetChannelIndex(IN uint8_t channel);
-
-uint8_t
-wlanGetChannelNumFromIndex(IN uint8_t ucIdx);
-
-void
-wlanSortChannel(IN struct ADAPTER *prAdapter,
-		IN enum ENUM_CHNL_SORT_POLICY ucSortType);
-
-uint32_t wlanSetForceRTS(IN struct ADAPTER *prAdapter,
-	IN u_int8_t fgEnForceRTS);
-
-
-u_int8_t wlanWfdEnabled(struct ADAPTER *prAdapter);
-
-#ifdef VENDOR_EDIT
-//Lei.Zhang@CONNECTIVITY.WIFI.HARDWARE.SAR.1785313, 2020/09/12
-//add hex project name compatible
-uint32_t getOplusRealProjectName(char *prjName, uint8_t len);
-#endif
 

@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -622,11 +620,6 @@ BOOLEAN rsnIsSuitableBSS(IN P_ADAPTER_T prAdapter, IN P_RSN_INFO_T prBssRsnInfo)
 		}
 	}
 
-	if (prAdapter->rWifiVar.rConnSettings.eAuthMode == AUTH_MODE_WPA3_SAE) {
-		DBGLOG(RSN, WARN, "Don't check AuthKeyMgtSuite with SAE\n");
-		return TRUE;
-	}
-
 	for (i = 0; i < prBssRsnInfo->u4AuthKeyMgtSuiteCount; i++) {
 		if ((prAdapter->rWifiVar.rConnSettings.
 			rRsnInfo.au4AuthKeyMgtSuite[0]
@@ -666,6 +659,7 @@ BOOLEAN rsnSearchAKMSuite(IN P_ADAPTER_T prAdapter, IN UINT_32 u4AkmSuite, OUT P
 	P_DOT11_RSNA_CONFIG_AUTHENTICATION_SUITES_ENTRY prEntry;
 
 	DEBUGFUNC("rsnSearchAKMSuite");
+
 	ASSERT(pu4Index);
 
 	for (i = 0; i < MAX_NUM_SUPPORTED_AKM_SUITES; i++) {
@@ -678,26 +672,6 @@ BOOLEAN rsnSearchAKMSuite(IN P_ADAPTER_T prAdapter, IN UINT_32 u4AkmSuite, OUT P
 	}
 	return FALSE;
 }				/* rsnSearchAKMSuite */
-
-/*----------------------------------------------------------------------------*/
-/*!
- * \brief refer to wpa_supplicant wpa_key_mgmt_wpa
- */
-
-uint8_t rsnKeyMgmtWpa(IN P_ADAPTER_T prAdapter,
-		      ENUM_PARAM_AUTH_MODE_T eAuthMode)
-{
-	uint32_t i;
-
-	return eAuthMode == AUTH_MODE_WPA2 ||
-	       eAuthMode == AUTH_MODE_WPA2_PSK ||
-	       eAuthMode == AUTH_MODE_WPA2_FT_PSK ||
-	       eAuthMode == AUTH_MODE_WPA2_FT ||
-	       eAuthMode == AUTH_MODE_WPA3_SAE ||
-	       eAuthMode == AUTH_MODE_WPA3_OWE ||
-	       rsnSearchAKMSuite(prAdapter, RSN_CIPHER_SUITE_OWE, &i) ||
-	       rsnSearchAKMSuite(prAdapter, RSN_CIPHER_SUITE_SAE, &i);
-}
 
 /*----------------------------------------------------------------------------*/
 /*!
@@ -728,7 +702,6 @@ BOOLEAN rsnPerformPolicySelection(IN P_ADAPTER_T prAdapter, IN P_BSS_DESC_T prBs
 	UINT_32 u4GroupCipher = 0;
 	UINT_32 u4AkmSuite = 0;
 	P_RSN_INFO_T prBssRsnInfo;
-	ENUM_PARAM_AUTH_MODE_T eAuthMode;
 	ENUM_NETWORK_TYPE_INDEX_T eNetwotkType;
 	BOOLEAN fgIsWpsActive = (BOOLEAN) FALSE;
 
@@ -744,14 +717,13 @@ BOOLEAN rsnPerformPolicySelection(IN P_ADAPTER_T prAdapter, IN P_BSS_DESC_T prBs
 	prBss->u4RsnSelectedGroupCipher = 0;
 	prBss->u4RsnSelectedAKMSuite = 0;
 	prBss->ucEncLevel = 0;
-	eAuthMode = prAdapter->rWifiVar.rConnSettings.eAuthMode;
 
 #if CFG_SUPPORT_WPS
 	fgIsWpsActive = kalWSCGetActiveState(prAdapter->prGlueInfo);
 
 	/* CR1640, disable the AP select privacy check */
 	if (fgIsWpsActive &&
-	    (eAuthMode < AUTH_MODE_WPA) &&
+	    (prAdapter->rWifiVar.rConnSettings.eAuthMode < AUTH_MODE_WPA) &&
 	    (prAdapter->rWifiVar.rConnSettings.eOPMode == NET_TYPE_INFRA)) {
 		DBGLOG(RSN, TRACE, "-- Skip the Protected BSS check\n");
 		return TRUE;
@@ -778,8 +750,9 @@ BOOLEAN rsnPerformPolicySelection(IN P_ADAPTER_T prAdapter, IN P_BSS_DESC_T prBs
 		}
 	}
 
-	if (eAuthMode == AUTH_MODE_WPA || eAuthMode == AUTH_MODE_WPA_PSK ||
-	    eAuthMode == AUTH_MODE_WPA_NONE) {
+	if (prAdapter->rWifiVar.rConnSettings.eAuthMode == AUTH_MODE_WPA ||
+	    prAdapter->rWifiVar.rConnSettings.eAuthMode == AUTH_MODE_WPA_PSK ||
+	    prAdapter->rWifiVar.rConnSettings.eAuthMode == AUTH_MODE_WPA_NONE) {
 
 		if (prBss->fgIEWPA) {
 			prBssRsnInfo = &prBss->rWPAInfo;
@@ -787,7 +760,10 @@ BOOLEAN rsnPerformPolicySelection(IN P_ADAPTER_T prAdapter, IN P_BSS_DESC_T prBs
 			DBGLOG(RSN, WARN, "WPA Information Element does not exist.\n");
 			return FALSE;
 		}
-	} else if (rsnKeyMgmtWpa(prAdapter, eAuthMode)) {
+	} else if (prAdapter->rWifiVar.rConnSettings.eAuthMode == AUTH_MODE_WPA2 ||
+		prAdapter->rWifiVar.rConnSettings.eAuthMode == AUTH_MODE_WPA2_PSK ||
+		prAdapter->rWifiVar.rConnSettings.eAuthMode == AUTH_MODE_WPA2_FT_PSK ||
+		prAdapter->rWifiVar.rConnSettings.eAuthMode == AUTH_MODE_WPA2_FT) {
 
 		if (prBss->fgIERSN) {
 			prBssRsnInfo = &prBss->rRSNInfo;
@@ -796,7 +772,7 @@ BOOLEAN rsnPerformPolicySelection(IN P_ADAPTER_T prAdapter, IN P_BSS_DESC_T prBs
 			return FALSE;
 		}
 #if CFG_SUPPORT_HOTSPOT_2_0
-	} else if (eAuthMode == AUTH_MODE_WPA_OSEN) {
+	} else if (prAdapter->rWifiVar.rConnSettings.eAuthMode == AUTH_MODE_WPA_OSEN) {
 		/* OSEN is mutual exclusion with RSN, so we can reuse RSN's flag and variables */
 		if (prBss->fgIEOsen) {
 			prBssRsnInfo = &prBss->rRSNInfo;
@@ -973,10 +949,10 @@ BOOLEAN rsnPerformPolicySelection(IN P_ADAPTER_T prAdapter, IN P_BSS_DESC_T prBs
 	 * the given BSS, we fail to perform RSNA policy selection.
 	 */
 	/* Attempt to find any overlapping supported AKM suite. */
-	if (eAuthMode == AUTH_MODE_WPA2_FT_PSK &&
+	if (prAdapter->rWifiVar.rConnSettings.eAuthMode == AUTH_MODE_WPA2_FT_PSK &&
 			rsnSearchAKMSuite(prAdapter, RSN_AKM_SUITE_FT_PSK, &j))
 		u4AkmSuite = RSN_AKM_SUITE_FT_PSK;
-	else if (eAuthMode == AUTH_MODE_WPA2_FT &&
+	else if (prAdapter->rWifiVar.rConnSettings.eAuthMode == AUTH_MODE_WPA2_FT &&
 				rsnSearchAKMSuite(prAdapter, RSN_AKM_SUITE_FT_802_1X, &j))
 		u4AkmSuite = RSN_AKM_SUITE_FT_802_1X;
 	else
@@ -1032,9 +1008,12 @@ BOOLEAN rsnPerformPolicySelection(IN P_ADAPTER_T prAdapter, IN P_BSS_DESC_T prBs
 			prAdapter->rWifiVar.rAisSpecificBssInfo.fgMgmtProtection = FALSE;
 		}
 	} else {
-		if (prBssRsnInfo->fgRsnCapPresent && (prBssRsnInfo->u2RsnCap & ELEM_WPA_CAP_MFPR)) {
-			if (prAdapter->rWifiVar.rAisSpecificBssInfo.fgMgmtProtection == FALSE) {
-				DBGLOG(RSN, TRACE, "[MFP] Skip RSN IE, No MFP Required Capability\n");
+		if (prBssRsnInfo->fgRsnCapPresent &&
+		    (prBssRsnInfo->u2RsnCap & ELEM_WPA_CAP_MFPR)) {
+			if (prAdapter->rWifiVar.rAisSpecificBssInfo
+			    .fgMgmtProtection == FALSE) {
+				DBGLOG(RSN, TRACE,
+				       "[MFP] Skip RSN IE, No MFP Required Capability\n");
 				return FALSE;
 			}
 		}
@@ -1298,7 +1277,6 @@ VOID rsnGenerateRSNIE(IN P_ADAPTER_T prAdapter, IN P_MSDU_INFO_T prMsduInfo)
 	PUCHAR cp;
 	BOOLEAN fgPmkidExist = FALSE;
 	PUINT_8 pucBuffer;
-	ENUM_PARAM_AUTH_MODE_T eAuthMode;
 	ENUM_NETWORK_TYPE_INDEX_T eNetworkId;
 	P_STA_RECORD_T prStaRec;
 
@@ -1312,12 +1290,11 @@ VOID rsnGenerateRSNIE(IN P_ADAPTER_T prAdapter, IN P_MSDU_INFO_T prMsduInfo)
 
 	/* Todo:: network id */
 	eNetworkId = (ENUM_NETWORK_TYPE_INDEX_T) prMsduInfo->ucNetworkType;
-	eAuthMode = prAdapter->rWifiVar.rConnSettings.eAuthMode;
 
 	/* for Fast Bss Transition,  we reuse the RSN Element composed in userspace */
-	if ((eAuthMode == AUTH_MODE_WPA2_FT ||
-	     eAuthMode == AUTH_MODE_WPA2_FT_PSK) &&
-	    prAdapter->prGlueInfo->rFtIeForTx.prRsnIE) {
+	if ((prAdapter->rWifiVar.rConnSettings.eAuthMode == AUTH_MODE_WPA2_FT ||
+		prAdapter->rWifiVar.rConnSettings.eAuthMode == AUTH_MODE_WPA2_FT_PSK) &&
+		prAdapter->prGlueInfo->rFtIeForTx.prRsnIE) {
 		authAddRSNIE(prAdapter, prMsduInfo);
 		return;
 	}
@@ -1331,7 +1308,10 @@ VOID rsnGenerateRSNIE(IN P_ADAPTER_T prAdapter, IN P_MSDU_INFO_T prMsduInfo)
 		   (eNetworkId == NETWORK_TYPE_BOW_INDEX) ||
 #endif
 		   (eNetworkId == NETWORK_TYPE_AIS_INDEX /* prCurrentBss->fgIERSN */  &&
-		    rsnKeyMgmtWpa(prAdapter, eAuthMode))) {
+		    ((prAdapter->rWifiVar.rConnSettings.eAuthMode == AUTH_MODE_WPA2) ||
+		     (prAdapter->rWifiVar.rConnSettings.eAuthMode == AUTH_MODE_WPA2_PSK) ||
+			 (prAdapter->rWifiVar.rConnSettings.eAuthMode == AUTH_MODE_WPA2_FT_PSK) ||
+			 (prAdapter->rWifiVar.rConnSettings.eAuthMode == AUTH_MODE_WPA2_FT)))) {
 		/* Construct a RSN IE for association request frame. */
 		RSN_IE(pucBuffer)->ucElemId = ELEM_ID_RSN;
 		RSN_IE(pucBuffer)->ucLength = ELEM_ID_RSN_LEN_FIXED;
@@ -1951,6 +1931,43 @@ VOID rsnGeneratePmkidIndication(IN P_ADAPTER_T prAdapter)
 }				/* rsnGeneratePmkidIndication */
 #endif
 
+#if CFG_SUPPORT_WPS2
+/*----------------------------------------------------------------------------*/
+/*!
+*
+* \brief This routine is called to generate WSC IE for
+*        associate request frame.
+*
+* \param[in]  prCurrentBss     The Selected BSS description
+*
+* \retval The append WSC IE length
+*
+* \note
+*      Called by: AIS module, Associate request
+*/
+/*----------------------------------------------------------------------------*/
+VOID rsnGenerateWSCIE(IN P_ADAPTER_T prAdapter, IN P_MSDU_INFO_T prMsduInfo)
+{
+	PUINT_8 pucBuffer;
+
+	ASSERT(prAdapter);
+	ASSERT(prMsduInfo);
+
+	if (prMsduInfo->ucNetworkType != NETWORK_TYPE_AIS_INDEX)
+		return;
+
+	pucBuffer = (PUINT_8) ((ULONG) prMsduInfo->prPacket + (UINT_32) prMsduInfo->u2FrameLength);
+
+	/* ASSOC INFO IE ID: 221 :0xDD */
+	if (prAdapter->prGlueInfo->u2WSCAssocInfoIELen) {
+		kalMemCopy(pucBuffer, &prAdapter->prGlueInfo->aucWSCAssocInfoIE,
+			   prAdapter->prGlueInfo->u2WSCAssocInfoIELen);
+		prMsduInfo->u2FrameLength += prAdapter->prGlueInfo->u2WSCAssocInfoIELen;
+	}
+
+}
+#endif
+
 #if CFG_SUPPORT_802_11W
 
 /*----------------------------------------------------------------------------*/
@@ -2039,11 +2056,6 @@ void rsnStartSaQueryTimer(IN P_ADAPTER_T prAdapter)
 	ASSERT(prBssSpecInfo);
 
 	DBGLOG(RSN, INFO, "MFP: Start Sa Query\n");
-
-	if (prBssInfo->prStaRecOfAP == NULL) {
-		DBGLOG(RSN, INFO, "MFP: unassociated AP!\n");
-		return;
-	}
 
 	if (prBssSpecInfo->u4SaQueryCount > 0 && rsnCheckSaQueryTimeout(prAdapter)) {
 		DBGLOG(RSN, INFO, "MFP: u4SaQueryCount count =%d\n", prBssSpecInfo->u4SaQueryCount);
@@ -2452,7 +2464,6 @@ BOOLEAN rsnCheckSecurityModeChanged(P_ADAPTER_T prAdapter, P_BSS_INFO_T prBssInf
 	case AUTH_MODE_WPA2_PSK:
 	case AUTH_MODE_WPA2_FT:
 	case AUTH_MODE_WPA2_FT_PSK:
-	case AUTH_MODE_WPA3_SAE:
 		if (prBssDesc->fgIERSN)
 			return rsnCheckWpaRsnInfo(prBssInfo, &prBssDesc->rRSNInfo);
 		DBGLOG(RSN, INFO, "security change, WPA2->%s\n",

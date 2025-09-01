@@ -54,14 +54,6 @@
 #define	CMD_OID_BUF_LENGTH	4096
 
 #define CMD_GET_WIFI_TYPE	"GET_WIFI_TYPE"
-
-#define TX_RATE_MODE_CCK	0
-#define TX_RATE_MODE_OFDM	1
-#define TX_RATE_MODE_HTMIX	2
-#define TX_RATE_MODE_HTGF	3
-#define TX_RATE_MODE_VHT	4
-#define MAX_TX_MODE		5
-
 /*******************************************************************************
 *                  F U N C T I O N   D E C L A R A T I O N S
 ********************************************************************************
@@ -107,157 +99,13 @@ reqExtSetConfiguration(IN P_GLUE_INFO_T prGlueInfo,
 static WLAN_STATUS
 reqExtSetAcpiDevicePowerState(IN P_GLUE_INFO_T prGlueInfo,
 			      IN PVOID pvSetBuffer, IN UINT_32 u4SetBufferLen, OUT PUINT_32 pu4SetInfoLen);
-/*******************************************************************************
- *                            P U B L I C   D A T A
- *******************************************************************************
- */
-#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
-/* link quality monitor */
-/* data rate mapping table for CCK */
-struct cckDataRateMappingTable_t {
-	UINT_32 rate[4];
-} g_rCckDataRateMappingTable = {
-	{10, 20, 55, 110}
-};
-/* data rate mapping table for OFDM */
-struct ofdmDataRateMappingTable_t {
-	UINT_32 rate[8];
-} g_rOfdmDataRateMappingTable = {
-	{60, 90, 120, 180, 240, 360, 480, 540}
-};
-/* data rate mapping table for 802.11n and 802.11ac */
-struct dataRateMappingTable_t {
-	struct nsts_t {
-		struct bw_t {
-			struct sgi_t {
-				UINT_32 rate[10];
-				} sgi[2];
-			} bw[4];
-		} nsts[3];
-} g_rDataRateMappingTable = {
-		{	{   {	{   { /* 20MHz */
-			{ /* no SGI */
-			    {65, 130, 195, 260, 390, 520, 585, 650, 780, 0}   },
-			{ /* SGI */
-			    {72, 144, 217, 289, 433, 578, 650, 722, 867, 0}   }
-		    }
-		},
-		{   { /* 40MHz */
-			{ /* no SGI */
-			    {135, 270, 405, 540, 810, 1080, 1215, 1350, 1620, 1800}   },
-			{ /* SGI */
-			    {150, 300, 450, 600, 900, 1200, 1350, 1500, 1800, 2000}   }
-		    }
-		},
-		{   { /* 80MHz */
-				{ /* no SGI */
-					{293, 585, 878, 1170, 1755, 2340, 2633, 2925, 3510, 3900}   },
-			{ /* SGI */
-			    {325, 650, 975, 1300, 1950, 2600, 2925, 3250, 3900, 4333}	}
-		    }
-		},
-		{   { /* 160MHz */
-				{ /* no SGI */
-					{585, 1170, 1755, 2340, 3510, 4680, 5265, 5850, 7020, 7800}   },
-			{ /* SGI */
-			    {650, 1300, 1950, 2600, 3900, 5200, 5850, 6500, 7800, 8667}   }
-		    }
-		}
-	    }
-	},
-	{   {	{   { /* 20MHz */
-			{ /* no SGI */
-			    {130, 260, 390, 520, 780, 1040, 1170, 1300, 1560, 0}   },
-			{ /* SGI */
-			    {144, 289, 433, 578, 867, 1156, 1303, 1444, 1733, 0}   }
-		    }
-		},
-		{   { /* 40MHz */
-				{ /* no SGI */
-			    {270, 540, 810, 1080, 1620, 2160, 2430, 2700, 3240, 3600}	},
-			{ /* SGI */
-			    {300, 600, 900, 1200, 1800, 2400, 2700, 3000, 3600, 4000}	}
-		    }
-		},
-		{   { /* 80MHz */
-			{ /* no SGI */
-			    {585, 1170, 1755, 2340, 3510, 4680, 5265, 5850, 7020, 7800}   },
-			{ /* SGI */
-			    {650, 1300, 1950, 2600, 3900, 5200, 5850, 6500, 7800, 8667}   }
-		    }
-		},
-		{   { /* 160MHz */
-			{ /* no SGI */
-			    {1170, 2340, 3510, 4680, 7020, 9360, 1053, 1170, 1404, 1560}   },
-			{ /* SGI */
-			    {1300, 2600, 3900, 5200, 7800, 10400, 11700, 13000, 15600, 17333}   }
-		    }
-		}
-	    }
-	},
-	{   {	{   { /* 20MHz */
-			{ /* no SGI */
-			    {195, 390, 585, 780, 1170, 1560, 1755, 1950, 2340, 2600}   },
-			{ /* SGI */
-			    {217, 433, 650, 867, 1300, 1733, 1950, 2167, 2600, 2889}   }
-		    }
-		},
-		{   { /* 40MHz */
-				{ /* no SGI */
-			    {405, 810, 1215, 1620, 2430, 3240, 3645, 4050, 4860, 5400}   },
-			{ /* SGI */
-			    {450, 900, 1350, 1800, 2700, 3600, 4050, 4500, 5400, 6000}   }
-		    }
-		},
-		{   { /* 80MHz */
-			{ /* no SGI */
-			    {878, 1755, 2633, 3510, 5265, 7020, 0, 8775, 10530, 11700}   },
-			{ /* SGI */
-			    {975, 1950, 2925, 3900, 5850, 7800, 0, 9750, 11700, 13000}   }
-		    }
-		},
-		{   { /* 160MHz */
-			{ /* no SGI */
-			    {1755, 3510, 5265, 7020, 10530, 14040, 15795, 17550, 21060, 0}   },
-			{ /* SGI */
-			    {1950, 3900, 5850, 7800, 11700, 15600, 17550, 19500, 23400, 0}   }
-		    }
-		}
-	    }
-	}
-	}
-};
-#endif
+
 /*******************************************************************************
 *                       P R I V A T E   D A T A
 ********************************************************************************
 */
 static UINT_8 aucOidBuf[CMD_OID_BUF_LENGTH] = { 0 };
-#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
-static UINT_32 hw_rate_ofdm_num(uint16_t ofdm_idx)
-{
-	switch (ofdm_idx) {
-	case 11: /* 6M */
-		return g_rOfdmDataRateMappingTable.rate[0];
-	case 15: /* 9M */
-		return g_rOfdmDataRateMappingTable.rate[1];
-	case 10: /* 12M */
-		return g_rOfdmDataRateMappingTable.rate[2];
-	case 14: /* 18M */
-		return g_rOfdmDataRateMappingTable.rate[3];
-	case 9: /* 24M */
-		return g_rOfdmDataRateMappingTable.rate[4];
-	case 13: /* 36M */
-		return g_rOfdmDataRateMappingTable.rate[5];
-	case 8: /* 48M */
-		return g_rOfdmDataRateMappingTable.rate[6];
-	case 12: /* 54M */
-		return g_rOfdmDataRateMappingTable.rate[7];
-	default:
-		return 0;
-	}
-}
-#endif
+
 /* OID processing table */
 /*
  * Order is important here because the OIDs should be in order of
@@ -548,6 +396,15 @@ static WLAN_REQ_ENTRY arWlanOidReqTable[] = {
 	,
 #endif
 
+#if CFG_SUPPORT_WPS2
+	{OID_802_11_WSC_ASSOC_INFO,
+	 DISP_STRING("OID_802_11_WSC_ASSOC_INFO"),
+	 FALSE, FALSE, ENUM_OID_DRIVER_CORE, 0,
+	 NULL,
+	 (PFN_OID_HANDLER_FUNC_REQ) wlanoidSetWSCAssocInfo}
+	,
+#endif
+
 #if CFG_SUPPORT_LOWLATENCY_MODE
 	{OID_CUSTOM_LOWLATENCY_MODE,
 	 DISP_STRING("OID_CUSTOM_LOWLATENCY_MODE"),
@@ -570,15 +427,6 @@ static WLAN_REQ_ENTRY arWlanOidReqTable[] = {
 	(PFN_OID_HANDLER_FUNC_REQ) wlanoidQueryWifiLogLevel,
 	(PFN_OID_HANDLER_FUNC_REQ) wlanoidSetWifiLogLevel}
 	,
-
-#if CFG_SUPPORT_ANT_SWAP
-	{OID_CUSTOM_QUERY_ANT_SWAP_CAPABILITY,
-	 DISP_STRING("OID_CUSTOM_QUERY_ANT_SWAP_CAPABILITY"),
-	 TRUE, TRUE, ENUM_OID_DRIVER_CORE, sizeof(UINT_32),
-	 (PFN_OID_HANDLER_FUNC_REQ) wlanoidQueryAntSwapCapability,
-	 NULL}
-	,
-#endif
 
 };
 
@@ -1203,7 +1051,7 @@ priv_get_int(IN struct net_device *prNetDev,
 		{
 			UINT_8 ucNumOfChannel, i;
 			UINT_8 ucMaxChannelNum = 50;
-			RF_CHANNEL_INFO_T aucChannelList[50] = { {0} };
+			RF_CHANNEL_INFO_T aucChannelList[50];
 			INT_32 ch[50];
 
 			kalGetChannelList(prGlueInfo, BAND_NULL, ucMaxChannelNum, &ucNumOfChannel, aucChannelList);
@@ -1370,7 +1218,7 @@ priv_get_ints(IN struct net_device *prNetDev,
 		{
 			UINT_8 ucNumOfChannel, i;
 			UINT_8 ucMaxChannelNum = 50;
-			RF_CHANNEL_INFO_T aucChannelList[50] = { {0} };
+			RF_CHANNEL_INFO_T aucChannelList[50];
 			INT_32 ch[50];
 
 			kalGetChannelList(prGlueInfo, BAND_NULL, ucMaxChannelNum, &ucNumOfChannel, aucChannelList);
@@ -2131,7 +1979,7 @@ priv_set_driver(IN struct net_device *prNetDev,
 	}
 
 	if (pcExtra) {
-		pcExtra[1999] = '\0';
+		pcExtra[2000] = '\0';
 		DBGLOG(REQ, INFO, "pcExtra %s\n", pcExtra);
 		/* Please check max length in rIwPrivTable */
 		DBGLOG(REQ, INFO, "%s prIwReqData->data.length = %d\n", __func__, prIwReqData->data.length);
@@ -2450,9 +2298,7 @@ reqExtSetAcpiDevicePowerState(IN P_GLUE_INFO_T prGlueInfo,
 #define CMD_RM_IT		"RM-IT"
 #define CMD_DUMP_UAPSD		"dumpuapsd"
 #define CMD_FW_EVENT		"FW-EVENT "
-#define CMD_O_SAR		"O-SAR-EANBLE"
 #define CMD_FW_PARAM            "set_fw_param "
-#define CMD_RSSI_DISCONNECT	"DISCONRSSI"
 #define PRIV_CMD_SIZE 512
 
 static UINT_8 g_ucMiracastMode = MIRACAST_MODE_OFF;
@@ -2478,10 +2324,10 @@ static int priv_driver_get_sw_ctrl(IN struct net_device *prNetDev, IN char *pcCo
 	UINT_32 u4BufLen = 0;
 	INT_32 i4BytesWritten = 0;
 	INT_32 i4Argc = 0;
-	PCHAR apcArgv[WLAN_CFG_ARGV_MAX] = {0};
+	PCHAR apcArgv[WLAN_CFG_ARGV_MAX];
 	INT_32 u4Ret = 0;
 
-	PARAM_CUSTOM_SW_CTRL_STRUCT_T rSwCtrlInfo = { {0} };
+	PARAM_CUSTOM_SW_CTRL_STRUCT_T rSwCtrlInfo;
 
 	ASSERT(prNetDev);
 	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
@@ -2591,10 +2437,6 @@ static int priv_driver_set_efuse_buffer_mode(IN struct net_device *prNetDev, IN 
 	wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
 
 	pucConfigBuf = (PUINT_8) kalMemAlloc(2048, VIR_MEM_TYPE);
-	if (!pucConfigBuf) {
-		DBGLOG(INIT, INFO, "allocate pucConfigBuf failed\n");
-		return -ENOMEM;
-	}
 	kalMemZero(pucConfigBuf, 2048);
 	u4ConfigReadLen = 0;
 
@@ -2644,7 +2486,7 @@ static int priv_driver_get_rx_statistics(IN struct net_device *prNetDev, IN char
 	UINT_32 u4BufLen = 0;
 	INT_32 i4BytesWritten = 0;
 	INT_32 i4Argc = 0;
-	PCHAR apcArgv[WLAN_CFG_ARGV_MAX] = {0};
+	PCHAR apcArgv[WLAN_CFG_ARGV_MAX];
 	INT_32 u4Ret = 0;
 	PARAM_CUSTOM_ACCESS_RX_STAT rRxStatisticsTest;
 
@@ -2984,7 +2826,7 @@ int priv_driver_set_band(IN struct net_device *prNetDev, IN char *pcCommand, IN 
 	UINT_32 ucBand = 0;
 	UINT_8 ucBssIndex;
 	ENUM_BAND_T eBand = BAND_NULL;
-	PCHAR apcArgv[WLAN_CFG_ARGV_MAX] = {0};
+	PCHAR apcArgv[WLAN_CFG_ARGV_MAX];
 	INT_32 u4Ret = 0;
 
 	ASSERT(prNetDev);
@@ -3025,11 +2867,11 @@ int priv_driver_set_txpower(IN struct net_device *prNetDev, IN char *pcCommand, 
 	WLAN_STATUS rStatus = WLAN_STATUS_SUCCESS;
 	UINT_32 u4BufLen = 0;
 	INT_32 i4Argc = 0;
-	PCHAR apcArgv[WLAN_CFG_ARGV_MAX] = {0};
+	PCHAR apcArgv[WLAN_CFG_ARGV_MAX];
 	P_SET_TXPWR_CTRL_T prTxpwr;
 	UINT_16 i;
 	INT_32 u4Ret = 0;
-	INT_32 ai4Setting[4] = {0};
+	INT_32 ai4Setting[4];
 
 	ASSERT(prNetDev);
 	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
@@ -3138,7 +2980,7 @@ int priv_driver_set_country(IN struct net_device *prNetDev, IN char *pcCommand, 
 	WLAN_STATUS rStatus = WLAN_STATUS_SUCCESS;
 	UINT_32 u4BufLen = 0;
 	INT_32 i4Argc = 0;
-	PCHAR apcArgv[WLAN_CFG_ARGV_MAX] = {0};
+	PCHAR apcArgv[WLAN_CFG_ARGV_MAX];
 	UINT_8 aucCountry[2];
 
 	ASSERT(prNetDev);
@@ -3175,7 +3017,7 @@ int priv_driver_set_miracast(IN struct net_device *prNetDev, IN char *pcCommand,
 	UINT_32 ucMode = 0;
 	P_WFD_CFG_SETTINGS_T prWfdCfgSettings = (P_WFD_CFG_SETTINGS_T) NULL;
 	P_MSG_WFD_CONFIG_SETTINGS_CHANGED_T prMsgWfdCfgUpdate = (P_MSG_WFD_CONFIG_SETTINGS_CHANGED_T) NULL;
-	PCHAR apcArgv[WLAN_CFG_ARGV_MAX] = {0};
+	PCHAR apcArgv[WLAN_CFG_ARGV_MAX];
 	INT_32 u4Ret = 0;
 
 	ASSERT(prNetDev);
@@ -3241,9 +3083,9 @@ int priv_driver_set_suspend_mode(IN struct net_device *prNetDev, IN char *pcComm
 {
 	P_GLUE_INFO_T prGlueInfo = NULL;
 	INT_32 i4Argc = 0;
-	PCHAR apcArgv[WLAN_CFG_ARGV_MAX] = {0};
+	PCHAR apcArgv[WLAN_CFG_ARGV_MAX];
 	BOOLEAN fgEnable;
-	UINT_32 u4Enable = 0;
+	UINT_32 u4Enable;
 	INT_32 u4Ret = 0;
 
 	ASSERT(prNetDev);
@@ -3286,8 +3128,8 @@ static int priv_driver_get_wifi_type(IN struct net_device *prNetDev,
 {
 	struct PARAM_GET_WIFI_TYPE rParamGetWifiType;
 	P_GLUE_INFO_T prGlueInfo = NULL;
-	UINT_32 rStatus;
-	UINT_32 u4BytesWritten = 0;
+	uint32_t rStatus;
+	uint32_t u4BytesWritten = 0;
 
 	ASSERT(prNetDev);
 	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE) {
@@ -3332,7 +3174,7 @@ int priv_driver_set_monitor(IN struct net_device *prNetDev, IN char *pcCommand, 
 	UINT_32 u4BufLen = 0;
 	INT_32 i4Argc = 0;
 	INT_32 i4BytesWritten = 0;
-	PCHAR apcArgv[WLAN_CFG_ARGV_MAX] = {0};
+	PCHAR apcArgv[WLAN_CFG_ARGV_MAX];
 	PARAM_CUSTOM_MONITOR_SET_STRUCT_T rMonitorSetInfo;
 	UINT_8 ucEnable = 0;
 	UINT_8 ucPriChannel = 0;
@@ -3476,33 +3318,6 @@ int priv_driver_set_monitor(IN struct net_device *prNetDev, IN char *pcCommand, 
 }
 #endif
 
-#if CFG_SUPPORT_RSSI_DISCONNECT
-int priv_driver_get_rssiDisconnect(IN struct net_device *prNetDev, IN char *pcCommand, IN int i4TotalLen)
-{
-	P_GLUE_INFO_T prGlueInfo = NULL;
-	WLAN_STATUS rStatus = WLAN_STATUS_SUCCESS;
-	UINT_32 u4BufLen = 0;
-	PARAM_RSSI i4Rssi = 0;
-	INT_32 i4BytesWritten = 0;
-
-	if (!prNetDev)
-		return -EPERM;
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return -EPERM;
-	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
-
-	rStatus = kalIoctl(prGlueInfo, wlanoidQueryRssiDisconnect, &i4Rssi,
-		sizeof(i4Rssi), TRUE, TRUE, TRUE, &u4BufLen);
-	if (rStatus != WLAN_STATUS_SUCCESS)
-		return -EPERM;
-
-	DBGLOG(REQ, INFO, "i4Rssi = %d\n", i4Rssi);
-	i4BytesWritten = snprintf(pcCommand, i4TotalLen, "DISCONRSSI %d", i4Rssi);
-	DBGLOG(REQ, INFO, "%s: Command result is %s\n", __func__, pcCommand);
-	return i4BytesWritten;
-}
-#endif
-
 #if CFG_SUPPORT_BATCH_SCAN
 #define CMD_BATCH_SET           "WLS_BATCHING SET"
 #define CMD_BATCH_GET           "WLS_BATCHING GET"
@@ -3515,7 +3330,7 @@ typedef int(*PRIV_CMD_FUNCTION) (
 		IN int i4TotalLen);
 
 struct PRIV_CMD_HANDLER {
-	UINT_8 *pcCmdStr;
+	uint8_t *pcCmdStr;
 	PRIV_CMD_FUNCTION pfHandler;
 };
 
@@ -3672,28 +3487,10 @@ INT_32 priv_driver_cmds(IN struct net_device *prNetDev, IN PCHAR pcCommand, IN I
 		} else if (!strncasecmp(pcCommand, CMD_DUMP_UAPSD, strlen(CMD_DUMP_UAPSD)))
 			kalIoctl(prGlueInfo, wlanoidDumpUapsdSetting, (PVOID)pcCommand,
 				 i4TotalLen, FALSE, FALSE, FALSE, &i4BytesWritten);
-		else if (!strncasecmp(pcCommand, CMD_O_SAR, strlen(CMD_O_SAR))) {
-			UINT_8 u2SarMode = 0;
-
-			DBGLOG(REQ, INFO, "cmd=%s\n", pcCommand);
-			if (strlen(pcCommand) > strlen(CMD_O_SAR)) {
-				if (strncasecmp(pcCommand + strlen(CMD_O_SAR) + 1, "1", 1) == 0)
-					u2SarMode = 0x01;
-				else if (strncasecmp(pcCommand + strlen(CMD_O_SAR) + 1, "2", 1) == 0)
-					u2SarMode = 0x02;
-			}
-			kalIoctl(prGlueInfo,
-				 wlanoidSendSarEnable,
-				 (PVOID)&u2SarMode, 1, FALSE, FALSE, TRUE, &i4BytesWritten);
-		} else if (!strncasecmp(pcCommand, CMD_FW_PARAM, strlen(CMD_FW_PARAM))) {
+		else if (!strncasecmp(pcCommand, CMD_FW_PARAM, strlen(CMD_FW_PARAM))) {
 			kalIoctl(prGlueInfo, wlanoidSetFwParam, (PVOID)(pcCommand + 13),
 				 i4TotalLen - 13, FALSE, FALSE, FALSE, &i4BytesWritten);
-		}
-#if CFG_SUPPORT_RSSI_DISCONNECT
-		else if (!strncasecmp(pcCommand, CMD_RSSI_DISCONNECT, strlen(CMD_RSSI_DISCONNECT)))
-			i4BytesWritten = priv_driver_get_rssiDisconnect(prNetDev, pcCommand, i4TotalLen);
-#endif
-		else
+		} else
 			i4CmdFound = 0;
 	}
 	/* i4CmdFound */
@@ -3783,144 +3580,4 @@ exit:
 
 	return ret;
 }				/* priv_support_driver_cmd */
-#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
-/* link quality monitor */
-int kalGetRate(uint32_t txmode, uint32_t rate, uint32_t frmode, uint32_t sgi,
-	       uint32_t nsts, uint32_t *pu4CurRate, uint32_t *pu4MaxRate)
-{
-	uint32_t u4CurRate, u4MaxRate;
-	uint8_t ucMaxIdx;
 
-	if (txmode == TX_RATE_MODE_CCK) {
-		ucMaxIdx = ARRAY_SIZE(g_rCckDataRateMappingTable.rate);
-		if (rate >= ucMaxIdx) {
-			DBGLOG(SW4, ERROR, "rate error for CCK: %u\n", rate);
-			return -1;
-		}
-		u4CurRate = g_rCckDataRateMappingTable.rate[rate];
-		u4MaxRate = g_rCckDataRateMappingTable.rate[ucMaxIdx - 1];
-	} else if (txmode == TX_RATE_MODE_OFDM) {
-		u4CurRate = hw_rate_ofdm_num(rate);
-		if (u4CurRate == 0) {
-			DBGLOG(SW4, ERROR, "rate error for OFDM\n");
-			return -1;
-		}
-		ucMaxIdx = ARRAY_SIZE(g_rOfdmDataRateMappingTable.rate);
-		u4MaxRate = g_rOfdmDataRateMappingTable.rate[ucMaxIdx - 1];
-	} else if ((txmode == TX_RATE_MODE_HTMIX) ||
-		   (txmode == TX_RATE_MODE_HTGF)) {
-		if (rate < 8)
-			nsts = 0;
-		else if (rate < 16) {
-			nsts = 1;
-			rate -= 8;
-		} else if (rate <= 23) {
-			nsts = 2;
-			rate -= 16;
-		} else {
-			DBGLOG(SW4, ERROR, "rate error for HT: %u\n", rate);
-			return -1;
-		}
-		u4CurRate =
-			g_rDataRateMappingTable.nsts[nsts].
-			bw[frmode].sgi[sgi].rate[rate];
-		ucMaxIdx =
-			ARRAY_SIZE(g_rDataRateMappingTable.nsts[nsts].
-			bw[frmode].sgi[sgi].rate);
-		u4MaxRate =
-			g_rDataRateMappingTable.nsts[nsts].
-			bw[frmode].sgi[sgi].rate[ucMaxIdx - 1];
-	} else {
-		if ((nsts == 0) || (nsts >= 4)) {
-			DBGLOG(SW4, ERROR, "nsts error: %u\n", nsts);
-			return -1;
-		}
-		rate &= RX_VT_RX_RATE_AC_MASK;
-		u4CurRate =
-			g_rDataRateMappingTable.nsts[nsts - 1].
-			bw[frmode].sgi[sgi].rate[rate];
-		ucMaxIdx =
-			ARRAY_SIZE(g_rDataRateMappingTable.nsts[nsts - 1].
-			bw[frmode].sgi[sgi].rate);
-		u4MaxRate =
-			g_rDataRateMappingTable.nsts[nsts - 1].
-			bw[frmode].sgi[sgi].rate[ucMaxIdx - 1];
-	}
-	*pu4CurRate = u4CurRate;
-	*pu4MaxRate = u4MaxRate;
-	return 0;
-}
-
-/* link quality monitor */
-int kalGetRxRate(IN P_GLUE_INFO_T prGlueInfo,
-		 IN UINT_32 *pu4CurRate, IN UINT_32 *pu4MaxRate)
-{
-	P_ADAPTER_T prAdapter;
-	UINT_32 txmode = 0, rate = 0, frmode = 0, sgi = 0, nsts = 0, groupid = 0;
-	UINT_32 u4RxVector0 = 0, u4RxVector1 = 0;
-	UINT_8 ucWlanIdx, ucStaIdx;
-	int rv;
-
-	*pu4CurRate = 0;
-	*pu4MaxRate = 0;
-	prAdapter = prGlueInfo->prAdapter;
-
-	/* Get AIS AP address for no argument */
-	if (prAdapter->prAisBssInfo->prStaRecOfAP) {
-		ucWlanIdx = prAdapter->prAisBssInfo->prStaRecOfAP
-			    ->ucWlanIndex;
-	} else { /* try get a peer */
-		DBGLOG(SW4, ERROR, "no connected peer found!\n");
-		goto errhandle;
-	}
-
-	if (wlanGetStaIdxByWlanIdx(prAdapter, ucWlanIdx, &ucStaIdx) ==
-	    WLAN_STATUS_SUCCESS) {
-		u4RxVector0 = prAdapter->arStaRec[ucStaIdx].u4RxVector0;
-		u4RxVector1 = prAdapter->arStaRec[ucStaIdx].u4RxVector1;
-	} else {
-		DBGLOG(SW4, ERROR, "Last RX Rate not support");
-		goto errhandle;
-	}
-
-	txmode = (u4RxVector0 & RX_VT_RX_MODE_MASK) >> RX_VT_RX_MODE_OFFSET;
-	rate = (u4RxVector0 & RX_VT_RX_RATE_MASK) >> RX_VT_RX_RATE_OFFSET;
-	frmode = (u4RxVector0 & RX_VT_FR_MODE_MASK) >> RX_VT_FR_MODE_OFFSET;
-	nsts = ((u4RxVector1 & RX_VT_NSTS_MASK) >> RX_VT_NSTS_OFFSET);
-	sgi = u4RxVector0 & RX_VT_SHORT_GI;
-	groupid = (u4RxVector1 & RX_VT_GROUP_ID_MASK) >> RX_VT_GROUP_ID_OFFSET;
-
-	if (u4RxVector0 == 0 && u4RxVector1 == 0)
-		goto errhandle;
-	/* Read Clear */
-	prAdapter->arStaRec[ucStaIdx].u4RxVector0 = 0;
-	prAdapter->arStaRec[ucStaIdx].u4RxVector1 = 0;
-	if (groupid && groupid != 63) {
-		/* mu = 1; */
-	} else {
-		/* mu = 0; */
-		nsts += 1;
-	}
-	sgi = (sgi == 0) ? 0 : 1;
-	if (frmode >= 4) {
-		DBGLOG(SW4, ERROR, "frmode error: %u\n", frmode);
-		goto errhandle;
-	}
-	DBGLOG(SW4, TRACE,
-	       "staIdx:%d,u4RxVector0=[%x], u4RxVector1=[%x], txmode=[%u], rate=[%u], frmode=[%u], sgi=[%u], nsts=[%u]\n",
-	       ucStaIdx, u4RxVector0, u4RxVector1, txmode, rate, frmode, sgi, nsts
-	);
-	rv = kalGetRate(txmode, rate, frmode, sgi, nsts, pu4CurRate,
-			pu4MaxRate);
-	if (rv < 0)
-		goto errhandle;
-	return 0;
-
-errhandle:
-	DBGLOG(SW4, ERROR,
-	       "u4RxVector0=[%x], u4RxVector1=[%x], txmode=[%u], rate=[%u], frmode=[%u], sgi=[%u], nsts=[%u]\n",
-	       u4RxVector0, u4RxVector1, txmode, rate, frmode, sgi, nsts
-	);
-	return -1;
-}
-#endif

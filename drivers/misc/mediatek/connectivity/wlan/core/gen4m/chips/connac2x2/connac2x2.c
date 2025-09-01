@@ -132,94 +132,31 @@ struct PCIE_CHIP_CR_MAPPING connac2x2_bus2chip_cr_mapping[] = {
 };
 #endif /* _HIF_PCIE || _HIF_AXI */
 
-void connac2x2ShowHifInfo(IN struct ADAPTER *prAdapter)
-{
-	uint32_t u4Value = 0;
-
-	/* conn2ap axi master sleep info */
-	HAL_MCR_RD(prAdapter, 0xBC010, &u4Value);
-	DBGLOG(HAL, INFO,
-		"Conn2ap axi master sleep prot info: 0x%08x\n", u4Value);
-
-	/* conn_mcu2ap axi master sleep info */
-	HAL_MCR_RD(prAdapter, 0xBC014, &u4Value);
-	DBGLOG(HAL, INFO,
-		"Conn_mcu2ap axi master sleep info: 0x%08x\n", u4Value);
-
-	/* conn2ap axi gals bus info */
-	HAL_MCR_RD(prAdapter, 0xBC018, &u4Value);
-	DBGLOG(HAL, INFO, "Conn2ap axi gals bus info: 0x%08x\n", u4Value);
-
-	/* conn2ap mux4to1 debug info */
-	HAL_MCR_RD(prAdapter, 0xBC01C, &u4Value);
-	DBGLOG(HAL, INFO, "Conn2ap mux4to1 debug info: 0x%08x\n", u4Value);
-
-	/* conn_hif_off bus busy info */
-	HAL_MCR_RD(prAdapter, 0xBC020, &u4Value);
-	DBGLOG(HAL, INFO, "Conn_hif_off bus busy info: 0x%08x\n", u4Value);
-
-	/* conn_hif_on misc info */
-	HAL_MCR_RD(prAdapter, 0x0713C, &u4Value);
-	DBGLOG(HAL, INFO, "Conn_hif_on misc info: 0x%08x\n", u4Value);
-
-	/* conn_on_host debug flag */
-	HAL_MCR_RD(prAdapter, 0xC1144, &u4Value);
-	DBGLOG(HAL, INFO, "Conn_on_host debug flag: 0x%08x\n", u4Value);
-}
-
 void connac2x2ConstructFirmwarePrio(struct GLUE_INFO *prGlueInfo,
 	uint8_t **apucNameTable, uint8_t **apucName,
 	uint8_t *pucNameIdx, uint8_t ucMaxNameIdx)
 {
 	uint8_t ucIdx = 0;
-	uint8_t ucFlavor = 0;
-	uint32_t u4IsFlavor = kalGetFwFlavor(&ucFlavor);
 
 	for (ucIdx = 0; apucConnac2x2FwName[ucIdx]; ucIdx++) {
 		if ((*pucNameIdx + 3) < ucMaxNameIdx) {
-			if (!u4IsFlavor) {
-				/* Type 1. WIFI_RAM_CODE_soc1_0_1_1.bin */
-				snprintf(*(apucName + (*pucNameIdx)),
-						CFG_FW_NAME_MAX_LEN,
-						"%s_%u_%u.bin",
-						apucConnac2x2FwName[ucIdx],
-						CFG_WIFI_IP_SET,
-						wlanGetEcoVersion(
-							prGlueInfo->prAdapter));
-				(*pucNameIdx) += 1;
+			/* Type 1. WIFI_RAM_CODE_soc1_0_1_1 */
+			snprintf(*(apucName + (*pucNameIdx)),
+					CFG_FW_NAME_MAX_LEN, "%s_%u_%u",
+					apucConnac2x2FwName[ucIdx],
+					CFG_WIFI_IP_SET,
+					wlanGetEcoVersion(
+						prGlueInfo->prAdapter));
+			(*pucNameIdx) += 1;
 
-				/* Type 2. WIFI_RAM_CODE_soc1_0_1_1 */
-				snprintf(*(apucName + (*pucNameIdx)),
-						CFG_FW_NAME_MAX_LEN,
-						"%s_%u_%u",
-						apucConnac2x2FwName[ucIdx],
-						CFG_WIFI_IP_SET,
-						wlanGetEcoVersion(
-							prGlueInfo->prAdapter));
-				(*pucNameIdx) += 1;
-			} else {
-				/* Type 1. WIFI_RAM_CODE_soc1_0_1a_1.bin */
-				snprintf(*(apucName + (*pucNameIdx)),
-						CFG_FW_NAME_MAX_LEN,
-						"%s_%u%c_%u.bin",
-						apucConnac2x2FwName[ucIdx],
-						CFG_WIFI_IP_SET,
-						ucFlavor,
-						wlanGetEcoVersion(
-							prGlueInfo->prAdapter));
-				(*pucNameIdx) += 1;
-
-				/* Type 2. WIFI_RAM_CODE_soc1_0_1a_1 */
-				snprintf(*(apucName + (*pucNameIdx)),
-						CFG_FW_NAME_MAX_LEN,
-						"%s_%u%c_%u",
-						apucConnac2x2FwName[ucIdx],
-						CFG_WIFI_IP_SET,
-						ucFlavor,
-						wlanGetEcoVersion(
-							prGlueInfo->prAdapter));
-				(*pucNameIdx) += 1;
-			}
+			/* Type 2. WIFI_RAM_CODE_soc1_0_1_1.bin */
+			snprintf(*(apucName + (*pucNameIdx)),
+					CFG_FW_NAME_MAX_LEN, "%s_%u_%u.bin",
+					apucConnac2x2FwName[ucIdx],
+					CFG_WIFI_IP_SET,
+					wlanGetEcoVersion(
+						prGlueInfo->prAdapter));
+			(*pucNameIdx) += 1;
 
 			/* Type 3. WIFI_RAM_CODE_soc1_0 */
 			snprintf(*(apucName + (*pucNameIdx)),
@@ -255,18 +192,12 @@ struct BUS_INFO connac2x2_bus_info = {
 	.bus2chip = connac2x2_bus2chip_cr_mapping,
 	.tx_ring_fwdl_idx = 3,
 	.tx_ring_cmd_idx = 15,
-	.tx_ring0_data_idx = 0,
-	/* Make sure your HIF_TX_MSDU_TOKEN_NUM is larger enough
-	 * to support max HW(or SW) AMSDU number.
-	 */
-	.tx_ring1_data_idx = 1,
-	.max_static_map_addr = 0x000E0000,
+	.tx_ring_data_idx = 0,
 	.fgCheckDriverOwnInt = FALSE,
 	.fgInitPCIeInt = FALSE,
 	.u4DmaMask = 36,
 
 	.pdmaSetup = asicPdmaConfig,
-	.updateTxRingMaxQuota = asicUpdatTxRingMaxQuota,
 	.enableInterrupt = asicEnableInterrupt,
 	.disableInterrupt = asicDisableInterrupt,
 	.lowPowerOwnRead = asicLowPowerOwnRead,
@@ -322,14 +253,12 @@ struct CHIP_DBG_OPS connac2x2_debug_ops = {
 	.showPleInfo = halShowPleInfo,
 	.showCsrInfo = halShowHostCsrInfo,
 	.showDmaschInfo = halShowDmaschInfo,
-	.showHifInfo = connac2x2ShowHifInfo,
 #else
 	.showPdmaInfo = NULL,
 	.showPseInfo = NULL,
 	.showPleInfo = NULL,
 	.showCsrInfo = NULL,
 	.showDmaschInfo = NULL,
-	.showHifInfo = NULL,
 #endif
 };
 
@@ -360,7 +289,6 @@ struct mt66xx_chip_info mt66xx_chip_info_connac2x2 = {
 	/* IP info, should be overwrite by getNicCapabalityV2 */
 	.u4ChipIpVersion = CONNAC_CHIP_IP_VERSION,
 	.u4ChipIpConfig = CONNAC_CHIP_IP_CONFIG,
-	.u2ADieChipVersion = CONNAC_CHIP_ADIE_INFO,
 	.asicCapInit = asicCapInit,
 	.asicEnableFWDownload = asicEnableFWDownload,
 	.asicGetChipID = asicGetChipID,
@@ -372,7 +300,6 @@ struct mt66xx_chip_info mt66xx_chip_info_connac2x2 = {
 #endif
 	.is_support_hw_amsdu = TRUE,
 	.ucMaxSwAmsduNum = 0,
-	.ucMaxSwapAntenna = 0,
 	.workAround = 0,
 };
 

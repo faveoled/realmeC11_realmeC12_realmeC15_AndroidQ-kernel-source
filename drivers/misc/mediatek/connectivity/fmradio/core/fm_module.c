@@ -128,19 +128,6 @@ static long fm_ops_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 				goto out;
 			}
 
-			if (parm.freq <= 0 || parm.freq > FM_FREQ_MAX) {
-				struct fm_tune_parm_old *old_parm =
-					(struct fm_tune_parm_old *)&parm;
-
-				if (old_parm->freq > 0 && old_parm->freq <= FM_FREQ_MAX) {
-					WCN_DBG(FM_WAR | MAIN,
-						"convert to old version fm_tune_parm [%u]->[%u]\n",
-						parm.freq, old_parm->freq);
-					parm.freq = old_parm->freq;
-					parm.deemphasis = 0;
-				}
-			}
-
 			if (parm.deemphasis == 1)
 				fm_config.rx_cfg.deemphasis = 1;
 			else
@@ -191,19 +178,6 @@ static long fm_ops_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 				goto out;
 			}
 
-			if (parm.freq <= 0 || parm.freq > FM_FREQ_MAX) {
-				struct fm_tune_parm_old *old_parm =
-					(struct fm_tune_parm_old *)&parm;
-
-				if (old_parm->freq > 0 && old_parm->freq <= FM_FREQ_MAX) {
-					WCN_DBG(FM_WAR | MAIN,
-						"convert to old version fm_tune_parm [%u]->[%u]\n",
-						parm.freq, old_parm->freq);
-					parm.freq = old_parm->freq;
-					parm.deemphasis = 0;
-				}
-			}
-
 			ret = fm_tune(fm, &parm);
 			if (ret < 0)
 				goto out;
@@ -251,7 +225,6 @@ static long fm_ops_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			struct fm_cqi_req cqi_req;
 			signed char *buf = NULL;
 			signed int tmp;
-			unsigned int cpy_size = 0;
 
 			WCN_DBG(FM_INF | MAIN, "FM_IOCTL_CQI_GET\n");
 
@@ -284,10 +257,7 @@ static long fm_ops_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 				goto out;
 			}
 
-			cpy_size = cqi_req.ch_num * sizeof(struct fm_cqi);
-			if (cpy_size > tmp)
-				cpy_size = tmp;
-			if (copy_to_user((void *)cqi_req.cqi_buf, buf, cpy_size)) {
+			if (copy_to_user((void *)cqi_req.cqi_buf, buf, cqi_req.ch_num * sizeof(struct fm_cqi))) {
 				fm_free(buf);
 				ret = -EFAULT;
 				goto out;
@@ -922,16 +892,7 @@ static long fm_ops_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	case FM_IOCTL_DUMP_REG:
 		{
 			WCN_DBG(FM_NTC | MAIN, "......FM_IOCTL_DUMP_REG......\n");
-			if (g_dbg_level != 0xfffffff7) {
-				WCN_DBG(FM_ERR | MAIN, "Not support FM_IOCTL_HOST_RDWR\n");
-				ret = -EFAULT;
-				goto out;
-			}
-			if (fm->chipon == false || fm_pwr_state_get(fm) == FM_PWR_OFF) {
-				WCN_DBG(FM_ERR | MAIN, "ERROR, FM chip is OFF\n");
-				ret = -EFAULT;
-				goto out;
-			}
+
 			ret = fm_dump_reg();
 			if (ret)
 				WCN_DBG(FM_ALT | MAIN, "fm_dump_reg err\n");
@@ -1568,8 +1529,6 @@ static signed int mt_fm_init(void)
 		platform_device_unregister(pr_fm_device);
 		return ret;
 	}
-
-	fm_register_irq(&mt_fm_dev_drv);
 
 	WCN_DBG(FM_NTC | MAIN, "6. fm platform driver registered\n");
 	return ret;

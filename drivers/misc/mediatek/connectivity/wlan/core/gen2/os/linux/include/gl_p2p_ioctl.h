@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -252,6 +250,12 @@ typedef struct iw_p2p_version {
 	UINT_32 u4Version;
 } IW_P2P_VERSION, *P_IW_P2P_VERSION;
 
+/*----------------------------------------------------------------------------*/
+/* NL80211 TEST MODE                                                          */
+/*----------------------------------------------------------------------------*/
+#if CONFIG_NL80211_TESTMODE
+
+#if CFG_AUTO_CHANNEL_SEL_SUPPORT
 typedef enum _ENUM_TESTMODE_AVAILABLE_CHAN_ATTR {
 	__NL80211_TESTMODE_AVAILABLE_CHAN_ATTR_INVALID,
 	NL80211_TESTMODE_AVAILABLE_CHAN_ATTR_2G_BASE_1,
@@ -263,6 +267,9 @@ typedef enum _ENUM_TESTMODE_AVAILABLE_CHAN_ATTR {
 	NL80211_TESTMODE_AVAILABLE_CHAN_ATTR_MAX = __NL80211_TESTMODE_AVAILABLE_CHAN_ATTR_AFTER_LAST - 1
 } ENUM_TESTMODE_AVAILABLE_CHAN_ATTR;
 
+#endif
+
+#endif
 /*******************************************************************************
 *                            P U B L I C   D A T A
 ********************************************************************************
@@ -271,7 +278,7 @@ typedef enum _ENUM_TESTMODE_AVAILABLE_CHAN_ATTR {
 #if CFG_ENABLE_WIFI_DIRECT_CFG_80211
 extern struct ieee80211_supported_band mtk_band_2ghz;
 extern struct ieee80211_supported_band mtk_band_5ghz;
-extern const UINT_32 mtk_cipher_suites[6];
+extern UINT_32 mtk_cipher_suites[6];
 #endif
 
 /*******************************************************************************
@@ -290,15 +297,10 @@ extern const UINT_32 mtk_cipher_suites[6];
 */
 
 #if CFG_ENABLE_WIFI_DIRECT_CFG_80211
-#if KERNEL_VERSION(4, 12, 0) <= CFG80211_VERSION_CODE
-int mtk_p2p_cfg80211_change_iface(struct wiphy *wiphy,
-				  struct net_device *ndev,
-				  enum nl80211_iftype type, struct vif_params *params);
-#else
 int mtk_p2p_cfg80211_change_iface(struct wiphy *wiphy,
 				  struct net_device *ndev,
 				  enum nl80211_iftype type, u32 *flags, struct vif_params *params);
-#endif
+
 int mtk_p2p_cfg80211_add_key(struct wiphy *wiphy,
 			     struct net_device *ndev,
 			     u8 key_index, bool pairwise, const u8 *mac_addr, struct key_params *params);
@@ -399,6 +401,10 @@ int mtk_p2p_cfg80211_testmode_wfd_update_cmd(IN struct wiphy *wiphy, IN void *da
 #endif
 
 int mtk_p2p_cfg80211_testmode_hotspot_block_cmd(IN struct wiphy *wiphy, IN void *data, IN int len);
+
+#if CFG_AUTO_CHANNEL_SEL_SUPPORT
+int mtk_p2p_cfg80211_testmode_get_best_channel(IN struct wiphy *wiphy, IN void *data, IN int len);
+#endif
 
 int mtk_p2p_cfg80211_testmode_hotspot_config_cmd(IN struct wiphy *wiphy, IN void *data, IN int len);
 

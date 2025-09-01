@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -49,7 +47,6 @@ static PUINT_8 apucDebugAAState[AA_STATE_NUM] = {
 	(PUINT_8) DISP_STRING("SAA_STATE_WAIT_AUTH2"),
 	(PUINT_8) DISP_STRING("SAA_STATE_SEND_AUTH3"),
 	(PUINT_8) DISP_STRING("SAA_STATE_WAIT_AUTH4"),
-	(PUINT_8) DISP_STRING("SAA_EXTERNAL_AUTH"),
 	(PUINT_8) DISP_STRING("SAA_STATE_SEND_ASSOC1"),
 	(PUINT_8) DISP_STRING("SAA_STATE_WAIT_ASSOC2"),
 	(PUINT_8) DISP_STRING("AAA_STATE_SEND_AUTH2"),
@@ -94,8 +91,9 @@ saaFsmSteps(IN P_ADAPTER_T prAdapter,
 	BOOLEAN fgIsTransition;
 
 	ASSERT(prStaRec);
-	if (!prStaRec)
+	if (!prStaRec) {
 		return;
+	}
 
 	do {
 
@@ -244,12 +242,6 @@ saaFsmSteps(IN P_ADAPTER_T prAdapter,
 
 		case SAA_STATE_WAIT_AUTH4:
 			break;
-
-#if CFG_SUPPORT_WPA3
-		case SAA_STATE_EXTERNAL_AUTH:
-			kalExternalAuthRequest(prAdapter);
-			break;
-#endif
 
 		case SAA_STATE_SEND_ASSOC1:
 			/* Do tasks in INIT STATE */
@@ -499,15 +491,9 @@ VOID saaFsmRunEventStart(IN P_ADAPTER_T prAdapter, IN P_MSG_HDR_T prMsgHdr)
 		DBGLOG(RLM, INFO, "STA 40mAllowed=%d\n", prBssInfo->fgAssoc40mBwAllowed);
 	}
 	/* 4 <7> Trigger SAA FSM */
-	if (prStaRec->ucStaState == STA_STATE_1) {
-		if (prStaRec->ucAuthAlgNum == AUTH_ALGORITHM_NUM_SAE)
-			saaFsmSteps(prAdapter, prStaRec,
-				    SAA_STATE_EXTERNAL_AUTH,
-				    (P_SW_RFB_T) NULL);
-		else
-			saaFsmSteps(prAdapter, prStaRec, SAA_STATE_SEND_AUTH1,
-				    (P_SW_RFB_T) NULL);
-	} else if (prStaRec->ucStaState == STA_STATE_2 || prStaRec->ucStaState == STA_STATE_3)
+	if (prStaRec->ucStaState == STA_STATE_1)
+		saaFsmSteps(prAdapter, prStaRec, SAA_STATE_SEND_AUTH1, (P_SW_RFB_T) NULL);
+	else if (prStaRec->ucStaState == STA_STATE_2 || prStaRec->ucStaState == STA_STATE_3)
 		saaFsmSteps(prAdapter, prStaRec, SAA_STATE_SEND_ASSOC1, (P_SW_RFB_T) NULL);
 
 }				/* end of saaFsmRunEventStart() */
@@ -930,10 +916,6 @@ VOID saaFsmRunEventRxAuth(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb)
 
 			saaFsmSteps(prAdapter, prStaRec, eNextState, (P_SW_RFB_T) NULL);
 		}
-		break;
-
-	case SAA_STATE_EXTERNAL_AUTH:
-		kalIndicateRxMgmtFrame(prAdapter->prGlueInfo, prSwRfb);
 		break;
 
 	default:
@@ -1361,31 +1343,6 @@ VOID saaFsmRunEventAbort(IN P_ADAPTER_T prAdapter, IN P_MSG_HDR_T prMsgHdr)
 #endif
 
 }				/* end of saaFsmRunEventAbort() */
-
-void saaFsmRunEventExternalAuthDone(IN P_ADAPTER_T prAdapter,
-				    IN P_MSG_HDR_T prMsgHdr)
-{
-	struct MSG_SAA_EXTERNAL_AUTH_DONE *prSaaFsmMsg = NULL;
-	P_STA_RECORD_T prStaRec;
-	uint16_t status;
-
-	ASSERT(prAdapter);
-	ASSERT(prMsgHdr);
-
-	prSaaFsmMsg = (struct MSG_SAA_EXTERNAL_AUTH_DONE *)prMsgHdr;
-	prStaRec = prSaaFsmMsg->prStaRec;
-	status = prSaaFsmMsg->status;
-
-	if (status != WLAN_STATUS_SUCCESS)
-		saaFsmSteps(prAdapter, prStaRec, AA_STATE_IDLE,
-			    (P_SW_RFB_T)NULL);
-	else if (prStaRec->eAuthAssocState != SAA_STATE_EXTERNAL_AUTH)
-		DBGLOG(SAA, WARN,
-		       "Receive External Auth DONE at wrong state\n");
-	else
-		saaFsmSteps(prAdapter, prStaRec, SAA_STATE_SEND_ASSOC1,
-			    (P_SW_RFB_T)NULL);
-}				/* end of saaFsmRunEventExternalAuthDone() */
 
 /* TODO(Kevin): following code will be modified and move to AIS FSM */
 #if 0

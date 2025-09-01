@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -31,7 +29,6 @@
 #include "wlan_p2p.h"
 #include "gl_kal.h"
 #include "gl_wext_priv.h"
-#include "gl_p2p_ioctl.h"
 #include "nic/p2p.h"
 
 #if DBG
@@ -212,12 +209,5 @@ VOID kalP2pUnlinkBss(IN P_GLUE_INFO_T prGlueInfo, IN UINT_8 aucBSSID[]);
 
 void kalP2pIndicateQueuedMgmtFrame(IN P_GLUE_INFO_T prGlueInfo,
 		IN struct P2P_QUEUED_ACTION_FRAME *prFrame);
-
-void kalP2pIndicateAcsResult(IN P_GLUE_INFO_T prGlueInfo,
-		IN uint8_t ucPrimaryCh,
-		IN uint8_t ucSecondCh,
-		IN uint8_t ucSeg0Ch,
-		IN uint8_t ucSeg1Ch,
-		IN enum ENUM_MAX_BANDWIDTH_SETTING eChnlBw);
 
 #endif /* _GL_P2P_KAL_H */

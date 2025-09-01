@@ -132,7 +132,7 @@ static const TX_TC_TRAFFIC_SETTING_T arTcTrafficSettings[NET_TC_NUM] = {
 	 NIC_TX_MGMT_DEFAULT_RETRY_COUNT_LIMIT},
 
 	/* non-StaRec frame (BMC, etc...) */
-	{NIC_TX_DESC_LONG_FORMAT_LENGTH, NIC_TX_BMC_REMAINING_TX_TIME,
+	{NIC_TX_DESC_LONG_FORMAT_LENGTH, TX_DESC_TX_TIME_NO_LIMIT,
 	 NIC_TX_DATA_DEFAULT_RETRY_COUNT_LIMIT},
 };
 
@@ -1349,11 +1349,6 @@ nicTxFillDesc(IN P_ADAPTER_T prAdapter, IN P_MSDU_INFO_T prMsduInfo,
 	UINT_8 ucChksumFlag = 0;
 #endif
 
-	/* This is to lock the process to preventing */
-	/* nicTxFreeDescTemplate while Filling it */
-	KAL_SPIN_LOCK_DECLARATION();
-	KAL_ACQUIRE_SPIN_LOCK(prAdapter, SPIN_LOCK_TX_DESC);
-
 /*
 *------------------------------------------------------------------------------
 * Fill up common fileds
@@ -1366,8 +1361,7 @@ nicTxFillDesc(IN P_ADAPTER_T prAdapter, IN P_MSDU_INFO_T prMsduInfo,
 		u4TxDescAppendLength = 0;
 
 	/* Get TXD from pre-allocated template */
-	if (nicTxIsTXDTemplateAllowed(prAdapter, prMsduInfo, prStaRec) &&
-		prStaRec->aprTxDescTemplate[prMsduInfo->ucUserPriority]) {
+	if (nicTxIsTXDTemplateAllowed(prAdapter, prMsduInfo, prStaRec)) {
 		prTxDescTemplate = prStaRec->aprTxDescTemplate[prMsduInfo->ucUserPriority];
 #if 1
 		u4TxDescLength = NIC_TX_DESC_LONG_FORMAT_LENGTH;
@@ -1426,8 +1420,6 @@ nicTxFillDesc(IN P_ADAPTER_T prAdapter, IN P_MSDU_INFO_T prMsduInfo,
 
 	if (pu4TxDescLength)
 		*pu4TxDescLength = u4TxDescLength;
-
-	KAL_RELEASE_SPIN_LOCK(prAdapter, SPIN_LOCK_TX_DESC);
 }
 
 VOID
@@ -1569,9 +1561,7 @@ WLAN_STATUS nicTxGenerateDescTemplate(IN P_ADAPTER_T prAdapter, IN P_STA_RECORD_
 
 			for (ucTid = 0; ucTid < TX_DESC_TID_NUM; ucTid++) {
 				prStaRec->aprTxDescTemplate[ucTid] = prTxDesc;
-				DBGLOG(QM, TRACE,
-					"TXD template: TID[%u] Ptr[0x%p]\n",
-					ucTid, prTxDesc);
+				DBGLOG(QM, TRACE, "TXD template: TID[%u] Ptr[0x%x]\n", ucTid, (ULONG) prTxDesc);
 			}
 		} while (FALSE);
 	}
@@ -1597,11 +1587,6 @@ VOID nicTxFreeDescTemplate(IN P_ADAPTER_T prAdapter, IN P_STA_RECORD_T prStaRec)
 	UINT_8 ucTxDescSize;
 	P_HW_MAC_TX_DESC_T prTxDesc;
 
-	/* This is to lock the process to preventing */
-	/* nicTxFreeDescTemplate while Filling it */
-	KAL_SPIN_LOCK_DECLARATION();
-	KAL_ACQUIRE_SPIN_LOCK(prAdapter, SPIN_LOCK_TX_DESC);
-
 	DBGLOG(QM, INFO, "Free TXD template for STA[%u] QoS[%u]\n", prStaRec->ucIndex, prStaRec->fgIsQoS);
 
 	if (prStaRec->fgIsQoS) {
@@ -1615,6 +1600,7 @@ VOID nicTxFreeDescTemplate(IN P_ADAPTER_T prAdapter, IN P_STA_RECORD_T prStaRec)
 					ucTxDescSize = NIC_TX_DESC_SHORT_FORMAT_LENGTH;
 
 				kalMemFree(prTxDesc, VIR_MEM_TYPE, ucTxDescSize);
+
 				prTxDesc = prStaRec->aprTxDescTemplate[ucTid] = NULL;
 			}
 		}
@@ -1632,8 +1618,6 @@ VOID nicTxFreeDescTemplate(IN P_ADAPTER_T prAdapter, IN P_STA_RECORD_T prStaRec)
 		for (ucTid = 0; ucTid < TX_DESC_TID_NUM; ucTid++)
 			prStaRec->aprTxDescTemplate[ucTid] = NULL;
 	}
-
-	KAL_RELEASE_SPIN_LOCK(prAdapter, SPIN_LOCK_TX_DESC);
 }
 
 /*----------------------------------------------------------------------------*/
@@ -2681,10 +2665,8 @@ UINT_8 nicTxGetWlanIdx(P_ADAPTER_T prAdapter, UINT_8 ucBssIdx, UINT_8 ucStaRecId
 	}
 
 	if (ucWlanIndex >= WTBL_SIZE) {
-		DBGLOG(TX, WARN,
-		"Unexpected WIDX[%u] BSS[%u] STA[%u], set WIDX to default value[%u]\n",
-		       ucWlanIndex, ucBssIdx, ucStaRecIdx,
-			   NIC_TX_DEFAULT_WLAN_INDEX);
+		DBGLOG(TX, WARN, "%s: Unexpected WIDX[%u] BSS[%u] STA[%u], set WIDX to default value[%u]\n",
+		       ucWlanIndex, ucBssIdx, ucStaRecIdx, NIC_TX_DEFAULT_WLAN_INDEX);
 
 		ucWlanIndex = NIC_TX_DEFAULT_WLAN_INDEX;
 	}
@@ -3300,14 +3282,12 @@ VOID nicTxDirectClearHifQ(IN P_ADAPTER_T prAdapter)
 	QUEUE_INITIALIZE(prNeedToFreeQue);
 
 	for (ucHifTc = 0; ucHifTc < TX_PORT_NUM; ucHifTc++) {
-		spin_lock_bh(&prGlueInfo->rSpinLock[SPIN_LOCK_TX_DIRECT]);
 		if (QUEUE_IS_NOT_EMPTY(&prAdapter->rTxDirectHifQueue[ucHifTc])) {
+			spin_lock_bh(&prGlueInfo->rSpinLock[SPIN_LOCK_TX_DIRECT]);
 			QUEUE_MOVE_ALL(prNeedToFreeQue, &prAdapter->rTxDirectHifQueue[ucHifTc]);
 			spin_unlock_bh(&prGlueInfo->rSpinLock[SPIN_LOCK_TX_DIRECT]);
 
 			wlanProcessQueuedMsduInfo(prAdapter, (P_MSDU_INFO_T) QUEUE_GET_HEAD(prNeedToFreeQue));
-		} else {
-		    spin_unlock_bh(&prGlueInfo->rSpinLock[SPIN_LOCK_TX_DIRECT]);
 		}
 	}
 }
@@ -3319,14 +3299,13 @@ VOID nicTxDirectClearStaPsQ(IN P_ADAPTER_T prAdapter, UINT_8 ucStaRecIndex)
 	P_QUE_T prNeedToFreeQue = &rNeedToFreeQue;
 
 	QUEUE_INITIALIZE(prNeedToFreeQue);
-	spin_lock_bh(&prGlueInfo->rSpinLock[SPIN_LOCK_TX_DIRECT]);
+
 	if (QUEUE_IS_NOT_EMPTY(&prAdapter->rStaPsQueue[ucStaRecIndex])) {
+		spin_lock_bh(&prGlueInfo->rSpinLock[SPIN_LOCK_TX_DIRECT]);
 		QUEUE_MOVE_ALL(prNeedToFreeQue, &prAdapter->rStaPsQueue[ucStaRecIndex]);
 		spin_unlock_bh(&prGlueInfo->rSpinLock[SPIN_LOCK_TX_DIRECT]);
 
 		wlanProcessQueuedMsduInfo(prAdapter, (P_MSDU_INFO_T) QUEUE_GET_HEAD(prNeedToFreeQue));
-	} else {
-	    spin_unlock_bh(&prGlueInfo->rSpinLock[SPIN_LOCK_TX_DIRECT]);
 	}
 }
 
@@ -3337,14 +3316,13 @@ VOID nicTxDirectClearBssAbsentQ(IN P_ADAPTER_T prAdapter, UINT_8 ucBssIndex)
 	P_QUE_T prNeedToFreeQue = &rNeedToFreeQue;
 
 	QUEUE_INITIALIZE(prNeedToFreeQue);
-	spin_lock_bh(&prGlueInfo->rSpinLock[SPIN_LOCK_TX_DIRECT]);
+
 	if (QUEUE_IS_NOT_EMPTY(&prAdapter->rBssAbsentQueue[ucBssIndex])) {
+		spin_lock_bh(&prGlueInfo->rSpinLock[SPIN_LOCK_TX_DIRECT]);
 		QUEUE_MOVE_ALL(prNeedToFreeQue, &prAdapter->rBssAbsentQueue[ucBssIndex]);
 		spin_unlock_bh(&prGlueInfo->rSpinLock[SPIN_LOCK_TX_DIRECT]);
 
 		wlanProcessQueuedMsduInfo(prAdapter, (P_MSDU_INFO_T) QUEUE_GET_HEAD(prNeedToFreeQue));
-	} else {
-	    spin_unlock_bh(&prGlueInfo->rSpinLock[SPIN_LOCK_TX_DIRECT]);
 	}
 }
 
@@ -3354,17 +3332,16 @@ VOID nicTxDirectClearAllStaPsQ(IN P_ADAPTER_T prAdapter)
 	UINT_32 u4StaPsBitmap;
 
 	u4StaPsBitmap = prAdapter->u4StaPsBitmap;
-	if (!u4StaPsBitmap)
-		return;
 
-	for (ucStaRecIndex = 0; ucStaRecIndex < CFG_STA_REC_NUM; ++ucStaRecIndex) {
-		if (QUEUE_IS_NOT_EMPTY(&prAdapter->rStaPsQueue[ucStaRecIndex])) {
-			nicTxDirectClearStaPsQ(prAdapter, ucStaRecIndex);
-			u4StaPsBitmap &= ~BIT(ucStaRecIndex);
+	if (u4StaPsBitmap)
+		for (ucStaRecIndex = 0; ucStaRecIndex < CFG_STA_REC_NUM; ++ucStaRecIndex) {
+			if (QUEUE_IS_NOT_EMPTY(&prAdapter->rStaPsQueue[ucStaRecIndex])) {
+				nicTxDirectClearBssAbsentQ(prAdapter, ucStaRecIndex);
+				u4StaPsBitmap &= ~BIT(ucStaRecIndex);
+			}
+			if (u4StaPsBitmap == 0)
+				break;
 		}
-		if (u4StaPsBitmap == 0)
-			break;
-	}
 }
 
 /*----------------------------------------------------------------------------*/
@@ -3390,10 +3367,6 @@ static VOID nicTxDirectCheckStaPsQ(IN P_ADAPTER_T prAdapter, UINT_8 ucStaRecInde
 		return;
 
 	prStaRec = cnmGetStaRecByIndex(prAdapter, ucStaRecIndex);
-	if (!prStaRec) {
-		DBGLOG(TX, WARN, "prStaRec is NULL!\n");
-		return;
-	}
 
 	QUEUE_CONCATENATE_QUEUES(&prAdapter->rStaPsQueue[ucStaRecIndex], prQue);
 	QUEUE_REMOVE_HEAD(&prAdapter->rStaPsQueue[ucStaRecIndex], prQueueEntry, P_QUE_ENTRY_T);
@@ -3512,7 +3485,7 @@ static VOID nicTxDirectCheckBssAbsentQ(IN P_ADAPTER_T prAdapter, UINT_8 ucBssInd
 		if (prAdapter->u4BssAbsentBitmap)
 			DBGLOG(TX, INFO, "fgIsNetAbsent END!\n");
 		QUEUE_INSERT_TAIL(prQue, (P_QUE_ENTRY_T) prMsduInfo);
-		if (QUEUE_IS_NOT_EMPTY(&prAdapter->rBssAbsentQueue[ucBssIndex]))
+		if (QUEUE_IS_NOT_EMPTY(&prAdapter->rBssAbsentQueue[prMsduInfo->ucStaRecIndex]))
 			QUEUE_CONCATENATE_QUEUES(prQue, &prAdapter->rBssAbsentQueue[ucBssIndex]);
 	}
 	prAdapter->u4BssAbsentBitmap &= ~BIT(ucBssIndex);
@@ -3651,10 +3624,6 @@ static WLAN_STATUS nicTxDirectStartXmitMain(struct sk_buff *prSkb, P_MSDU_INFO_T
 			break;
 		}
 
-		/* BMC pkt need limited rate according to coex report*/
-		if (prMsduInfo->ucStaRecIndex == STA_REC_INDEX_BMCAST)
-			nicTxSetPktLowestFixedRate(prAdapter, prMsduInfo);
-
 		nicTxFillDataDesc(prAdapter, prMsduInfo);
 
 		prStaRec = cnmGetStaRecByIndex(prAdapter, prMsduInfo->ucStaRecIndex);
@@ -3777,20 +3746,11 @@ static WLAN_STATUS nicTxDirectStartXmitMain(struct sk_buff *prSkb, P_MSDU_INFO_T
 * \retval none
 */
 /*----------------------------------------------------------------------------*/
-#if KERNEL_VERSION(4, 14, 0) <= LINUX_VERSION_CODE
-void nicTxDirectTimerCheckSkbQ(struct timer_list *timer)
-#else
 void nicTxDirectTimerCheckSkbQ(unsigned long data)
-#endif
 {
-#if KERNEL_VERSION(4, 14, 0) <= LINUX_VERSION_CODE
-	struct _ADAPTER_T *prAdapter =
-		from_timer(prAdapter, timer, rTxDirectSkbTimer);
-	struct _GLUE_INFO_T *prGlueInfo = prAdapter->prGlueInfo;
-#else
 	P_GLUE_INFO_T prGlueInfo = (P_GLUE_INFO_T)data;
 	P_ADAPTER_T prAdapter = prGlueInfo->prAdapter;
-#endif
+
 	if (skb_queue_len(&prAdapter->rTxDirectSkbQueue))
 		nicTxDirectStartXmit(NULL, prGlueInfo);
 	else
@@ -3807,20 +3767,10 @@ void nicTxDirectTimerCheckSkbQ(unsigned long data)
 * \retval none
 */
 /*----------------------------------------------------------------------------*/
-#if KERNEL_VERSION(4, 14, 0) <= LINUX_VERSION_CODE
-void nicTxDirectTimerCheckHifQ(struct timer_list *timer)
-#else
 void nicTxDirectTimerCheckHifQ(unsigned long data)
-#endif
 {
-#if KERNEL_VERSION(4, 14, 0) <= LINUX_VERSION_CODE
-	struct _ADAPTER_T *prAdapter =
-		from_timer(prAdapter, timer, rTxDirectHifTimer);
-	struct _GLUE_INFO_T *prGlueInfo = prAdapter->prGlueInfo;
-#else
 	P_GLUE_INFO_T prGlueInfo = (P_GLUE_INFO_T)data;
 	P_ADAPTER_T prAdapter = prGlueInfo->prAdapter;
-#endif
 	UINT_8 ucHifTc = 0;
 	UINT_32 u4StaPsBitmap, u4BssAbsentBitmap;
 	UINT_8 ucStaRecIndex, ucBssIndex;

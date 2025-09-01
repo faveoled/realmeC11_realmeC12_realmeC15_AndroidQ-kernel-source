@@ -50,6 +50,17 @@
  *
  *****************************************************************************/
 /*
+ ***************************************************************************
+ * MediaTek Inc.
+ *
+ * All rights reserved. source code is an unpublished work and the
+ * use of a copyright notice does not imply otherwise. This source code
+ * contains confidential trade secret material of MediaTek. Any attemp
+ * or participation in deciphering, decoding, reverse engineering or in any
+ * way altering the source code is stricitly prohibited, unless the prior
+ * written consent of MediaTek, Inc. is obtained.
+ ***************************************************************************
+
 	Module Name:
 	gl_ate_agent.c
 */
@@ -63,7 +74,6 @@
  ********************************************************************************
  */
 #include "precomp.h"
-
 #if CFG_SUPPORT_QA_TOOL
 #include "gl_wext.h"
 #include "gl_cfg80211.h"
@@ -1092,7 +1102,7 @@ INT_32 MT_ATESetRate(struct net_device *prNetDev, UINT_32 u4Rate)
 
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
 
-	DBGLOG(RFTEST, INFO, "MT6632 : QA_ATE_HOOK SetRate=0x%08x\n", u4Rate);
+	DBGLOG(RFTEST, INFO, "MT6632 : QA_ATE_HOOK SetRate=0x%08lx\n", u4Rate);
 
 	rRfATInfo.u4FuncIndex = RF_AT_FUNCID_RATE;
 	rRfATInfo.u4FuncData = u4Rate;
@@ -1386,9 +1396,7 @@ INT_32 MT_ATELogOnOff(struct net_device *prNetDev, UINT_32 u4Type, UINT_32 u4On_
 				rxv = rRfATInfo.u4FuncData;
 
 				if (i % 36 == 0)
-					TOOL_PRINTLOG(RFTEST, ERROR,
-					"%%[RXV DUMP START][%d]\n",
-					(i / 36) + 1);
+					TOOL_PRINTLOG(RFTEST, ERROR, "\%[RXV DUMP START][%d]\n", (i / 36) + 1);
 
 				TOOL_PRINTLOG(RFTEST, ERROR, "[RXVD%d]%08x\n", ((i % 36) / 4) + 1, rxv);
 
@@ -2497,8 +2505,6 @@ INT_32 MT_ATEWriteEfuse(struct net_device *prNetDev, UINT_16 u2Offset, UINT_16 u
 	kalMemSet(&rAccessEfuseInfoWrite, 0, sizeof(PARAM_CUSTOM_ACCESS_EFUSE_T));
 	u4Index = u2Offset % EFUSE_BLOCK_SIZE;
 
-	if (u4Index > EFUSE_BLOCK_SIZE - 2)
-		return -EINVAL;
 
 	prGlueInfo->prAdapter->aucEepromVaule[u4Index] = u2Content;
 	prGlueInfo->prAdapter->aucEepromVaule[u4Index+1] = u2Content >> 8 & 0xff;
@@ -3274,8 +3280,7 @@ INT_32 TxBfProfilePnWrite(struct net_device *prNetDev, UINT_8 profileIdx, UINT_1
 	rTxBfActionInfo.rProfilePnWrite.ucTxBfCategory = BF_PN_WRITE;
 	rTxBfActionInfo.rProfilePnWrite.ucPfmuIdx = profileIdx;
 	rTxBfActionInfo.rProfilePnWrite.u2bw = u2bw;
-	memcpy(&rTxBfActionInfo.rProfilePnWrite.ucBuf[0], &au2XSTS[0],
-		sizeof(UINT_16)*12);
+	memcpy(&rTxBfActionInfo.rProfilePnWrite.ucBuf[0], &au2XSTS, sizeof(UINT_16)*12);
 
 	i4Status = kalIoctl(prGlueInfo,
 			    wlanoidTxBfAction,

@@ -67,6 +67,7 @@
  */
 #define CONNAC_CHIP_IP_VERSION			(0x10020300)
 #define CONNAC_CHIP_IP_CONFIG			(0x1)
+#define CONNAC_CHIP_ADIE_INFO			(0x31)
 #define USB_HIF_TXD_LEN    4
 
 /*******************************************************************************
@@ -109,8 +110,6 @@ void fillTxDescTxByteCountWithCR4(IN struct ADAPTER *prAdapter,
 void asicPcieDmaShdlInit(IN struct ADAPTER *prAdapter);
 void asicPdmaLoopBackConfig(struct GLUE_INFO *prGlueInfo, u_int8_t fgEnable);
 void asicPdmaConfig(struct GLUE_INFO *prGlueInfo, u_int8_t fgEnable);
-uint32_t asicUpdatTxRingMaxQuota(IN struct ADAPTER *prAdapter,
-	IN uint16_t u2Port, IN uint32_t u4MaxQuota);
 void asicEnableInterrupt(IN struct ADAPTER *prAdapter);
 void asicDisableInterrupt(IN struct ADAPTER *prAdapter);
 void asicLowPowerOwnRead(IN struct ADAPTER *prAdapter, OUT u_int8_t *pfgResult);

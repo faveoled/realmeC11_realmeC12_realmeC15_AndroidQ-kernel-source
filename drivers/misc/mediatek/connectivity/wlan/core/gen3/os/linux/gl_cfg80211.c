@@ -712,9 +712,6 @@ int mtk_cfg80211_scan(struct wiphy *wiphy,
 	struct _PARAM_SCAN_RANDOM_MAC_ADDR_T *prScanRandMacAddr = NULL;
 	UINT_32 num_ssid = 0, u4ValidIdx;
 
-	if (kalIsResetting())
-		return -EBUSY;
-
 	prGlueInfo = (P_GLUE_INFO_T) wiphy_priv(wiphy);
 	ASSERT(prGlueInfo);
 
@@ -866,9 +863,10 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 	WLAN_STATUS rStatus;
 	UINT_32 u4BufLen;
 	ENUM_PARAM_ENCRYPTION_STATUS_T eEncStatus;
-	ENUM_PARAM_AUTH_MODE_T eAuthMode = AUTH_MODE_NUM;
+	ENUM_PARAM_AUTH_MODE_T eAuthMode;
 	UINT_32 cipher;
 	PARAM_CONNECT_T rNewSsid;
+	BOOLEAN fgCarryWPSIE = FALSE;
 	ENUM_PARAM_OP_MODE_T eOpMode;
 	UINT_32 i, u4AkmSuite = 0;
 	P_DOT11_RSNA_CONFIG_AUTHENTICATION_SUITES_ENTRY prEntry;
@@ -901,10 +899,10 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 
 	prConnSettings = &prGlueInfo->prAdapter->rWifiVar.rConnSettings;
 
-	if (prConnSettings->eOPMode > NET_TYPE_AUTO_SWITCH)
+	if (prGlueInfo->prAdapter->rWifiVar.rConnSettings.eOPMode > NET_TYPE_AUTO_SWITCH)
 		eOpMode = NET_TYPE_AUTO_SWITCH;
 	else
-		eOpMode = prConnSettings->eOPMode;
+		eOpMode = prGlueInfo->prAdapter->rWifiVar.rConnSettings.eOPMode;
 
 	rStatus = kalIoctl(prGlueInfo,
 			   wlanoidSetInfrastructureMode, &eOpMode, sizeof(eOpMode), FALSE, FALSE, TRUE, &u4BufLen);
@@ -945,14 +943,6 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 	/* DBGLOG(SCN, INFO, ("MFP=%d\n", prGlueInfo->rWpaInfo.u4Mfp)); */
 #endif
 
-	DBGLOG(REQ, INFO,
-	       "sme:Flag=%08x Type=%x Ver=%x Na=%d Nc=%d Pri=%d Len=%d\n",
-	       sme->flags, sme->auth_type,
-	       sme->crypto.wpa_versions,
-	       sme->crypto.n_akm_suites,
-	       sme->crypto.n_ciphers_pairwise,
-	       sme->privacy, sme->ie_len);
-
 	if (sme->crypto.wpa_versions & NL80211_WPA_VERSION_1)
 		prGlueInfo->rWpaInfo.u4WpaVersion = IW_AUTH_WPA_VERSION_WPA;
 	else if (sme->crypto.wpa_versions & NL80211_WPA_VERSION_2)
@@ -970,18 +960,15 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 	case NL80211_AUTHTYPE_FT:
 		prGlueInfo->rWpaInfo.u4AuthAlg = IW_AUTH_ALG_FT;
 		break;
-	case NL80211_AUTHTYPE_SAE:
-		prGlueInfo->rWpaInfo.u4AuthAlg = IW_AUTH_ALG_SAE;
-		break;
 	default:
 		prGlueInfo->rWpaInfo.u4AuthAlg = IW_AUTH_ALG_OPEN_SYSTEM | IW_AUTH_ALG_SHARED_KEY;
 		break;
 	}
 
 	if (sme->crypto.n_ciphers_pairwise) {
-		DBGLOG(SCN, INFO, "[wlan] cipher pairwise (%x)\n", sme->crypto.ciphers_pairwise[0]);
+		/* DBGLOG(SCN, INFO, ("[wlan] cipher pairwise (%x)\n", sme->crypto.ciphers_pairwise[0])); */
 
-		prConnSettings->rRsnInfo.au4PairwiseKeyCipherSuite[0] =
+		prGlueInfo->prAdapter->rWifiVar.rConnSettings.rRsnInfo.au4PairwiseKeyCipherSuite[0] =
 		    sme->crypto.ciphers_pairwise[0];
 		switch (sme->crypto.ciphers_pairwise[0]) {
 		case WLAN_CIPHER_SUITE_WEP40:
@@ -1006,7 +993,7 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 	}
 
 	if (sme->crypto.cipher_group) {
-		prConnSettings->rRsnInfo.u4GroupKeyCipherSuite = sme->crypto.cipher_group;
+		prGlueInfo->prAdapter->rWifiVar.rConnSettings.rRsnInfo.u4GroupKeyCipherSuite = sme->crypto.cipher_group;
 		switch (sme->crypto.cipher_group) {
 		case WLAN_CIPHER_SUITE_WEP40:
 			prGlueInfo->rWpaInfo.u4CipherGroup = IW_AUTH_CIPHER_WEP40;
@@ -1030,7 +1017,7 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 	}
 	/* DBGLOG(SCN, INFO, ("akm_suites=%x\n", sme->crypto.akm_suites[0])); */
 	if (sme->crypto.n_akm_suites) {
-		prConnSettings->rRsnInfo.au4AuthKeyMgtSuite[0] =
+		prGlueInfo->prAdapter->rWifiVar.rConnSettings.rRsnInfo.au4AuthKeyMgtSuite[0] =
 		    sme->crypto.akm_suites[0];
 		if (prGlueInfo->rWpaInfo.u4WpaVersion == IW_AUTH_WPA_VERSION_WPA) {
 			switch (sme->crypto.akm_suites[0]) {
@@ -1077,17 +1064,8 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 				u4AkmSuite = RSN_AKM_SUITE_PSK_SHA256;
 				break;
 #endif
-			case WLAN_AKM_SUITE_SAE:
-				eAuthMode = AUTH_MODE_WPA3_SAE;
-				u4AkmSuite = RSN_CIPHER_SUITE_SAE;
-				break;
-			case WLAN_AKM_SUITE_OWE:
-				DBGLOG(REQ, WARN, "Akm Suite = OWE 0x000FAC12\n");
-				eAuthMode = AUTH_MODE_WPA3_OWE;
-				u4AkmSuite = RSN_CIPHER_SUITE_OWE;
-				break;
 			default:
-				DBGLOG(REQ, WARN, "invalid wpa2 akm (%u)\n", sme->crypto.akm_suites[0]);
+				DBGLOG(REQ, WARN, "invalid auth mode (%d)\n", eAuthMode);
 				return -EINVAL;
 			}
 		}
@@ -1120,12 +1098,6 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 		UINT_32 u4BufLen;
 		PUINT_8 prDesiredIE = NULL;
 		PUINT_8 pucIEStart = (PUINT_8)sme->ie;
-
-		/*We need to check the length of IEs*/
-		if (sme->ie_len > MSDU_MAX_LENGTH) {
-			DBGLOG(REQ, ERROR, "IE len exceeds limit %d\n", sme->ie_len);
-			return -EINVAL;
-		}
 #if CFG_SUPPORT_WAPI
 		rStatus = kalIoctl(prGlueInfo,
 				   wlanoidSetWapiAssocInfo, pucIEStart, sme->ie_len, FALSE, FALSE, FALSE, &u4BufLen);
@@ -1136,6 +1108,13 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 #if CFG_SUPPORT_WPS2
 		if (wextSrchDesiredWPSIE(pucIEStart, sme->ie_len, 0xDD, (PUINT_8 *) &prDesiredIE)) {
 			prGlueInfo->fgWpsActive = TRUE;
+			fgCarryWPSIE = TRUE;
+
+			rStatus = kalIoctl(prGlueInfo,
+					   wlanoidSetWSCAssocInfo,
+					   prDesiredIE, IE_SIZE(prDesiredIE), FALSE, FALSE, FALSE, &u4BufLen);
+			if (rStatus != WLAN_STATUS_SUCCESS)
+				DBGLOG(SEC, WARN, "[WSC] set WSC assoc info error:%x\n", rStatus);
 		}
 #endif
 #if CFG_SUPPORT_PASSPOINT
@@ -1193,27 +1172,13 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 			}
 		}
 #endif
-		/*We need to free buffer first*/
-		if (prConnSettings->assocIeLen > 0) {
-			kalMemFree(prConnSettings->pucAssocIEs, VIR_MEM_TYPE,
-				   prConnSettings->assocIeLen);
-			prConnSettings->assocIeLen = 0;
-		}
-		/*Do mem allocate*/
-		if (prConnSettings->assocIeLen == 0) {
-			prConnSettings->pucAssocIEs =
-				kalMemAlloc(sme->ie_len, VIR_MEM_TYPE);
-			prConnSettings->assocIeLen = sme->ie_len;
-		}
-		if (prConnSettings->pucAssocIEs)
-			kalMemCopy(prConnSettings->pucAssocIEs,
-				   sme->ie, prConnSettings->assocIeLen);
-		else {
-			DBGLOG(INIT, INFO,
-			       "allocate memory for AssocIEs failed!\n");
-			prConnSettings->assocIeLen = 0;
-			return -ENOMEM;
-		}
+
+	}
+
+	/* clear WSC Assoc IE buffer in case WPS IE is not detected */
+	if (fgCarryWPSIE == FALSE) {
+		kalMemZero(&prGlueInfo->aucWSCAssocInfoIE, 200);
+		prGlueInfo->u2WSCAssocInfoIELen = 0;
 	}
 
 	rStatus = kalIoctl(prGlueInfo,
@@ -1284,7 +1249,6 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 	rNewSsid.pucBssid = (UINT_8 *)sme->bssid;
 	rNewSsid.pucSsid = (UINT_8 *)sme->ssid;
 	rNewSsid.u4SsidLen = sme->ssid_len;
-
 	rStatus = kalIoctl(prGlueInfo, wlanoidSetConnect, (PVOID)&rNewSsid, sizeof(PARAM_CONNECT_T),
 			   FALSE, FALSE, TRUE, &u4BufLen);
 
@@ -1292,44 +1256,41 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 		DBGLOG(REQ, WARN, "set SSID:%x\n", rStatus);
 		return -EINVAL;
 	}
-	return 0;
-}
+#if 0
+	if (sme->bssid != NULL && 1 /* prGlueInfo->fgIsBSSIDSet */) {
+		/* connect by BSSID */
+		if (sme->ssid_len > 0) {
+			P_CONNECTION_SETTINGS_T prConnSettings = NULL;
 
-#if (defined(NL80211_ATTR_EXTERNAL_AUTH_SUPPORT) \
-	|| LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0))
-/*----------------------------------------------------------------------------*/
-/*!
- * @brief This routine is responsible for receiveing external auth result
- *
- * @param
- *
- * @retval always successful
- */
-/*----------------------------------------------------------------------------*/
-int mtk_cfg80211_external_auth(struct wiphy *wiphy,
-			 struct net_device *ndev,
-			 struct cfg80211_external_auth_params *params)
-{
-	struct _GLUE_INFO_T *prGlueInfo = NULL;
-	uint32_t rStatus = WLAN_STATUS_FAILURE;
-	uint32_t u4BufLen;
-	struct PARAM_EXTERNAL_AUTH auth;
+			prConnSettings = &(prGlueInfo->prAdapter->rWifiVar.rConnSettings);
+			/* prGlueInfo->fgIsSSIDandBSSIDSet = TRUE; */
+			COPY_SSID(prConnSettings->aucSSID, prConnSettings->ucSSIDLen, sme->ssid, sme->ssid_len);
+		}
+		rStatus = kalIoctl(prGlueInfo,
+				   wlanoidSetBssid,
+				   (PVOID) sme->bssid, MAC_ADDR_LEN, FALSE, FALSE, TRUE, FALSE, &u4BufLen);
 
-	prGlueInfo = (struct _GLUE_INFO_T *) wiphy_priv(wiphy);
-	if (!prGlueInfo)
-		DBGLOG(REQ, WARN,
-		       "SAE-confirm failed with invalid prGlueInfo\n");
+		if (rStatus != WLAN_STATUS_SUCCESS) {
+			DBGLOG(REQ, WARN, "set BSSID:%lx\n", rStatus);
+			return -EINVAL;
+		}
+	} else if (sme->ssid_len > 0) {
+		/* connect by SSID */
+		COPY_SSID(rNewSsid.aucSsid, rNewSsid.u4SsidLen, sme->ssid, sme->ssid_len);
 
-	COPY_MAC_ADDR(auth.bssid, params->bssid);
-	auth.status = params->status;
-	auth.ucBssIdx = wlanGetBssIdx(ndev);
-	rStatus = kalIoctl(prGlueInfo, wlanoidExternalAuthDone, (void *)&auth,
-			   sizeof(auth), FALSE, FALSE, FALSE, &u4BufLen);
-	if (rStatus != WLAN_STATUS_SUCCESS)
-		DBGLOG(OID, INFO, "SAE-confirm failed with: 0x%x\n", rStatus);
-	return 0;
-}
+		rStatus = kalIoctl(prGlueInfo,
+				   wlanoidSetSsid,
+				   (PVOID)&rNewSsid, sizeof(PARAM_SSID_T), FALSE, FALSE, TRUE, FALSE, &u4BufLen);
+
+		if (rStatus != WLAN_STATUS_SUCCESS) {
+			DBGLOG(REQ, WARN, "set SSID:%lx\n", rStatus);
+			return -EINVAL;
+		}
+	}
 #endif
+	return 0;
+}
+
 /*----------------------------------------------------------------------------*/
 /*!
  * @brief This routine is responsible for requesting to disconnect from
@@ -1344,60 +1305,13 @@ int mtk_cfg80211_external_auth(struct wiphy *wiphy,
 int mtk_cfg80211_disconnect(struct wiphy *wiphy, struct net_device *ndev, u16 reason_code)
 {
 	P_GLUE_INFO_T prGlueInfo = NULL;
-	struct wireless_dev *wdev = NULL;
-	P_BSS_INFO_T prAisBssInfo = NULL;
 	WLAN_STATUS rStatus;
 	UINT_32 u4BufLen;
 
-	if (ndev == NULL) {
-		DBGLOG(REQ, ERROR, "ndev is NULL\n");
-		return -EINVAL;
-	}
-	wdev = ndev->ieee80211_ptr;
-
 	prGlueInfo = (P_GLUE_INFO_T) wiphy_priv(wiphy);
-	if ((prGlueInfo == NULL) || (prGlueInfo->prAdapter == NULL)) {
-		DBGLOG(REQ, ERROR,
-			"mtk_cfg80211_disconnect, prGlueInfo ==NULL!!\n");
-		return -EFAULT;
-	}
-
-	prAisBssInfo = (prGlueInfo->prAdapter)->prAisBssInfo;
-	if (prAisBssInfo == NULL) {
-		DBGLOG(REQ, ERROR,
-			"mtk_cfg80211_disconnect, prAisBssInfo ==NULL!!\n");
-		return -EFAULT;
-	}
-
-	DBGLOG(REQ, INFO, "Current_bss %d ssid_len %d StateIndicated %d %d\n",
-	       (wdev->current_bss == NULL) ? 0 : 1, wdev->ssid_len,
-	       prAisBssInfo->eConnectionStateIndicated,
-	       prGlueInfo->eParamMediaStateIndicated);
-
-	/* Check if kernel state = connected but driver state = disconnected.
-	 * If yes, report disconnected to kernel directly since driver has
-	 * already stayed in disconnected state.
-	 */
-	if ((wdev->current_bss && wdev->ssid_len > 0) &&
-		prAisBssInfo->eConnectionStateIndicated
-			== PARAM_MEDIA_STATE_DISCONNECTED) {
-		DBGLOG(REQ, ERROR,
-			"Kernel & driver have differnet conn state!!\n");
-		cfg80211_disconnected(prGlueInfo->prDevHandler, reason_code,
-				NULL, 0,
-				WLAN_STATUS_MEDIA_DISCONNECT_LOCALLY,
-				GFP_KERNEL);
-		return 0;
-	}
+	ASSERT(prGlueInfo);
 
 	rStatus = kalIoctl(prGlueInfo, wlanoidSetDisassociate, NULL, 0, FALSE, FALSE, TRUE, &u4BufLen);
-
-#if CFG_SUPPORT_REPORT_MISC
-	set_bit(EXT_SRC_DISCONNCT_BIT,
-	&(prGlueInfo->prAdapter->rReportMiscSet.ulExtSrcFlag));
-
-	kalSetReportMiscEvent(prGlueInfo);
-#endif
 
 	if (rStatus != WLAN_STATUS_SUCCESS) {
 		DBGLOG(REQ, WARN, "disassociate error:%x\n", rStatus);
@@ -2084,8 +1998,7 @@ int mtk_cfg80211_testmode_set_key_ext(IN struct wiphy *wiphy, IN void *data, IN 
 		/* handle_sec_msg_final(prIWEncExt->key, 32, prIWEncExt->key, NULL); */
 /* #endif */
 		/* PN */
-		memcpy(prWpiKey->aucPN, prIWEncExt->tx_seq, IW_ENCODE_SEQ_MAX_SIZE);
-		memcpy(prWpiKey->aucPN + IW_ENCODE_SEQ_MAX_SIZE, prIWEncExt->rx_seq, IW_ENCODE_SEQ_MAX_SIZE);
+		memcpy(prWpiKey->aucPN, prIWEncExt->tx_seq, IW_ENCODE_SEQ_MAX_SIZE * 2);
 
 		/* BSSID */
 		memcpy(prWpiKey->aucAddrIndex, prIWEncExt->addr, 6);
@@ -2474,8 +2387,8 @@ mtk_cfg80211_sched_scan_start(IN struct wiphy *wiphy,
 	ASSERT(prGlueInfo);
 
 	/* check if there is any pending scan/sched_scan not yet finished */
-	if (prGlueInfo->prSchedScanRequest != NULL) {
-		DBGLOG(SCN, ERROR, "prGlueInfo->prSchedScanRequest != NULL\n");
+	if (prGlueInfo->prScanRequest != NULL || prGlueInfo->prSchedScanRequest != NULL) {
+		DBGLOG(SCN, ERROR, "(prGlueInfo->prScanRequest != NULL || prGlueInfo->prSchedScanRequest != NULL)\n");
 		return -EBUSY;
 	} else if (request == NULL || request->n_match_sets > CFG_SCAN_SSID_MATCH_MAX_NUM) {
 		DBGLOG(SCN, ERROR, "(request == NULL || request->n_match_sets > CFG_SCAN_SSID_MATCH_MAX_NUM)\n");
@@ -3173,20 +3086,6 @@ INT_32 mtk_cfg80211_process_str_cmd(P_GLUE_INFO_T prGlueInfo, PUINT_8 cmd, INT_3
 		rStatus = kalIoctl(prGlueInfo,
 				   wlanoidSendBTMQuery,
 				   (PVOID)pucReason, 1, FALSE, FALSE, TRUE, &u4SetInfoLen);
-	} else if (strncasecmp(cmd, "O-SAR-ENABLE", 12) == 0) {
-		UINT_8 u2SarMode = 0;
-
-		DBGLOG(REQ, INFO, "cmd=%s\n", cmd);
-		if (len > 13) {
-			if (strncasecmp(cmd+13, "1", 1) == 0)
-				u2SarMode = 0x01;
-			else if (strncasecmp(cmd+13, "2", 1) == 0)
-				u2SarMode = 0x02;
-		}
-
-		rStatus = kalIoctl(prGlueInfo,
-				   wlanoidSendSarEnable,
-				   (PVOID)&u2SarMode, 1, FALSE, FALSE, TRUE, &u4SetInfoLen);
 	} else if (kalStrniCmp(cmd, "OSHAREMOD ", 10) == 0) {
 #if CFG_SUPPORT_OSHARE
 		struct OSHARE_MODE_T cmdBuf;
@@ -3214,8 +3113,6 @@ INT_32 mtk_cfg80211_process_str_cmd(P_GLUE_INFO_T prGlueInfo, PUINT_8 cmd, INT_3
 				   FALSE,
 				   TRUE,
 				   &u4SetInfoLen);
-		if (rStatus == WLAN_STATUS_SUCCESS)
-			prGlueInfo->prAdapter->fgEnOshareMode = pCmdData->osharemode;
 #else
 		DBGLOG(REQ, WARN, "not support OSHAREMOD\n");
 		return -EOPNOTSUPP;

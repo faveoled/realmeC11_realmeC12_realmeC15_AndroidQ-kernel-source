@@ -166,10 +166,6 @@ BOOLEAN kalP2PGetTkipCipher(IN P_GLUE_INFO_T prGlueInfo, IN UINT_8 ucRoleIdx);
 
 BOOLEAN kalP2PGetCcmpCipher(IN P_GLUE_INFO_T prGlueInfo, IN UINT_8 ucRoleIdx);
 
-#if CFG_SUPPORT_SUITB
-BOOLEAN kalP2PGetGcmp256Cipher(IN P_GLUE_INFO_T prGlueInfo,
-				IN UINT_8 ucRoleIdx);
-#endif
 VOID kalP2PSetWscMode(IN P_GLUE_INFO_T prGlueInfo, IN UINT_8 ucWscMode);
 
 UINT_8 kalP2PGetWscMode(IN P_GLUE_INFO_T prGlueInfo);
@@ -180,15 +176,6 @@ VOID kalP2PGenWSC_IE(IN P_GLUE_INFO_T prGlueInfo, IN UINT_8 ucType, IN PUINT_8 p
 
 VOID kalP2PUpdateWSC_IE(IN P_GLUE_INFO_T prGlueInfo, IN UINT_8 ucType, IN PUINT_8 pucBuffer,
 	IN UINT_16 u2BufferLength, IN UINT_8 ucRoleIdx);
-
-UINT_16 kalP2PCalP2P_IELen(IN P_GLUE_INFO_T prGlueInfo,
-	IN UINT_32 u4IEIdx, IN UINT_8 ucRoleIdx);
-VOID kalP2PGenP2P_IE(IN P_GLUE_INFO_T prGlueInfo, IN UINT_32 u4IEIdx,
-	IN PUINT_8 pucBuffer, IN UINT_8 ucRoleIdx);
-VOID kalP2PResetP2P_IE(IN P_GLUE_INFO_T prGlueInfo,
-	IN UINT_8 ucRoleIdx);
-VOID kalP2PUpdateP2P_IE(IN P_GLUE_INFO_T prGlueInfo,
-	IN PUINT_8 pucBuffer, IN UINT_16 u2BufferLength, IN UINT_8 ucRoleIdx);
 
 BOOLEAN kalP2PIndicateFound(IN P_GLUE_INFO_T prGlueInfo);
 

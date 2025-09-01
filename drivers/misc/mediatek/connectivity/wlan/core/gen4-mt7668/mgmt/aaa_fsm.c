@@ -400,9 +400,6 @@ bow_proc:
 					DBGLOG(AAA, WARN,
 					       "Previous AuthAssocState (%d) != IDLE.\n", prStaRec->eAuthAssocState);
 				}
-				if (prStaRec->eAuthAssocState
-					== AAA_STATE_SEND_AUTH2)
-				return;
 
 				prStaRec->eAuthAssocState = AAA_STATE_SEND_AUTH2;
 			} else {
@@ -431,7 +428,7 @@ bow_proc:
 
 
 		/*sta_rec might be removed when client list full, skip timer setting*/
-		if (prStaRec && prStaRec->fgIsInUse == TRUE) {
+		if (prStaRec) {
 			cnmTimerStopTimer(prAdapter, &prStaRec->rTxReqDoneOrRxRespTimer);
 			/*ToDo:Init Timer to check get Auth Txdone avoid sta_rec not clear*/
 			cnmTimerInitTimer(prAdapter,
@@ -642,17 +639,7 @@ WLAN_STATUS aaaFsmRunEventRxAssoc(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRf
 
 				/* If (Re)association fail, remove sta record and use class error to handle sta */
 				prStaRec->eAuthAssocState = AA_STATE_IDLE;
-				/* Remove from client list if it was previously associated */
-				if ((prStaRec->ucStaState > STA_STATE_1) && prAdapter->fgIsP2PRegistered
-					&& (IS_STA_IN_P2P(prStaRec))) {
-					P_BSS_INFO_T prBssInfo = NULL;
 
-					prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, prStaRec->ucBssIndex);
-					if (prBssInfo) {
-						DBGLOG(AAA, INFO, "Remove client!\n");
-						bssRemoveClient(prAdapter, prBssInfo, prStaRec);
-					}
-				}
 				/* NOTE(Kevin): Better to change state here, not at TX Done */
 				cnmStaRecChangeState(prAdapter, prStaRec, STA_STATE_2);
 			}
@@ -702,8 +689,7 @@ aaaFsmRunEventTxDone(IN P_ADAPTER_T prAdapter, IN P_MSDU_INFO_T prMsduInfo, IN E
 	ASSERT(prAdapter);
 	ASSERT(prMsduInfo);
 
-	DBGLOG(AAA, LOUD, "EVENT-TX DONE: Current Time = %d\n",
-			kalGetTimeTick());
+	DBGLOG(AAA, LOUD, "EVENT-TX DONE: Current Time = %ld\n", kalGetTimeTick());
 
 	prStaRec = cnmGetStaRecByIndex(prAdapter, prMsduInfo->ucStaRecIndex);
 

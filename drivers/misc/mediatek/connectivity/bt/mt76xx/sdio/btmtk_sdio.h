@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016 MediaTek Inc.
+ *  Copyright (c) 2016,2017 MediaTek Inc.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -14,9 +14,9 @@
 #ifndef _BTMTK_SDIO_H_
 #define _BTMTK_SDIO_H_
 #include "btmtk_config.h"
-#include <linux/pm_wakeup.h>
 
-#define VERSION "v0.0.1.12_2019071501"
+
+#define VERSION "v0.0.0.40_2018061401"
 
 #define SDIO_HEADER_LEN                 4
 
@@ -67,6 +67,32 @@
 #define CARD_IO_READY                           BIT(3)
 
 #define FIRMWARE_READY                          0xfedc
+#define CFG_THREE_IN_ONE_FIRMWARE               0
+
+
+#if CFG_THREE_IN_ONE_FIRMWARE
+#define BUILD_SIGN(ch0, ch1, ch2, ch3) \
+		((unsigned int)(unsigned char)(ch0) | \
+		((unsigned int)(unsigned char)(ch1) << 8) | \
+		((unsigned int)(unsigned char)(ch2) << 16) | \
+		((unsigned int)(unsigned char)(ch3) << 24))
+
+#define MTK_WIFI_SIGNATURE BUILD_SIGN('M', 'T', 'K', 'W')
+#define FW_TYPE_PATCH   2
+struct _FW_SECTION_T {
+	unsigned int u4FwType;
+	unsigned int u4Offset;
+	unsigned int u4Length;
+};
+
+struct _FIRMWARE_HEADER_T {
+	unsigned int u4Signature;
+	unsigned int u4CRC;
+	unsigned int u4NumOfEntries;
+	unsigned int u4Reserved;
+	struct _FW_SECTION_T arSection[];
+};
+#endif
 
 struct btmtk_sdio_card_reg {
 	u8 cfg;
@@ -92,75 +118,35 @@ struct btmtk_sdio_card_reg {
 	u8 func_num;
 	u32 chip_id;
 };
-#if SUPPORT_MT7668
-#define WOBLE_SETTING_FILE_NAME_7668 "woble_setting_7668.bin"
-#endif
 
-#if SUPPORT_MT7663
-#define WOBLE_SETTING_FILE_NAME_7663 "woble_setting_7663.bin"
-#endif
-
-/* Backward compatibility */
 #define WOBLE_SETTING_FILE_NAME "woble_setting.bin"
-#define BT_CFG_NAME "bt.cfg"
-#define BT_UNIFY_WOBLE "SUPPORT_UNIFY_WOBLE"
-#define BT_LEGACY_WOBLE "SUPPORT_LEGACY_WOBLE"
-#define BT_WOBLE_BY_EINT "SUPPORT_WOBLE_BY_EINT"
-#define BT_DONGLE_RESET_PIN "BT_DONGLE_RESET_GPIO_PIN"
-#define BT_SAVE_FW_DUMP_IN_KERNEL "SAVE_FW_DUMP_IN_KERNEL"
-#define BT_SYS_LOG_FILE "SYS_LOG_FILE_NAME"
-#define BT_FW_DUMP_FILE "FW_DUMP_FILE_NAME"
-#define BT_RESET_DONGLE "SUPPORT_DONGLE_RESET"
-#define BT_FULL_FW_DUMP "SUPPORT_FULL_FW_DUMP"
-#define BT_WOBLE_WAKELOCK "SUPPORT_WOBLE_WAKELOCK"
-#define BT_WOBLE_FOR_BT_DISABLE "SUPPORT_WOBLE_FOR_BT_DISABLE"
-
-
 #define WOBLE_SETTING_COUNT 10
 
 #define WOBLE_FAIL -10
 
-enum bt_sdio_dongle_state {
-	BT_SDIO_DONGLE_STATE_UNKNOWN,
-	BT_SDIO_DONGLE_STATE_POWER_ON,
-	BT_SDIO_DONGLE_STATE_POWER_ON_FOR_WOBLE,
-	BT_SDIO_DONGLE_STATE_POWER_OFF,
-	BT_SDIO_DONGLE_STATE_WOBLE,
-	BT_SDIO_DONGLE_STATE_ERROR
-};
 
 struct woble_setting_struct {
 	char	*content;	/* APCF conecnt or radio off content */
 	int	length;		/* APCF conecnt or radio off content of length */
 };
 
-struct bt_cfg_struct {
-	bool	support_unify_woble;	/* support unify woble or not */
-	bool	support_legacy_woble;		/* support legacy woble or not */
-	bool	support_woble_by_eint;		/* support woble by eint or not */
-	bool	save_fw_dump_in_kernel;		/* save fw dump in kernel or not */
-	bool	support_dongle_reset;		/* support chip reset or not */
-	bool	support_full_fw_dump;		/* dump full fw coredump or not */
-	bool	support_woble_wakelock;		/* support when woble error, do wakelock or not */
-	bool	support_woble_for_bt_disable;		/* when bt disable, support enter susend or not */
-	unsigned int	dongle_reset_gpio_pin;		/* BT_DONGLE_RESET_GPIO_PIN number */
-	char	*sys_log_file_name;
-	char	*fw_dump_file_name;
-};
-
 struct btmtk_sdio_card {
 	struct sdio_func *func;
 	u32 ioport;
 	const char *helper;
+	const char *firmware;
+	const char *firmware1;
 	const struct btmtk_sdio_card_reg *reg;
 	bool support_pscan_win_report;
 	bool supports_fw_dump;
 	u16 sd_blksz_fw_dl;
 	u8 rx_unit;
-	bool is_KeepFullPwr;
 	struct btmtk_private *priv;
 
+
+	unsigned char		*woble_setting;
 	unsigned char		*woble_setting_file_name;
+	unsigned int		woble_setting_len;
 
 	unsigned int		chip_id;
 	struct woble_setting_struct		woble_setting_apcf[WOBLE_SETTING_COUNT];
@@ -182,28 +168,14 @@ struct btmtk_sdio_card {
 	struct woble_setting_struct		woble_setting_apcf_resume_event[WOBLE_SETTING_COUNT];
 	unsigned char					bdaddr[BD_ADDRESS_SIZE];
 	unsigned int					woble_need_trigger_coredump;
-	unsigned char		*bt_cfg_file_name;
-	unsigned char		*setting_file;
-	struct bt_cfg_struct		bt_cfg;
-	struct		wakeup_source woble_ws;
-	struct		wakeup_source eint_ws;
-
-	/* WoBLE */
-	unsigned int wobt_irq;
-	int wobt_irqlevel;
-	atomic_t irq_enable_count;
-	struct input_dev *WoBLEInputDev;
-
-	int pa_setting;
-	int duplex_setting;
-	u8 *bin_file_buffer;
-	size_t bin_file_size;
-
-	enum bt_sdio_dongle_state dongle_state;
+#if (SUPPORT_UNIFY_WOBLE & SUPPORT_ANDROID)
+	struct					wake_lock woble_wlock;
+#endif
 };
-
 struct btmtk_sdio_device {
 	const char *helper;
+	const char *firmware;
+	const char *firmware1;
 	const struct btmtk_sdio_card_reg *reg;
 	const bool support_pscan_win_report;
 	u16 sd_blksz_fw_dl;
@@ -220,24 +192,10 @@ struct _PATCH_HEADER {
 };
 #pragma pack()
 
-struct bt_stereo_clk {
-	u64 sys_clk;
-	u64 fw_clk;
-};
-
-struct bt_stereo_para {
-	u16 handle;
-	u8 method;
-	u32 period;
-	u16 active_slots;
-};
-
 #define HW_VERSION 0x80000000
 #define FW_VERSION 0x80000004
-#define CHIP_ID 0x80000008
 
 /*common register address*/
-#define CCIR 0x0000
 #define CHLPCR 0x0004
 #define CSDIOCSR 0x0008
 #define CHCR   0x000C
@@ -245,16 +203,13 @@ struct bt_stereo_para {
 #define CHIER  0x0014
 #define CTDR   0x0018
 #define CRDR   0x001C
-#define CTFSR 0x0020
-#define CRPLR 0x0024
-#define SWPCDBGR   0x0154
+
 /*CHLPCR*/
 #define C_FW_INT_EN_SET            0x00000001
 #define C_FW_INT_EN_CLEAR        0x00000002
 /*CHISR*/
 #define RX_PKT_LEN             0xFFFF0000
 #define FIRMWARE_INT             0x0000FE00
-#define FIRMWARE_INT_BIT15       0x00008000/*FW inform driver don't change to fw own for dore dump*/
 #define TX_FIFO_OVERFLOW         0x00000100
 #define FW_INT_IND_INDICATOR        0x00000080
 #define TX_COMPLETE_COUNT         0x00000070
@@ -279,13 +234,9 @@ struct bt_stereo_para {
 
 #define DEFAULE_PATCH_FRAG_SIZE    1000
 
-#define PATCH_IS_DOWNLOAD_BY_OTHER 0
+#define PATCH_IS_DOWNLOAD_BT_OTHER 0
 #define PATCH_READY 1
 #define PATCH_NEED_DOWNLOAD 2
-
-#define BTMTK_SDIO_RETRY_COUNT 500
-
-#define BTMTK_LOAD_WOBLE_RETRY_COUNT 1
 
 /**
  * stpbtfwlog device node
@@ -355,62 +306,20 @@ enum {
 
 #define COMPARE_FAIL				-1
 #define COMPARE_SUCCESS				1
-#define COMP_EVENT_TIMO				2000
 #define WOBLE_COMP_EVENT_TIMO		5000
-#define WLAN_STATUS_IS_NOT_LOAD		-1
-#define WLAN_STATUS_DEFAULT		0
-#define WLAN_STATUS_CALL_REMOVE_START	1 /* WIFI driver is inserted */
 
-/**
- * BTMTK ioctl
- */
-#define BTMTK_IOCTL_MAGIC 'k'
-
-#define BTMTK_IOCTL_STEREO_GET_CLK _IOR(BTMTK_IOCTL_MAGIC, 1, void *)
-#define BTMTK_IOCTL_STEREO_SET_PARA _IOW(BTMTK_IOCTL_MAGIC, 2, void *)
 
 /**
  * Inline functions
  */
 static inline int is_support_unify_woble(struct btmtk_sdio_card *data)
 {
-	if (data->bt_cfg.support_unify_woble) {
-		if (((data->chip_id & 0xffff) == 0x7668) ||
-				((data->chip_id & 0xffff) == 0x7663))
-			return 1;
-		else
-			return 0;
-	} else {
-		return 0;
-	}
-}
-
-static inline int is_mt7668(struct btmtk_sdio_card *data)
-{
-#if SUPPORT_MT7668
+#if SUPPORT_UNIFY_WOBLE
 	return ((data->chip_id & 0xffff) == 0x7668);
 #else
 	return 0;
 #endif
 }
 
-static inline int is_mt7663(struct btmtk_sdio_card *data)
-{
-#if SUPPORT_MT7663
-	return ((data->chip_id & 0xffff) == 0x7663);
-#else
-	return 0;
+
 #endif
-}
-
-#define FW_OWN_OFF "fw own off"
-#define FW_OWN_ON  "fw own on"
-
-#define WOBLE_OFF "woble off"
-#define WOBLE_ON  "woble on"
-
-#define RELOAD_SETTING "reload_setting"
-
-int btmtk_sdio_reset_dongle(void);
-#endif
-

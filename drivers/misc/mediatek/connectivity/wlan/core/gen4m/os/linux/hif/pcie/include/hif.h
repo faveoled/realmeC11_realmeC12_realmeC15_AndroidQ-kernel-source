@@ -189,16 +189,12 @@ struct BUS_INFO {
 	const struct PCIE_CHIP_CR_MAPPING *bus2chip;
 	const unsigned int tx_ring_cmd_idx;
 	const unsigned int tx_ring_fwdl_idx;
-	const unsigned int tx_ring0_data_idx;
-	const unsigned int tx_ring1_data_idx;
-	const unsigned int max_static_map_addr;
+	const unsigned int tx_ring_data_idx;
 	const bool fgCheckDriverOwnInt;
 	const bool fgInitPCIeInt;
 	const uint32_t u4DmaMask;
 
 	void (*pdmaSetup)(struct GLUE_INFO *prGlueInfo, u_int8_t enable);
-	uint32_t (*updateTxRingMaxQuota)(struct ADAPTER *prAdapter,
-		uint16_t u2Port, uint32_t u4MaxQuota);
 	void (*enableInterrupt)(struct ADAPTER *prAdapter);
 	void (*disableInterrupt)(struct ADAPTER *prAdapter);
 	void (*lowPowerOwnRead)(struct ADAPTER *prAdapter, u_int8_t *pfgResult);

@@ -119,7 +119,6 @@ struct sdio_ops mt_sdio_ops[4] = {
 static wmt_aif_ctrl_cb cmb_stub_aif_ctrl_cb;
 static wmt_func_ctrl_cb cmb_stub_func_ctrl_cb;
 static wmt_thermal_query_cb cmb_stub_thermal_ctrl_cb;
-static wmt_trigger_assert_cb cmb_stub_trigger_assert_cb;
 static enum CMB_STUB_AIF_X cmb_stub_aif_stat = CMB_STUB_AIF_0;
 static wmt_deep_idle_ctrl_cb cmb_stub_deep_idle_ctrl_cb;
 static wmt_func_do_reset cmb_stub_do_reset_cb;
@@ -155,7 +154,6 @@ static u32 wifi_irq = 0xffffffff;
 
 #ifndef MTK_WCN_REMOVE_KERNEL_MODULE
 static int _mtk_wcn_cmb_stub_query_ctrl(void);
-static int _mtk_wcn_cmb_stub_trigger_assert(void);
 static void _mtk_wcn_cmb_stub_clock_fail_dump(void);
 #endif /* MTK_WCN_REMOVE_KERNEL_MODULE */
 
@@ -178,8 +176,6 @@ int mtk_wcn_cmb_stub_reg(struct _CMB_STUB_CB_ *p_stub_cb)
 {
 #ifndef MTK_WCN_REMOVE_KERNEL_MODULE
 	struct wmt_platform_bridge pbridge;
-
-	memset(&pbridge, 0, sizeof(struct wmt_platform_bridge));
 #endif
 
 	if ((!p_stub_cb)
@@ -195,14 +191,12 @@ int mtk_wcn_cmb_stub_reg(struct _CMB_STUB_CB_ *p_stub_cb)
 	cmb_stub_aif_ctrl_cb = p_stub_cb->aif_ctrl_cb;
 	cmb_stub_func_ctrl_cb = p_stub_cb->func_ctrl_cb;
 	cmb_stub_thermal_ctrl_cb = p_stub_cb->thermal_query_cb;
-	cmb_stub_trigger_assert_cb = p_stub_cb->trigger_assert_cb;
 	cmb_stub_deep_idle_ctrl_cb = p_stub_cb->deep_idle_ctrl_cb;
 	cmb_stub_do_reset_cb = p_stub_cb->wmt_do_reset_cb;
 	cmb_stub_clock_fail_dump_cb = p_stub_cb->clock_fail_dump_cb;
 
 #ifndef MTK_WCN_REMOVE_KERNEL_MODULE
 	pbridge.thermal_query_cb = _mtk_wcn_cmb_stub_query_ctrl;
-	pbridge.trigger_assert_cb = _mtk_wcn_cmb_stub_trigger_assert;
 	pbridge.clock_fail_dump_cb = _mtk_wcn_cmb_stub_clock_fail_dump;
 	wmt_export_platform_bridge_register(&pbridge);
 #endif
@@ -293,22 +287,6 @@ static int _mtk_wcn_cmb_stub_query_ctrl(void)
 		CMB_STUB_LOG_PR_WARN("[cmb_stub] thermal_ctrl_cb null\n");
 
 	return temp;
-}
-
-#ifdef MTK_WCN_REMOVE_KERNEL_MODULE
-int mtk_wcn_cmb_stub_trigger_assert(void)
-#else
-static int _mtk_wcn_cmb_stub_trigger_assert(void)
-#endif
-{
-	int ret = 0;
-
-	if (cmb_stub_trigger_assert_cb)
-		ret = (*cmb_stub_trigger_assert_cb) ();
-	else
-		CMB_STUB_LOG_PR_WARN("[cmb_stub] trigger_assert_cb null\n");
-
-	return ret;
 }
 
 #ifndef MTK_WCN_REMOVE_KERNEL_MODULE
@@ -449,7 +427,7 @@ static void mtk_wcn_cmb_sdio_enable_eirq(void)
 		CMB_STUB_LOG_PR_DBG("wifi eint has been enabled\n");
 	else {
 		atomic_set(&irq_enable_flag, 1);
-		if (wifi_irq != 0xffffffff) {
+		if (wifi_irq != 0xfffffff) {
 			enable_irq(wifi_irq);
 			CMB_STUB_LOG_PR_DBG(" enable WIFI EINT irq %d !!\n",
 					wifi_irq);
@@ -462,7 +440,7 @@ static void mtk_wcn_cmb_sdio_disable_eirq(void)
 	if (!atomic_read(&irq_enable_flag))
 		CMB_STUB_LOG_PR_DBG("wifi eint has been disabled!\n");
 	else {
-		if (wifi_irq != 0xffffffff) {
+		if (wifi_irq != 0xfffffff) {
 			disable_irq_nosync(wifi_irq);
 			CMB_STUB_LOG_PR_DBG("disable WIFI EINT irq %d !!\n",
 					wifi_irq);
@@ -587,12 +565,12 @@ int board_sdio_ctrl(unsigned int sdio_port_num, unsigned int on)
 #endif
 		/* off -> on */
 		mtk_wcn_cmb_sdio_on(sdio_port_num);
-		if (wifi_irq != 0xffffffff)
+		if (wifi_irq != 0xfffffff)
 			irq_set_irq_wake(wifi_irq, 1);
 		else
 			CMB_STUB_LOG_PR_WARN("wifi_irq is not available\n");
 	} else {
-			if (wifi_irq != 0xffffffff)
+			if (wifi_irq != 0xfffffff)
 				irq_set_irq_wake(wifi_irq, 0);
 			else
 				CMB_STUB_LOG_PR_WARN("wifi_irq is not available\n");

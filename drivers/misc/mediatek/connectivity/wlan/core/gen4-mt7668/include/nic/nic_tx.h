@@ -187,7 +187,6 @@
 #define NIC_TX_AC_VO_REMAINING_TX_TIME          TX_DESC_TX_TIME_NO_LIMIT	/* in unit of ms */
 #define NIC_TX_AC_VI_REMAINING_TX_TIME          TX_DESC_TX_TIME_NO_LIMIT	/* in unit of ms */
 #define NIC_TX_MGMT_REMAINING_TX_TIME           2000						/* in unit of ms */
-#define NIC_TX_BMC_REMAINING_TX_TIME            2000	/* in unit of ms */
 
 #define NIC_TX_CRITICAL_DATA_TID                7
 
@@ -1517,13 +1516,8 @@ VOID nicTxDirectClearHifQ(IN P_ADAPTER_T prAdapter);
 VOID nicTxDirectClearStaPsQ(IN P_ADAPTER_T prAdapter, UINT_8 ucStaRecIndex);
 VOID nicTxDirectClearBssAbsentQ(IN P_ADAPTER_T prAdapter, UINT_8 ucBssIndex);
 VOID nicTxDirectClearAllStaPsQ(IN P_ADAPTER_T prAdapter);
-#if KERNEL_VERSION(4, 14, 0) <= LINUX_VERSION_CODE
-void nicTxDirectTimerCheckSkbQ(struct timer_list *timer);
-void nicTxDirectTimerCheckHifQ(struct timer_list *timer);
-#else
 void nicTxDirectTimerCheckSkbQ(unsigned long data);
 void nicTxDirectTimerCheckHifQ(unsigned long data);
-#endif
 WLAN_STATUS nicTxDirectStartXmit(struct sk_buff *prSkb, P_GLUE_INFO_T prGlueInfo);
 /* TX Direct functions : END */
 

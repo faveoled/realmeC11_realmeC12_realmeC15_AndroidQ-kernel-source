@@ -93,8 +93,7 @@
 							 * weakest one from them
 							 * Else remove the weakest one.
 							 */
-/* Remove entire SCAN result */
-#define SCN_RM_POLICY_ENTIRE                BIT(5)
+#define SCN_RM_POLICY_ENTIRE                BIT(4)	/* Remove entire SCAN result */
 
 #define SCN_BSS_DESC_SAME_SSID_THRESHOLD    3	/* This is used by POLICY SMART WEAKEST,
 						 * If exceed this value, remove weakest BSS_DESC_T
@@ -267,8 +266,7 @@ struct _BSS_DESC_T {
 
 	BOOLEAN fgIsLargerTSF;	/* This BSS's TimeStamp is larger than us(TCL == 1 in RX_STATUS_T) */
 
-	UINT_8 ucRCPI; /* WF0 */
-	UINT_8 ucRCPI1; /* WF1 */
+	UINT_8 ucRCPI;
 
 	UINT_8 ucWmmFlag;	/* A flag to indicate this BSS's WMM capability */
 
@@ -330,7 +328,6 @@ struct _BSS_DESC_T {
 	UINT_8 aucIEBuf[CFG_IE_BUFFER_SIZE];
 	UINT_8 ucJoinFailureCount;
 	OS_SYSTIME rJoinFailTime;
-	struct AIS_BLACKLIST_ITEM *prBlack;
 };
 
 #if CFG_SUPPORT_ROAMING_SKIP_ONE_AP
@@ -603,12 +600,6 @@ P_BSS_DESC_T
 scanSearchBssDescByBssidAndSsid(IN P_ADAPTER_T prAdapter,
 				IN UINT_8 aucBSSID[], IN BOOLEAN fgCheckSsid, IN P_PARAM_SSID_T prSsid);
 
-#if CFG_SUPPORT_CFG80211_AUTH
-P_BSS_DESC_T
-scanSearchBssDescByBssidAndChanNum(IN P_ADAPTER_T prAdapter,
-	IN UINT_8 aucBSSID[], IN BOOLEAN fgCheckChanNum,
-	IN UINT_8 ucChannelNum);
-#endif
 P_BSS_DESC_T scanSearchBssDescByTA(IN P_ADAPTER_T prAdapter, IN UINT_8 aucSrcAddr[]);
 
 P_BSS_DESC_T

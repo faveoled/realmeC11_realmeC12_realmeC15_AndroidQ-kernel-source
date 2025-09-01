@@ -35,7 +35,6 @@ signed int fm_file_read(const signed char *filename, unsigned char *dst, signed 
 	ret = request_firmware(&fw, filename, NULL);
 	if (ret) {
 		WCN_DBG(FM_ERR | CHIP, "Failed to load firmware \"%s\"\n", filename);
-		release_firmware(fw);
 		return -FM_EPATCH;
 	}
 	WCN_DBG(FM_NTC | CHIP, "load firmware \"%s\" ok\n", filename);

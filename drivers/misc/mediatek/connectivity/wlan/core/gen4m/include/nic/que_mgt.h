@@ -381,8 +381,6 @@ struct RX_BA_ENTRY {
 	u_int8_t fgAmsduNeedLastFrame; /* for statistic */
 	uint8_t u8LastAmsduSubIdx;
 	u_int8_t fgIsAmsduDuplicated;
-	u_int8_t fgNoDrop;
-	uint32_t u4SNOverlapCount;
 #endif
 };
 
@@ -678,6 +676,19 @@ enum ENUM_WMM_ACI {
 	WMM_AC_INDEX_NUM
 };
 
+/* WMM QOS user priority from 802.1D/802.11e */
+enum ENUM_WMM_UP {
+	WMM_UP_BE_INDEX = 0,
+	WMM_UP_BK_INDEX,
+	WMM_UP_RESV_INDEX,
+	WMM_UP_EE_INDEX,
+	WMM_UP_CL_INDEX,
+	WMM_UP_VI_INDEX,
+	WMM_UP_VO_INDEX,
+	WMM_UP_NC_INDEX,
+	WMM_UP_INDEX_NUM
+};
+
 /* Used for CMD Queue Operation */
 enum ENUM_FRAME_ACTION {
 	FRAME_ACTION_DROP_PKT = 0,
@@ -687,7 +698,7 @@ enum ENUM_FRAME_ACTION {
 };
 
 enum ENUM_FRAME_TYPE_IN_CMD_Q {
-	FRAME_TYPE_802_1X = 0, /* For security and cmd data frame*/
+	FRAME_TYPE_802_1X = 0,
 	FRAME_TYPE_MMPDU,
 	FRAME_TYPE_NUM
 };
@@ -1034,8 +1045,6 @@ void qmDelRxBaEntry(IN struct ADAPTER *prAdapter,
 		    IN uint8_t ucStaRecIdx, IN uint8_t ucTid,
 		    IN u_int8_t fgFlushToHost);
 
-u_int8_t qmIsIndependentPkt(IN struct SW_RFB *prSwRfb);
-
 void mqmProcessAssocRsp(IN struct ADAPTER *prAdapter,
 			IN struct SW_RFB *prSwRfb, IN uint8_t *pucIE,
 			IN uint16_t u2IELength);
@@ -1157,39 +1166,20 @@ void qmHandleRxArpPackets(struct ADAPTER *prAdapter,
 void qmHandleRxDhcpPackets(struct ADAPTER *prAdapter,
 			   struct SW_RFB *prSwRfb);
 #endif
-
-#if defined(CFG_SUPPORT_REPLAY_DETECTION) || \
-	defined(CFG_SUPPORT_FRAG_AGG_ATTACK_DETECTION)
-#define CCMPTSCPNNUM	6
-u_int8_t qmRxPNtoU64(uint8_t *pucPN, uint8_t uPNNum,
-	uint64_t *pu64Rets);
-#endif
-
 #ifdef CFG_SUPPORT_REPLAY_DETECTION
 u_int8_t qmHandleRxReplay(struct ADAPTER *prAdapter,
 			  struct SW_RFB *prSwRfb);
 #endif
 
-#if CFG_SUPPORT_FRAG_AGG_ATTACK_DETECTION
-u_int8_t qmDetectRxInvalidEAPOL(IN struct ADAPTER *prAdapter,
-	IN struct SW_RFB *prSwRfb);
-#endif /* CFG_SUPPORT_FRAG_AGG_ATTACK_DETECTION */
-
-#if CFG_SUPPORT_FRAG_AGG_ATTACK_DETECTION
-u_int8_t qmAmsduAttackDetection(IN struct ADAPTER *prAdapter,
-	IN struct SW_RFB *prSwRfb);
-#endif /* CFG_SUPPORT_FRAG_AGG_ATTACK_DETECTION */
-
+#if CFG_SUPPORT_LOWLATENCY_MODE || CFG_SUPPORT_OSHARE
 u_int8_t
 qmIsNoDropPacket(IN struct ADAPTER *prAdapter, IN struct SW_RFB *prSwRfb);
+#endif /* CFG_SUPPORT_LOWLATENCY_MODE */
 
 void qmMoveStaTxQueue(struct STA_RECORD *prSrcStaRec,
 		      struct STA_RECORD *prDstStaRec);
 void qmHandleDelTspec(struct ADAPTER *prAdapter, struct STA_RECORD *prStaRec,
 		      enum ENUM_ACI eAci);
-void qmReleaseCHAtFinishedDhcp(struct ADAPTER *prAdapter,
-			       struct TIMER *prTimer,
-			       uint8_t ucBssIndex);
 /*******************************************************************************
  *                              F U N C T I O N S
  *******************************************************************************
@@ -1199,7 +1189,6 @@ void qmReleaseCHAtFinishedDhcp(struct ADAPTER *prAdapter,
 extern struct QUE_MGT g_rQM;
 #endif
 extern const uint8_t aucTid2ACI[TX_DESC_TID_NUM];
-extern const uint8_t aucACI2TxQIdx[WMM_AC_INDEX_NUM];
 extern const uint8_t arNetwork2TcResource[MAX_BSSID_NUM +
 		1][NET_TC_NUM];
 

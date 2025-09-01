@@ -117,10 +117,7 @@ static ssize_t fw_log_wifi_read(struct file *filp, char __user *buf, size_t len,
 {
 	size_t ret = 0;
 
-    //#ifdef ODM_WT_EDIT
-    //Fanghua.Zhu@ODM_WT.BSP.CONN.WIFI.BugID2628224, 2019/12/18, Modify for reduce reduce wifi kernel log print.
-    //WIFI_INFO_FUNC_LIMITED("fw_log_wifi_read len --> %d\n", (uint32_t) len);
-    //#endif /* ODM_WT_EDIT */
+	WIFI_INFO_FUNC_LIMITED("fw_log_wifi_read len --> %d\n", (uint32_t) len);
 	ret = connsys_log_read_to_user(CONNLOG_TYPE_WIFI, buf, len);
 	return ret;
 }

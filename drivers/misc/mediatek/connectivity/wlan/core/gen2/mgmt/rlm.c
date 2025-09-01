@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -2340,17 +2338,7 @@ BOOLEAN rlmFillScanMsg(P_ADAPTER_T prAdapter, P_MSG_SCN_SCAN_REQ prMsg)
 		u2RemainLen -= IE_SIZE(pucSubIE);
 		pucSubIE += IE_SIZE(pucSubIE);
 	}
-
-	/*
-	 * If an AP Channel Report is not available in the STA, the STA shall
-	 * iteratively conduct measurements on all supported channels in the
-	 * specified Regulatory Class that are valid for the current
-	 * regulatory domain.
-	 */
-	if (prMsg->ucChannelListNum == 0)
-		prMsg->eScanChannel = SCAN_CHANNEL_FULL;
-
-	DBGLOG(RLM, INFO, "SSIDtype %d, ScanType %d, ChnlType %d, Dwell %d, MinDwell %d, ChnlNum %d\n",
+	DBGLOG(RLM, INFO, "SSIDtype %d, ScanType %d, Dwell %d, MinDwell %d, ChnlType %d, ChnlNum %d\n",
 		prMsg->ucSSIDType, prMsg->eScanType, prMsg->eScanChannel, prMsg->u2ChannelDwellTime,
 		prMsg->u2MinChannelDwellTime, prMsg->ucChannelListNum);
 	return TRUE;
@@ -2805,8 +2793,6 @@ VOID rlmActivateNetwork(P_ADAPTER_T prAdapter, ENUM_NETWORK_TYPE_INDEX_T eNetwor
 		SET_NET_ACTIVE(prAdapter, eNetworkTypeIdx);
 		/* sync with firmware */
 		nicActivateNetwork(prAdapter, eNetworkTypeIdx);
-		if (eNetworkTypeIdx == NETWORK_TYPE_P2P_INDEX)
-			nicUpdateBss(prAdapter, eNetworkTypeIdx);
 	}
 	DBGLOG(RLM, INFO, "rlm: active=%d, Type=%d, Src=%d, SrcVal=%d\n",
 		isActive, eNetworkTypeIdx, eNetActiveSrcIdx,

@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -62,9 +60,6 @@
 #define P2P_AP_CHNL_HOLD_TIME_MS 5000
 
 #define P2P_CHNL_EXTEND_CHAN_TIME 500
-
-#define AP_DEFAULT_CHANNEL_2G     6
-#define AP_DEFAULT_CHANNEL_5G     36
 
 /*******************************************************************************
 *                                 M A C R O S

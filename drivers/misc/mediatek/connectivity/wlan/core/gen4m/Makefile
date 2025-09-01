@@ -10,6 +10,10 @@ ifeq ($(KBUILD_MODPOST_FAIL_ON_WARNINGS),)
     KBUILD_MODPOST_FAIL_ON_WARNINGS=y
 endif
 
+ccflags-y += -Wno-unused-variable
+ccflags-y += -Wno-unused-value
+ccflags-y += -Wno-unused-result
+ccflags-y += -Wno-format
 DRIVER_BUILD_DATE=$(shell date +%Y%m%d%H%M%S)
 ccflags-y += -DDRIVER_BUILD_DATE='"$(DRIVER_BUILD_DATE)"'
 
@@ -34,10 +38,10 @@ endif
 
 ccflags-y += -DCFG_SUPPORT_DEBUG_FS=0
 ccflags-y += -DWLAN_INCLUDE_PROC
-ccflags-y += -DCFG_SUPPORT_AGPS_ASSIST=0
+ccflags-y += -DCFG_SUPPORT_AGPS_ASSIST=1
 ccflags-y += -DCFG_SUPPORT_TSF_USING_BOOTTIME=1
 ccflags-y += -DARP_MONITER_ENABLE=1
-ccflags-y += -Werror -Wno-pointer-to-int-cast
+ccflags-y += -Werror
 #ccflags-y:=$(filter-out -U$(WLAN_CHIP_ID),$(ccflags-y))
 #ccflags-y += -DLINUX -D$(WLAN_CHIP_ID)
 ccflags-y += -DLINUX
@@ -69,12 +73,6 @@ endif
 
 ifeq ($(WIFI_ENABLE_GCOV), y)
 GCOV_PROFILE := y
-endif
-
-ifneq ($(filter 6765, $(WLAN_CHIP_ID)),)
-    ccflags-y += -DCFG_SUPPORT_DUAL_STA=0
-else
-    ccflags-y += -DCFG_SUPPORT_DUAL_STA=1
 endif
 
 ifeq ($(MTK_ANDROID_WMT), y)
@@ -116,11 +114,11 @@ else
 endif
 
 # Disable ASSERT() for user load, enable for others
-ifneq ($(TARGET_BUILD_VARIANT),user)
-    ccflags-y += -DBUILD_QA_DBG=1
-else
+#ifneq ($(TARGET_BUILD_VARIANT),user)
+#    ccflags-y += -DBUILD_QA_DBG=1
+#else
     ccflags-y += -DBUILD_QA_DBG=0
-endif
+#endif
 
 ifeq ($(CONFIG_MTK_COMBO_WIFI),y)
     ccflags-y += -DCFG_WPS_DISCONNECT=1
@@ -190,16 +188,6 @@ else
     ccflags-y += -DCFG_TC1_FEATURE=0
 endif
 
-ifneq ($(filter 6779, $(WLAN_CHIP_ID)),)
-    ifneq ($(filter MT6631, $(MTK_CONSYS_ADIE)),)
-        ccflags-y += -DCFG_FLAVOR_FIRMWARE=1
-    else
-        ccflags-y += -DCFG_FLAVOR_FIRMWARE=0
-    endif
-else
-    ccflags-y += -DCFG_FLAVOR_FIRMWARE=0
-endif
-
 ifeq ($(MODULE_NAME),)
 	MODULE_NAME := wlan_$(shell echo $(strip $(WLAN_CHIP_ID)) | tr A-Z a-z)_$(CONFIG_MTK_COMBO_WIFI_HIF)
 endif
@@ -213,8 +201,6 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/performance/include/
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/emi/$(MTK_PLATFORM)
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/emi/submodule
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/pmic/include/
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/sched/
 ccflags-y += -I$(srctree)/drivers/devfreq/
 ccflags-y += -I$(srctree)/net
 
@@ -249,7 +235,7 @@ $(warning $(MODULE_NAME) build-in boot.img)
 obj-y += $(MODULE_NAME).o
 else
 $(warning $(MODULE_NAME) is kernel module)
-obj-m += $(MODULE_NAME).o
+obj-y += $(MODULE_NAME).o
 endif
 
 # ---------------------------------------------------

@@ -35,17 +35,7 @@ endif
     obj-y += $(MODULE_NAME).o
     $(MODULE_NAME)-objs += common/connectivity_build_in_adapter.o
     $(MODULE_NAME)-objs += common/wmt_build_in_adapter.o
-export CONFIG_MTK_COMBO=y
-export CONFIG_MTK_COMBO_CHIP_CONSYS_6765=y
-export CONFIG_MTK_COMBO_BT=y
-export CONFIG_MTK_COMBO_GPS=y
-export CONFIG_MTK_COMBO_WIFI=y
-export CONFIG_MTK_DHCPV6C_WIFI=y
-export CONFIG_MTK_GPS_SUPPORT=y
-export CONFIG_MTK_GPS_EMI=y
-export CONFIG_MTK_FMRADIO=y
-export CONFIG_MTK_FM_CHIP="MT6631_FM"
-export CONFIG_MTK_FM_50KHZ_SUPPORT=y
+
     # for gen4m options
     export CONFIG_MTK_COMBO_WIFI_HIF=axi
     export MTK_COMBO_CHIP=CONNAC
@@ -54,7 +44,7 @@ export CONFIG_MTK_FM_50KHZ_SUPPORT=y
     # Do build-in for xxx.c checking
     subdir-ccflags-y += -D MTK_WCN_REMOVE_KERNEL_MODULE
     subdir-ccflags-y += -D MTK_WCN_BUILT_IN_DRIVER
-    obj-y += bt/mt66xx/legacy/
+    obj-y += bt/mt66xx/
     obj-y += common/
     obj-y += wlan/adaptor/
     obj-y += wlan/core/gen4m/
@@ -65,11 +55,9 @@ export CONFIG_MTK_FM_50KHZ_SUPPORT=y
     export WIFI_IP_SET=1
     export WIFI_ECO_VER=1
     # Do build-in for Makefile checking
-    export CONFIG_WLAN_DRV_BUILD_IN=y
+    # export CONFIG_WLAN_DRV_BUILD_IN=y
 
-        $(info $$CONFIG_MTK_COMBO_CHIP is [${CONFIG_MTK_COMBO_CHIP}])
-        MTK_PLATFORM_ID := $(patsubst CONSYS_%,%,$(subst ",,$(CONFIG_MTK_COMBO_CHIP)))
-        $(info MTK_PLATFORM_ID is [${MTK_PLATFORM_ID}])
+  
 
 # Otherwise we were called directly from the command line;
 # invoke the kernel build system.

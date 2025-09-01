@@ -54,8 +54,8 @@ UINT_8 p2pDevFsmInit(IN P_ADAPTER_T prAdapter)
 		prP2pBssInfo = cnmGetBssInfoAndInit(prAdapter, NETWORK_TYPE_P2P, TRUE);
 		if (prP2pBssInfo == NULL)
 			break;
-		COPY_MAC_ADDR(prP2pBssInfo->aucOwnMacAddr, prAdapter->rWifiVar.aucDeviceAddress);
-		DBGLOG(INIT, INFO, "Set dev mac address from aucDeviceAddress %pM\n", prP2pBssInfo->aucOwnMacAddr);
+		COPY_MAC_ADDR(prP2pBssInfo->aucOwnMacAddr, prAdapter->rMyMacAddr);
+		prP2pBssInfo->aucOwnMacAddr[0] ^= 0x2;	/* change to local administrated address */
 
 		prP2pDevFsmInfo->ucBssIndex = prP2pBssInfo->ucBssIndex;
 

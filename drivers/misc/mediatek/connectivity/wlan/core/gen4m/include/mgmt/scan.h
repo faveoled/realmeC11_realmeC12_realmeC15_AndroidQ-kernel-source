@@ -80,6 +80,11 @@
 #define SCN_MAX_BUFFER_SIZE \
 	(CFG_MAX_NUM_BSS_LIST * ALIGN_4(sizeof(struct BSS_DESC)))
 
+#if CFG_SUPPORT_ROAMING_SKIP_ONE_AP
+#define SCN_ROAM_MAX_BUFFER_SIZE \
+	(CFG_MAX_NUM_ROAM_BSS_LIST * ALIGN_4(sizeof(struct ROAM_BSS_DESC)))
+#endif
+
 /* Remove SCAN result except the connected one. */
 #define SCN_RM_POLICY_EXCLUDE_CONNECTED		BIT(0)
 
@@ -105,11 +110,19 @@
  */
 #define SCN_BSS_DESC_SAME_SSID_THRESHOLD	20
 
+#if CFG_SUPPORT_ROAMING_SKIP_ONE_AP
+#define REMOVE_TIMEOUT_TWO_DAY			(60*60*24*2)
+#endif
+
 #if 1
 #define SCN_BSS_DESC_REMOVE_TIMEOUT_SEC		30
 #define SCN_BSS_DESC_STALE_SEC			20 /* Scan Request Timeout */
+#if CFG_ENABLE_WIFI_DIRECT
+#if CFG_SUPPORT_WFD
 /* For WFD scan need about 15s. */
-#define SCN_BSS_DESC_STALE_SEC_WFD		30
+#define SCN_BSS_DESC_STALE_SEC_WFD		20
+#endif
+#endif
 
 #else
 /* Second. This is used by POLICY TIMEOUT, If exceed this
@@ -181,7 +194,7 @@
 
 #define SCN_CTRL_DEFAULT_SCAN_CTRL		SCN_CTRL_IGNORE_AIS_FIX_CHANNEL
 
-#define SCN_SCAN_DONE_PRINT_BUFFER_LENGTH	300
+#define SCN_SCAN_DONE_PRINT_BUFFER_LENGTH	200
 /*******************************************************************************
  *                             D A T A   T Y P E S
  *******************************************************************************
@@ -236,8 +249,9 @@ enum ENUM_SCHED_SCAN_ACT {
 };
 
 #define SCAN_LOG_PREFIX_MAX_LEN		(16)
-#define SCAN_LOG_MSG_MAX_LEN		(500)
+#define SCAN_LOG_MSG_MAX_LEN		(400)
 #define SCAN_LOG_BUFF_SIZE		(200)
+#define SCAN_LOG_DYN_ALLOC_MEM		(0)
 
 enum ENUM_SCAN_LOG_PREFIX {
 	/* Scan */
@@ -274,7 +288,7 @@ enum ENUM_SCAN_LOG_PREFIX {
 struct BSS_DESC {
 	struct LINK_ENTRY rLinkEntry;
 	/* Support AP Selection*/
-	struct LINK_ENTRY rLinkEntryEss[KAL_AIS_NUM];
+	struct LINK_ENTRY rLinkEntryEss;
 
 	uint8_t aucBSSID[MAC_ADDR_LEN];
 
@@ -290,6 +304,9 @@ struct BSS_DESC {
 	 * this record from BSS list.
 	 */
 	u_int8_t fgIsConnected;
+
+	/* This flag is TRUE if the SSID is not hidden */
+	u_int8_t fgIsValidSSID;
 
 	/* When this flag is TRUE, means the SSID of this
 	 * BSS is not known yet.
@@ -435,6 +452,15 @@ struct BSS_DESC {
 	uint8_t aucRrmCap[5];
 };
 
+#if CFG_SUPPORT_ROAMING_SKIP_ONE_AP
+struct ROAM_BSS_DESC {
+	struct LINK_ENTRY rLinkEntry;
+	uint8_t ucSSIDLen;
+	uint8_t aucSSID[ELEM_MAX_LEN_SSID];
+	OS_SYSTIME rUpdateTime;
+};
+#endif
+
 struct SCAN_PARAM {	/* Used by SCAN FSM */
 	/* Active or Passive */
 	enum ENUM_SCAN_TYPE eScanType;
@@ -532,7 +558,11 @@ struct SCAN_INFO {
 	struct LINK rFreeBSSDescList;
 
 	struct LINK rPendingMsgList;
-
+#if CFG_SUPPORT_ROAMING_SKIP_ONE_AP
+	uint8_t aucScanRoamBuffer[SCN_ROAM_MAX_BUFFER_SIZE];
+	struct LINK rRoamFreeBSSDescList;
+	struct LINK rRoamBSSDescList;
+#endif
 	/* Sparse Channel Detection */
 	u_int8_t fgIsSparseChannelValid;
 	struct RF_CHANNEL_INFO rSparseChannel;
@@ -787,6 +817,17 @@ void scanReportBss2Cfg80211(IN struct ADAPTER *prAdapter,
 			    IN enum ENUM_BSS_TYPE eBSSType,
 			    IN struct BSS_DESC *SpecificprBssDesc);
 
+#if CFG_SUPPORT_ROAMING_SKIP_ONE_AP
+struct ROAM_BSS_DESC *scanSearchRoamBssDescBySsid(
+					IN struct ADAPTER *prAdapter,
+					IN struct BSS_DESC *prBssDesc);
+struct ROAM_BSS_DESC *scanAllocateRoamBssDesc(IN struct ADAPTER *prAdapter);
+void scanAddToRoamBssDesc(IN struct ADAPTER *prAdapter,
+			  IN struct BSS_DESC *prBssDesc);
+void scanSearchBssDescOfRoamSsid(IN struct ADAPTER *prAdapter);
+void scanRemoveRoamBssDescsByTime(IN struct ADAPTER *prAdapter,
+				  IN uint32_t u4RemoveTime);
+#endif
 /*----------------------------------------------------------------------------*/
 /* Routines in scan_fsm.c                                                     */
 /*----------------------------------------------------------------------------*/
@@ -886,6 +927,10 @@ u_int8_t isScanCacheDone(struct GL_SCAN_CACHE_INFO *prScanCache);
 #endif /* CFG_SUPPORT_SCAN_CACHE_RESULT */
 
 void scanReqLog(struct CMD_SCAN_REQ_V2 *prCmdScanReq);
+void scanReqSsidLog(struct CMD_SCAN_REQ_V2 *prCmdScanReq,
+	const uint16_t logBufLen);
+void scanReqChannelLog(struct CMD_SCAN_REQ_V2 *prCmdScanReq,
+	const uint16_t logBufLen);
 void scanResultLog(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb);
 void scanLogCacheAddBSS(struct LINK *prList,
 	struct SCAN_LOG_ELEM_BSS *prListBuf,
@@ -893,8 +938,7 @@ void scanLogCacheAddBSS(struct LINK *prList,
 	uint8_t bssId[], uint16_t seq);
 void scanLogCacheFlushBSS(struct LINK *prList, enum ENUM_SCAN_LOG_PREFIX prefix,
 	const uint16_t logBufLen);
-void scanLogCacheFlushAll(struct ADAPTER *prAdapter,
-	struct SCAN_LOG_CACHE *prScanLogCache,
+void scanLogCacheFlushAll(struct SCAN_LOG_CACHE *prScanLogCache,
 	enum ENUM_SCAN_LOG_PREFIX prefix, const uint16_t logBufLen);
 
 void scanRemoveBssDescFromList(IN struct LINK *prBSSDescList,
@@ -905,10 +949,5 @@ void scanInsertBssDescToList(IN struct LINK *prBSSDescList,
 			     IN u_int8_t init);
 void scanResetBssDesc(IN struct ADAPTER *prAdapter,
 		      IN struct BSS_DESC *prBssDesc);
-
-/* Check if VHT IE filled in Epigram IE */
-void scanCheckEpigramVhtIE(IN uint8_t *pucBuf, IN struct BSS_DESC *prBssDesc);
-void scanParseVHTCapIE(IN uint8_t *pucIE, IN struct BSS_DESC *prBssDesc);
-void scanParseVHTOpIE(IN uint8_t *pucIE, IN struct BSS_DESC *prBssDesc);
 
 #endif /* _SCAN_H */

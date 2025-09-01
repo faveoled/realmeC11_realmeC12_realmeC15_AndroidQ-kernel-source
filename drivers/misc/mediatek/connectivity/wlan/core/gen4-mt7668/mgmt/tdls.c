@@ -140,7 +140,7 @@ UINT_32 TdlsexLinkMgt(P_ADAPTER_T prAdapter, PVOID pvSetBuffer, UINT_32 u4SetBuf
 	prCmd = (TDLS_CMD_LINK_MGT_T *) pvSetBuffer;
 	prBssInfo = prAdapter->prAisBssInfo;
 
-	DBGLOG(TDLS, INFO, "u4SetBufferLen=%d", u4SetBufferLen);
+	/* printk("\n\n\n  TdlsexLinkMgt\n\n\n"); */
 
 #if 1
 	/* AIS only */
@@ -153,8 +153,6 @@ UINT_32 TdlsexLinkMgt(P_ADAPTER_T prAdapter, PVOID pvSetBuffer, UINT_32 u4SetBuf
 	}
 #endif
 
-	DBGLOG(TDLS, INFO, "prCmd->ucActionCode=%d, prCmd->ucDialogToken=%d",
-		prCmd->ucActionCode, prCmd->ucDialogToken);
 
 	switch (prCmd->ucActionCode) {
 
@@ -287,6 +285,8 @@ UINT_32 TdlsexLinkMgt(P_ADAPTER_T prAdapter, PVOID pvSetBuffer, UINT_32 u4SetBuf
 /*----------------------------------------------------------------------------*/
 UINT_32 TdlsexLinkOper(P_ADAPTER_T prAdapter, PVOID pvSetBuffer, UINT_32 u4SetBufferLen, PUINT_32 pu4SetInfoLen)
 {
+	/* printk("TdlsexLinkOper\n"); */
+
 	/* from supplicant -- wpa_supplicant_tdls_peer_addset() */
 	UINT_16 i;
 	STA_RECORD_T *prStaRec;
@@ -294,9 +294,6 @@ UINT_32 TdlsexLinkOper(P_ADAPTER_T prAdapter, PVOID pvSetBuffer, UINT_32 u4SetBu
 	TDLS_CMD_LINK_OPER_T *prCmd;
 
 	prCmd = (TDLS_CMD_LINK_OPER_T *) pvSetBuffer;
-
-	DBGLOG(TDLS, INFO, "prCmd->oper=%d, u4SetBufferLen=%d",
-		prCmd->oper, u4SetBufferLen);
 
 	switch (prCmd->oper) {
 
@@ -762,7 +759,7 @@ TdlsDataFrameSend_SETUP_REQ(ADAPTER_T *prAdapter,
 	/* 5. Update packet length */
 	prMsduInfo->len = u4PktLen;
 
-	DBGLOG(TDLS, INFO, "wlanHardStartXmit, u4PktLen=%d", u4PktLen);
+	DBGLOG(TDLS, INFO, "\n\n\n  wlanHardStartXmit\n\n\n");
 
 	/* 5. send the data frame */
 	wlanHardStartXmit(prMsduInfo, prMsduInfo->dev);
@@ -1266,15 +1263,12 @@ TdlsDataFrameSend_DISCOVERY_REQ(ADAPTER_T *prAdapter,
 		 *  FTIE
 		 *  Timeout Interval
 		 */
-
-		if (ucActionCode != TDLS_FRM_ACTION_CONFIRM && ucActionCode != TDLS_FRM_ACTION_DISCOVERY_REQ) {
+		if (ucActionCode != TDLS_FRM_ACTION_CONFIRM) {
 			/* 3. Frame Formation - (4) Capability: 0x31 0x04, privacy bit will be set */
 			u2CapInfo = assocBuildCapabilityInfo(prAdapter, prStaRec);
 			WLAN_SET_FIELD_16(pPkt, u2CapInfo);
 			LR_TDLS_FME_FIELD_FILL(2);
-		}
 
-		if (ucActionCode != TDLS_FRM_ACTION_CONFIRM) {
 			/* 4. Append general IEs */
 			/*
 			 *  TODO check HT: prAdapter->rWifiVar.rConnSettings.uc2G4BandwidthMode
@@ -1954,26 +1948,6 @@ TdlsSendChSwControlCmd(P_ADAPTER_T prAdapter, PVOID pvSetBuffer, UINT_32 u4SetBu
 	return TDLS_STATUS_SUCCESS;
 }
 
-WLAN_STATUS
-TdlsTxCtrl(P_ADAPTER_T prAdapter, P_BSS_INFO_T prBssInfo, BOOLEAN fgEnable)
-{
-	int i;
-	P_STA_RECORD_T prStaRec;
-
-	for (i = 0; i < CFG_STA_REC_NUM; i++) {
-		prStaRec = &prAdapter->arStaRec[i];
-
-		if (prStaRec->eStaType != STA_TYPE_DLS_PEER)
-			continue;
-
-		if (prStaRec->fgIsInUse && prStaRec->ucBssIndex == prBssInfo->ucBssIndex) {
-			qmSetStaRecTxAllowed(prAdapter, prStaRec, fgEnable);
-			DBGLOG(TDLS, EVENT, "TDLS STA[%d], TX ctrl=%d\n", i, fgEnable);
-		}
-	}
-
-	return TDLS_STATUS_SUCCESS;
-}
 #endif /* CFG_SUPPORT_TDLS */
 
 /* End of tdls.c */

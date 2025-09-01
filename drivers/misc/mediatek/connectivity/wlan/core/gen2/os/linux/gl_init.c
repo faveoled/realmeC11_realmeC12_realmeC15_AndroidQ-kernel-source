@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -298,9 +296,6 @@ static struct cfg80211_ops mtk_wlan_ops = {
 	.sched_scan_stop = mtk_cfg80211_sched_scan_stop,
 #endif
 	.update_ft_ies = mtk_cfg80211_update_ft_ies,
-#if CFG_SUPPORT_WPA3
-	.external_auth = mtk_cfg80211_external_auth,
-#endif
 };
 
 
@@ -556,9 +551,7 @@ static const struct ieee80211_txrx_stypes
 	},
 	[NL80211_IFTYPE_STATION] = {
 		.tx = 0xffff,
-		.rx = BIT(IEEE80211_STYPE_ACTION >> 4) |
-		      BIT(IEEE80211_STYPE_PROBE_REQ >> 4) |
-		      BIT(IEEE80211_STYPE_AUTH >> 4)
+		.rx = BIT(IEEE80211_STYPE_ACTION >> 4) | BIT(IEEE80211_STYPE_PROBE_REQ >> 4)
 	},
 	[NL80211_IFTYPE_AP] = {
 		.tx = 0xffff,
@@ -1203,30 +1196,15 @@ static void createWirelessDevice(void)
 	prWiphy->signal_type = CFG80211_SIGNAL_TYPE_MBM;
 	prWiphy->cipher_suites = mtk_cipher_suites;
 	prWiphy->n_cipher_suites = ARRAY_SIZE(mtk_cipher_suites);
-#if KERNEL_VERSION(4, 12, 0) <= CFG80211_VERSION_CODE
-	prWiphy->flags = WIPHY_FLAG_SUPPORTS_FW_ROAM
-			| WIPHY_FLAG_HAS_REMAIN_ON_CHANNEL;
-	/* In kernel 4.12 or newer,
-	 * this is obsoletes - WIPHY_FLAG_SUPPORTS_SCHED_SCAN
-	 */
-	prWiphy->max_sched_scan_reqs = 1;
-#else
 	prWiphy->flags = WIPHY_FLAG_SUPPORTS_FW_ROAM
 			| WIPHY_FLAG_HAS_REMAIN_ON_CHANNEL
 			| WIPHY_FLAG_SUPPORTS_SCHED_SCAN;
-#endif
-#if CFG_SUPPORT_AAA && CFG_SUPPORT_WPA3
-	prWiphy->flags |= WIPHY_FLAG_HAVE_AP_SME;
-#endif
 	prWiphy->regulatory_flags = REGULATORY_CUSTOM_REG;
 #if CFG_SUPPORT_TDLS
 	TDLSEX_WIPHY_FLAGS_INIT(prWiphy->flags);
 #endif /* CFG_SUPPORT_TDLS */
 	prWiphy->max_remain_on_channel_duration = 500;
 	prWiphy->mgmt_stypes = mtk_cfg80211_ais_default_mgmt_stypes;
-#if CFG_SUPPORT_WPA3
-	prWiphy->features |= NL80211_FEATURE_SAE;
-#endif
 	prWiphy->vendor_commands = mtk_wlan_vendor_ops;
 	prWiphy->n_vendor_commands = sizeof(mtk_wlan_vendor_ops) / sizeof(struct wiphy_vendor_command);
 	prWiphy->vendor_events = mtk_wlan_vendor_events;
@@ -1444,11 +1422,7 @@ VOID wlanSchedScanStoppedWorkQueue(struct work_struct *work)
 
 	/* 2. indication to cfg80211 */
 	/* 20150205 change cfg80211_sched_scan_stopped to work queue due to sched_scan_mtx dead lock issue */
-#if KERNEL_VERSION(4, 12, 0) <= CFG80211_VERSION_CODE
-	cfg80211_sched_scan_stopped(priv_to_wiphy(prGlueInfo), 0);
-#else
 	cfg80211_sched_scan_stopped(priv_to_wiphy(prGlueInfo));
-#endif
 	DBGLOG(SCN, INFO,
 		"cfg80211_sched_scan_stopped event send done\n");
 
@@ -2477,30 +2451,6 @@ notify_resume:
 }
 #endif /* ! CONFIG_X86 */
 
-void reset_p2p_mode(P_GLUE_INFO_T prGlueInfo)
-{
-	PARAM_CUSTOM_P2P_SET_STRUCT_T rSetP2P;
-	uint32_t rWlanStatus = WLAN_STATUS_SUCCESS;
-	uint32_t u4BufLen = 0;
-
-	if (!prGlueInfo)
-		return;
-
-	rSetP2P.u4Enable = 0;
-	rSetP2P.u4Mode = 0;
-
-	p2pNetUnregister(prGlueInfo, FALSE);
-
-	rWlanStatus = kalIoctl(prGlueInfo, wlanoidSetP2pMode, (PVOID)&rSetP2P,
-		sizeof(PARAM_CUSTOM_P2P_SET_STRUCT_T), FALSE, FALSE, TRUE, FALSE, &u4BufLen);
-
-	if (rWlanStatus != WLAN_STATUS_SUCCESS)
-		prGlueInfo->prAdapter->fgIsP2PRegistered = FALSE;
-
-	DBGLOG(INIT, INFO,
-			"ret = 0x%08x\n", (uint32_t) rWlanStatus);
-}
-
 int set_p2p_mode_handler(struct net_device *netdev, PARAM_CUSTOM_P2P_SET_STRUCT_T p2pmode)
 {
 #if 0
@@ -2557,14 +2507,6 @@ int set_p2p_mode_handler(struct net_device *netdev, PARAM_CUSTOM_P2P_SET_STRUCT_
 		g_u4P2POnOffing = 0;
 		GLUE_RELEASE_THE_SPIN_LOCK(&g_p2p_lock);
 		return 0;
-	}
-
-	/* Resetting p2p mode if registered to avoid launch KE */
-	if (p2pmode.u4Enable
-		&& prGlueInfo->prAdapter->fgIsP2PRegistered
-		&& !kalIsResetting()) {
-		DBGLOG(INIT, WARN, "Resetting p2p mode\n");
-		reset_p2p_mode(prGlueInfo);
 	}
 
 	rSetP2P.u4Enable = p2pmode.u4Enable;
@@ -2799,10 +2741,10 @@ static uint32_t u4LogOnOffCache = -1;
 static void consys_log_event_notification(int cmd, int value)
 {
 	P_GLUE_INFO_T prGlueInfo = NULL;
-	P_ADAPTER_T prAdapter = NULL;
+	P_ADAPTER_T *prAdapter = NULL;
 	struct net_device *prDev = gPrDev;
-#if 0 /* gen2? */
 	WLAN_STATUS rStatus = WLAN_STATUS_FAILURE;
+#if 0 /* gen2? */
 	struct _CMD_HEADER_T rCmdV1Header;
 	struct _CMD_FORMAT_V1_T rCmd_v1;
 #endif
@@ -2838,9 +2780,9 @@ static void consys_log_event_notification(int cmd, int value)
 	}
 
 	if (cmd == FW_LOG_CMD_ON_OFF) {
-#if 0 /* gen2? */
+
 		uint8_t onoff[1] = {'0'};
-#endif
+
 		DBGLOG(INIT, TRACE, "FW_LOG_CMD_ON_OFF\n");
 #if 0 /* gen2? */
 		rCmdV1Header.cmdType = CMD_TYPE_SET;
@@ -3470,7 +3412,6 @@ static VOID wlanRemove(VOID)
 	P_WLANDEV_INFO_T prWlandevInfo = NULL;
 	P_GLUE_INFO_T prGlueInfo = NULL;
 	P_ADAPTER_T prAdapter = NULL;
-	P_CONNECTION_SETTINGS_T prConnSettings;
 
 	DBGLOG(INIT, LOUD, "Remove wlan!\n");
 
@@ -3561,13 +3502,6 @@ static VOID wlanRemove(VOID)
 		flush_delayed_work(&workq);	/* flush_delayed_work_sync is deprecated */
 	}
 
-	/* Prevent memory leakage */
-	prConnSettings = &prGlueInfo->prAdapter->rWifiVar.rConnSettings;
-	if (prConnSettings && prConnSettings->assocIeLen > 0) {
-		kalMemFree(prConnSettings->pucAssocIEs, VIR_MEM_TYPE,
-			   prConnSettings->assocIeLen);
-		prConnSettings->assocIeLen = 0;
-	}
 	flush_delayed_work(&sched_workq);
 
 	DBGLOG(INIT, INFO, "down g_halt_sem...\n");

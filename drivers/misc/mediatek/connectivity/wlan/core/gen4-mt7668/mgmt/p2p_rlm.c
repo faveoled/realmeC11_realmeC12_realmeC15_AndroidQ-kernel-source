@@ -95,48 +95,6 @@
 *                                 M A C R O S
 ********************************************************************************
 */
-ENUM_CHNL_EXT_T MAP_SECONDATY_CHANNEL_5KHZ(UINT_32 ch)
-{
-	ENUM_CHNL_EXT_T eSCO = CHNL_EXT_SCN;
-
-	switch (ch) {
-	case 36:
-	case 44:
-	case 52:
-	case 60:
-	case 100:
-	case 108:
-	case 116:
-	case 124:
-	case 132:
-	case 140:
-	case 149:
-	case 157:
-		eSCO = CHNL_EXT_SCA;
-		break;
-	case 40:
-	case 48:
-	case 56:
-	case 64:
-	case 104:
-	case 112:
-	case 120:
-	case 128:
-	case 136:
-	case 144:
-	case 153:
-	case 161:
-		eSCO = CHNL_EXT_SCB;
-		break;
-	case 165:
-	default:
-		eSCO = CHNL_EXT_SCN;
-		break;
-	}
-	return eSCO;
-}
-
-
 
 /*******************************************************************************
 *                   F U N C T I O N   D E C L A R A T I O N S
@@ -982,8 +940,8 @@ ENUM_CHNL_EXT_T rlmDecideScoForAP(P_ADAPTER_T prAdapter, P_BSS_INFO_T prBssInfo)
 		if (regd_is_single_sku_en()) {
 			if (rlmDomainIsLegalChannel(prAdapter, prBssInfo->eBand,
 										prBssInfo->ucPrimaryChannel))
-				eSCO = MAP_SECONDATY_CHANNEL_5KHZ
-					((UINT_32)prBssInfo->ucPrimaryChannel);
+				eSCO = rlmSelectSecondaryChannelType(prAdapter, prBssInfo->eBand,
+										prBssInfo->ucPrimaryChannel);
 		} else {
 		prDomainInfo = rlmDomainGetDomainInfo(prAdapter);
 		ASSERT(prDomainInfo);

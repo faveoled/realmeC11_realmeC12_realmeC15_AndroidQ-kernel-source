@@ -334,13 +334,8 @@ void cnmMemInit(struct ADAPTER *prAdapter)
  * \retval NULL     Fail to allocat memory
  */
 /*----------------------------------------------------------------------------*/
-#if CFG_DBG_MGT_BUF
-void *cnmMemAllocX(IN struct ADAPTER *prAdapter, IN enum ENUM_RAM_TYPE eRamType,
-	IN uint32_t u4Length, uint8_t *fileAndLine)
-#else
 void *cnmMemAlloc(IN struct ADAPTER *prAdapter, IN enum ENUM_RAM_TYPE eRamType,
 	IN uint32_t u4Length)
-#endif
 {
 	struct BUF_INFO *prBufInfo;
 	uint32_t rRequiredBitmap;
@@ -433,24 +428,7 @@ void *cnmMemAlloc(IN struct ADAPTER *prAdapter, IN enum ENUM_RAM_TYPE eRamType,
 	KAL_RELEASE_SPIN_LOCK(prAdapter, eLockBufCat);
 
 #ifdef LINUX
-#if CFG_DBG_MGT_BUF
-	pvMemory = (void *) kalMemAlloc(u4Length + sizeof(struct MEM_TRACK),
-		PHY_MEM_TYPE);
-	if (pvMemory) {
-		struct MEM_TRACK *prMemTrack = (struct MEM_TRACK *)pvMemory;
-
-		KAL_ACQUIRE_SPIN_LOCK(prAdapter, SPIN_LOCK_MGT_BUF);
-		LINK_INSERT_TAIL(
-			&prAdapter->rMemTrackLink, &prMemTrack->rLinkEntry);
-		KAL_RELEASE_SPIN_LOCK(prAdapter, SPIN_LOCK_MGT_BUF);
-		prMemTrack->pucFileAndLine = fileAndLine;
-		prMemTrack->u2CmdIdAndWhere = 0x0000;
-		pvMemory = (void *)(prMemTrack + 1);
-		kalMemZero(pvMemory, u4Length);
-	}
-#else
 	pvMemory = (void *) kalMemAlloc(u4Length, PHY_MEM_TYPE);
-#endif
 #else
 	pvMemory = (void *) NULL;
 #endif
@@ -513,19 +491,8 @@ void cnmMemFree(IN struct ADAPTER *prAdapter, IN void *pvMemory)
 		eRamType = RAM_TYPE_BUF;
 	} else {
 #ifdef LINUX
-#if CFG_DBG_MGT_BUF
-		struct MEM_TRACK *prTrack = (struct MEM_TRACK *)
-			((uint8_t *)pvMemory - sizeof(struct MEM_TRACK));
-
-		KAL_ACQUIRE_SPIN_LOCK(prAdapter, SPIN_LOCK_MGT_BUF);
-		LINK_REMOVE_KNOWN_ENTRY(
-			&prAdapter->rMemTrackLink, &prTrack->rLinkEntry);
-		KAL_RELEASE_SPIN_LOCK(prAdapter, SPIN_LOCK_MGT_BUF);
-		kalMemFree(prTrack, PHY_MEM_TYPE, 0);
-#else
 		/* For Linux, it is supported because size is not needed */
 		kalMemFree(pvMemory, PHY_MEM_TYPE, 0);
-#endif
 #else
 		/* For Windows, it is not supported because of
 		 * no size argument
@@ -534,7 +501,7 @@ void cnmMemFree(IN struct ADAPTER *prAdapter, IN void *pvMemory)
 #endif
 
 #if CFG_DBG_MGT_BUF
-		GLUE_INC_REF_CNT(prAdapter->u4MemFreeDynamicCount);
+		prAdapter->u4MemFreeDynamicCount++;
 #endif
 		return;
 	}
@@ -588,9 +555,6 @@ void cnmStaRecInit(struct ADAPTER *prAdapter)
 
 		prStaRec->ucIndex = (uint8_t) i;
 		prStaRec->fgIsInUse = FALSE;
-#if DSCP_SUPPORT
-		prStaRec->qosMapSet = NULL;
-#endif
 	}
 }
 
@@ -627,10 +591,6 @@ struct STA_RECORD *cnmStaRecAlloc(struct ADAPTER *prAdapter,
 			for (k = 0; k < TID_NUM + 1; k++) {
 				prStaRec->au2CachedSeqCtrl[k] = 0xFFFF;
 				prStaRec->afgIsIgnoreAmsduDuplicate[k] = FALSE;
-#if CFG_SUPPORT_FRAG_AGG_ATTACK_DETECTION
-				prStaRec->au2AmsduInvalidSN[k] = 0xFFFF;
-				prStaRec->afgIsAmsduInvalid[k] = FALSE;
-#endif /* CFG_SUPPORT_FRAG_AGG_ATTACK_DETECTION */
 			}
 
 			/* Initialize SW TX queues in STA_REC */
@@ -658,6 +618,9 @@ struct STA_RECORD *cnmStaRecAlloc(struct ADAPTER *prAdapter,
 			prStaRec->u4MaxMpduLen = 0;
 			prStaRec->u4MinMpduLen = 0;
 
+#if DSCP_SUPPORT
+			qosMapSetInit(prStaRec);
+#endif
 			break;
 		}
 	}
@@ -677,11 +640,6 @@ struct STA_RECORD *cnmStaRecAlloc(struct ADAPTER *prAdapter,
 	} else {
 		prStaRec = NULL;
 	}
-
-	/* remove pending msdu when sta_rec alloc */
-	if (prStaRec)
-		nicFreePendingTxMsduInfoByWlanIdx(prAdapter,
-			prStaRec->ucWlanIndex);
 
 	return prStaRec;
 }
@@ -713,12 +671,6 @@ void cnmStaRecFree(struct ADAPTER *prAdapter, struct STA_RECORD *prStaRec)
 
 	cnmStaSendRemoveCmd(prAdapter, STA_REC_CMD_ACTION_STA,
 		ucStaRecIndex, ucBssIndex);
-#if DSCP_SUPPORT
-	if (prStaRec->qosMapSet) {
-		QosMapSetRelease(prStaRec);
-		prStaRec->qosMapSet = NULL;
-	}
-#endif
 }
 
 /*----------------------------------------------------------------------------*/
@@ -1473,7 +1425,7 @@ cnmPeerAdd(struct ADAPTER *prAdapter, void *pvSetBuffer,
 	uint32_t u4SetBufferLen, uint32_t *pu4SetInfoLen)
 {
 	struct CMD_PEER_ADD *prCmd;
-	struct BSS_INFO *prBssInfo;
+	struct BSS_INFO *prAisBssInfo;
 	struct STA_RECORD *prStaRec;
 
 	/* sanity check */
@@ -1486,42 +1438,38 @@ cnmPeerAdd(struct ADAPTER *prAdapter, void *pvSetBuffer,
 	*pu4SetInfoLen = sizeof(struct CMD_PEER_ADD);
 	prCmd = (struct CMD_PEER_ADD *) pvSetBuffer;
 
-	prBssInfo
-		= GET_BSS_INFO_BY_INDEX(prAdapter, prCmd->ucBssIdx);
-	if (prBssInfo == NULL) {
-		log_dbg(MEM, ERROR, "prBssInfo %d is NULL!\n"
-				, prCmd->ucBssIdx);
+	prAisBssInfo = prAdapter->prAisBssInfo;	/* for AIS only test */
+	if (!prAisBssInfo)
 		return TDLS_STATUS_FAIL;
-	}
 
 	prStaRec = cnmGetStaRecByAddress(prAdapter,
-		(uint8_t) prBssInfo->ucBssIndex,
+		(uint8_t) prAdapter->prAisBssInfo->ucBssIndex,
 		prCmd->aucPeerMac);
 
 	if (prStaRec == NULL) {
 		prStaRec =
 		cnmStaRecAlloc(prAdapter, STA_TYPE_DLS_PEER,
-			(uint8_t) prBssInfo->ucBssIndex,
+			(uint8_t) prAdapter->prAisBssInfo->ucBssIndex,
 			prCmd->aucPeerMac);
 
 		if (prStaRec == NULL)
 			return TDLS_STATUS_RESOURCES;
 
-		if (prBssInfo->ucBssIndex)
-			prStaRec->ucBssIndex = prBssInfo->ucBssIndex;
+		if (prAisBssInfo->ucBssIndex)
+			prStaRec->ucBssIndex = prAisBssInfo->ucBssIndex;
 
 		/* init the prStaRec */
 		/* prStaRec will be zero first in cnmStaRecAlloc() */
 		COPY_MAC_ADDR(prStaRec->aucMacAddr, prCmd->aucPeerMac);
 
-		prStaRec->u2BSSBasicRateSet = prBssInfo->u2BSSBasicRateSet;
+		prStaRec->u2BSSBasicRateSet = prAisBssInfo->u2BSSBasicRateSet;
 
 		prStaRec->u2DesiredNonHTRateSet
 			= prAdapter->rWifiVar.ucAvailablePhyTypeSet;
 
 		prStaRec->u2OperationalRateSet
-			= prBssInfo->u2OperationalRateSet;
-		prStaRec->ucPhyTypeSet = prBssInfo->ucPhyTypeSet;
+			= prAisBssInfo->u2OperationalRateSet;
+		prStaRec->ucPhyTypeSet = prAisBssInfo->ucPhyTypeSet;
 		prStaRec->eStaType = prCmd->eStaType;
 
 		/* Init lowest rate to prevent CCK in 5G band */
@@ -1563,7 +1511,7 @@ cnmPeerUpdate(struct ADAPTER *prAdapter, void *pvSetBuffer,
 {
 
 	struct CMD_PEER_UPDATE *prCmd;
-	struct BSS_INFO *prBssInfo;
+	struct BSS_INFO *prAisBssInfo;
 	struct STA_RECORD *prStaRec;
 	uint8_t ucNonHTPhyTypeSet;
 
@@ -1580,16 +1528,14 @@ cnmPeerUpdate(struct ADAPTER *prAdapter, void *pvSetBuffer,
 	*pu4SetInfoLen = sizeof(struct CMD_PEER_ADD);
 	prCmd = (struct CMD_PEER_UPDATE *) pvSetBuffer;
 
-	prBssInfo
-		= GET_BSS_INFO_BY_INDEX(prAdapter, prCmd->ucBssIdx);
-
-	if (prBssInfo == NULL) {
-		log_dbg(MEM, ERROR, "prBssInfo %d is NULL!\n"
-				, prCmd->ucBssIdx);
+	prAisBssInfo = prAdapter->prAisBssInfo;
+	if (prAisBssInfo == NULL) {
+		log_dbg(MEM, ERROR, "%s: prAisBssInfo is NULL!\n"
+				, __func__);
 		return TDLS_STATUS_FAIL;
 	}
 	prStaRec = cnmGetStaRecByAddress(prAdapter,
-		(uint8_t) prBssInfo->ucBssIndex,
+		(uint8_t) prAisBssInfo->ucBssIndex,
 		prCmd->aucPeerMac);
 
 	if ((!prStaRec) || !(prStaRec->fgIsInUse))
@@ -1598,9 +1544,9 @@ cnmPeerUpdate(struct ADAPTER *prAdapter, void *pvSetBuffer,
 	if (!IS_DLS_STA(prStaRec))
 		return TDLS_STATUS_FAIL;
 
-	if (prBssInfo) {
-		if (prBssInfo->ucBssIndex)
-			prStaRec->ucBssIndex = prBssInfo->ucBssIndex;
+	if (prAisBssInfo) {
+		if (prAisBssInfo->ucBssIndex)
+			prStaRec->ucBssIndex = prAisBssInfo->ucBssIndex;
 	}
 
 	/* update the record join time. */
@@ -1638,13 +1584,13 @@ cnmPeerUpdate(struct ADAPTER *prAdapter, void *pvSetBuffer,
 		}
 
 		prStaRec->u2OperationalRateSet = u2OperationalRateSet;
-		prStaRec->u2BSSBasicRateSet = prBssInfo->u2BSSBasicRateSet;
+		prStaRec->u2BSSBasicRateSet = prAisBssInfo->u2BSSBasicRateSet;
 
 		/* 4     <5> PHY type setting */
 
 		prStaRec->ucPhyTypeSet = 0;
 
-		if (prBssInfo->eBand == BAND_2G4) {
+		if (prAisBssInfo->eBand == BAND_2G4) {
 			if (prCmd->fgIsSupHt)
 				prStaRec->ucPhyTypeSet |= PHY_TYPE_BIT_HT;
 
@@ -1685,18 +1631,16 @@ cnmPeerUpdate(struct ADAPTER *prAdapter, void *pvSetBuffer,
 		}
 
 		if (IS_STA_IN_AIS(prStaRec)) {
-			struct CONNECTION_SETTINGS *prConnSettings;
-			enum ENUM_WEP_STATUS eEncStatus;
-
-			prConnSettings =
-				aisGetConnSettings(prAdapter,
-				prStaRec->ucBssIndex);
-
-			eEncStatus = prConnSettings->eEncStatus;
-
-			if (!((eEncStatus == ENUM_ENCRYPTION3_ENABLED)
-				|| (eEncStatus == ENUM_ENCRYPTION3_KEY_ABSENT)
-				|| (eEncStatus == ENUM_ENCRYPTION_DISABLED)
+			if (!((prAdapter->rWifiVar.rConnSettings
+				.eEncStatus == ENUM_ENCRYPTION3_ENABLED)
+				|| (prAdapter->rWifiVar.rConnSettings
+				.eEncStatus == ENUM_ENCRYPTION3_KEY_ABSENT)
+				|| (prAdapter->rWifiVar.rConnSettings
+				.eEncStatus == ENUM_ENCRYPTION_DISABLED)
+				|| (prAdapter->prGlueInfo->u2WSCAssocInfoIELen)
+#if CFG_SUPPORT_WAPI
+				|| (prAdapter->prGlueInfo->u2WapiAssocInfoIESz)
+#endif
 			    )) {
 
 				prStaRec->ucPhyTypeSet &= ~PHY_TYPE_BIT_HT;

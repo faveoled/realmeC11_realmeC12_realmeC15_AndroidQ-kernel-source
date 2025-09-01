@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -179,7 +177,8 @@ DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 	  {121, BAND_5G, CHNL_SPAN_20, 100, 11, TRUE}
 	  ,			/* CH_SET_UNII_WW_100_140 */
 	  {125, BAND_NULL, 0, 0, 0, FALSE}
-				/* CH_SET_UNII_UPPER_NA */
+	  ,			/* CH_SET_UNII_UPPER_NA */
+	  {0, BAND_NULL, 0, 0, 0, FALSE}
 	 }
 	}
 	,
@@ -270,8 +269,8 @@ DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 	  {121, BAND_5G, CHNL_SPAN_20, 132, 3, TRUE}
 	  ,			/* CH_SET_UNII_WW_132_140 */
 	  {125, BAND_5G, CHNL_SPAN_20, 149, 5, FALSE}
-				/* CH_SET_UNII_UPPER_149_165 */
-
+	  ,			/* CH_SET_UNII_UPPER_149_165 */
+	  {0, BAND_NULL, 0, 0, 0, FALSE}
 	 }
 	}
 	,
@@ -505,8 +504,8 @@ DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 	  {121, BAND_5G, CHNL_SPAN_20, 132, 3, TRUE}
 	  ,			/* CH_SET_UNII_WW_132_140 */
 	  {125, BAND_5G, CHNL_SPAN_20, 149, 5, FALSE}
-				/* CH_SET_UNII_UPPER_149_165 */
-
+	  ,			/* CH_SET_UNII_UPPER_149_165 */
+	  {0, BAND_NULL, 0, 0, 0, FALSE}
 	 }
 	}
 	,
@@ -581,7 +580,7 @@ static UINT_16 g_u2CountryGroup1_Passive[] = {
 DOMAIN_INFO_ENTRY arSupportedRegDomains_Passive[] = {
 	{
 	 /* Default passive scan channel table is empty */
-	 NULL, 0,
+	 COUNTRY_CODE_NULL, 0,
 	 {
 	  {81, BAND_2G4, CHNL_SPAN_5, 11, 0, 0},	/* CH_SET_2G4_1_14 */
 	  {82, BAND_2G4, CHNL_SPAN_5, 5, 0, 0},

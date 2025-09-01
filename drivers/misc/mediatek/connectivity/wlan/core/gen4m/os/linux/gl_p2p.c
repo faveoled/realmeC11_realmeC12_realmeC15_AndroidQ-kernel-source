@@ -208,38 +208,7 @@ static const struct wiphy_vendor_command mtk_p2p_vendor_ops[] = {
 		.doit = mtk_cfg80211_vendor_get_preferred_freq_list
 	},
 #endif /* CFG_SUPPORT_P2P_PREFERRED_FREQ_LIST */
-#if CFG_AUTO_CHANNEL_SEL_SUPPORT
-	{
-		{
-			.vendor_id = OUI_QCA,
-			.subcmd = NL80211_VENDOR_SUBCMD_ACS
-		},
-		.flags = WIPHY_VENDOR_CMD_NEED_WDEV
-				| WIPHY_VENDOR_CMD_NEED_NETDEV
-				| WIPHY_VENDOR_CMD_NEED_RUNNING,
-		.doit = mtk_cfg80211_vendor_acs
-	},
-#endif
-	{
-		{
-			.vendor_id = OUI_QCA,
-			.subcmd = NL80211_VENDOR_SUBCMD_GET_FEATURES
-		},
-		.flags = WIPHY_VENDOR_CMD_NEED_WDEV
-				| WIPHY_VENDOR_CMD_NEED_NETDEV,
-		.doit = mtk_cfg80211_vendor_get_features
-	},
 };
-
-static const struct nl80211_vendor_cmd_info mtk_p2p_vendor_events[] = {
-#if CFG_AUTO_CHANNEL_SEL_SUPPORT
-	{
-		.vendor_id = OUI_QCA,
-		.subcmd = NL80211_VENDOR_SUBCMD_ACS
-	},
-#endif
-};
-
 
 #endif
 
@@ -501,22 +470,6 @@ static int p2pDoIOCTL(struct net_device *prDev,
 		struct ifreq *prIFReq,
 		int i4Cmd);
 
-/*----------------------------------------------------------------------------*/
-/*!
- * \brief A method of callback function for napi struct
- *
- * It just return false because driver indicate Rx packet directly.
- *
- * \param[in] napi      Pointer to struct napi_struct.
- * \param[in] budget    Polling time interval.
- *
- * \return false
- */
-/*----------------------------------------------------------------------------*/
-static int p2p_napi_poll(struct napi_struct *napi, int budget)
-{
-	return 0;
-}
 
 /*---------------------------------------------------------------------------*/
 /*!
@@ -530,27 +483,8 @@ static int p2p_napi_poll(struct napi_struct *napi, int budget)
 /*---------------------------------------------------------------------------*/
 static int p2pInit(struct net_device *prDev)
 {
-	struct GLUE_INFO *prGlueInfo = NULL;
-	uint8_t ucBssIndex;
-
 	if (!prDev)
 		return -ENXIO;
-
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prDev));
-	ucBssIndex = wlanGetBssIdx(prDev);
-
-	if (ucBssIndex < MAX_BSSID_NUM) {
-		prDev->features |= NETIF_F_GRO;
-		prDev->hw_features |= NETIF_F_GRO;
-		prGlueInfo->napi[ucBssIndex].dev = prDev;
-		netif_napi_add(prGlueInfo->napi[ucBssIndex].dev,
-			&prGlueInfo->napi[ucBssIndex], p2p_napi_poll, 64);
-		DBGLOG(INIT, INFO,
-			"GRO interface add success: %d\n", ucBssIndex);
-	} else {
-		DBGLOG(INIT, ERROR,
-			"invalid BSSID: %d, No GRO interface\n", ucBssIndex);
-	}
 
 	return 0;		/* success */
 }				/* end of p2pInit() */
@@ -939,8 +873,8 @@ u_int8_t p2pNetRegister(struct GLUE_INFO *prGlueInfo,
 
 			DBGLOG(INIT, WARN,
 				"unable to register netdevice for p2p\n");
-			/* free dev in glUnregisterP2P() */
-			/* free_netdev(prP2PInfo[1]->prDevHandler); */
+
+			free_netdev(prGlueInfo->prP2PInfo[1]->prDevHandler);
 
 			ret = FALSE;
 		} else {
@@ -999,7 +933,7 @@ u_int8_t p2pNetUnregister(struct GLUE_INFO *prGlueInfo,
 
 #if CFG_ENABLE_UNIFY_WIPHY
 		/* don't unregister the dev that share with the AIS */
-		if (wlanIsAisDev(prP2PInfo->prDevHandler))
+		if (prP2PInfo->prDevHandler == gprWdev->netdev)
 			continue;
 #endif
 
@@ -1123,6 +1057,7 @@ int glSetupP2P(struct GLUE_INFO *prGlueInfo, struct wireless_dev *prP2pWdev,
 	/*0. allocate p2pinfo */
 	if (p2PAllocInfo(prGlueInfo, u4Idx) != TRUE) {
 		DBGLOG(INIT, WARN, "Allocate memory for p2p FAILED\n");
+		ASSERT(0);
 		return -1;
 	}
 
@@ -1312,11 +1247,11 @@ u_int8_t glRegisterP2P(struct GLUE_INFO *prGlueInfo, const char *prDevName,
 			goto err_alloc_netdev;
 		}
 
-		COPY_MAC_ADDR(rMacAddr,
-				prAdapter->rWifiVar.aucInterfaceAddress[i]);
-
-		DBGLOG(INIT, INFO, "Set p2p role[%d] mac to " MACSTR "\n",
-				i, MAC2STR(rMacAddr));
+		/* fill hardware address */
+		COPY_MAC_ADDR(rMacAddr, prAdapter->rMyMacAddr);
+		rMacAddr[0] |= 0x2;
+		/* change to local administrated address */
+		rMacAddr[0] ^= i << 2;
 		kalMemCopy(prP2pDev->dev_addr, rMacAddr, ETH_ALEN);
 		kalMemCopy(prP2pDev->perm_addr, prP2pDev->dev_addr, ETH_ALEN);
 
@@ -1356,7 +1291,7 @@ err_alloc_netdev:
 #if CFG_ENABLE_UNIFY_WIPHY
 u_int8_t glP2pCreateWirelessDevice(struct GLUE_INFO *prGlueInfo)
 {
-	struct wiphy *prWiphy = wlanGetWiphy();
+	struct wiphy *prWiphy = gprWdev->wiphy;
 	struct wireless_dev *prWdev = NULL;
 	uint8_t	i = 0;
 
@@ -1449,11 +1384,6 @@ u_int8_t glP2pCreateWirelessDevice(struct GLUE_INFO *prGlueInfo)
 #endif
 	prWiphy->ap_sme_capa = 1;
 
-#if CFG_ENABLE_OFFCHANNEL_TX
-	prWiphy->flags |= WIPHY_FLAG_OFFCHAN_TX;
-#endif /* CFG_ENABLE_OFFCHANNEL_TX */
-	prWiphy->features |= NL80211_FEATURE_INACTIVITY_TIMER;
-
 	prWiphy->max_scan_ssids = MAX_SCAN_LIST_NUM;
 	prWiphy->max_scan_ie_len = MAX_SCAN_IE_LEN;
 	prWiphy->signal_type = CFG80211_SIGNAL_TYPE_MBM;
@@ -1461,18 +1391,12 @@ u_int8_t glP2pCreateWirelessDevice(struct GLUE_INFO *prGlueInfo)
 	prWiphy->vendor_commands = mtk_p2p_vendor_ops;
 	prWiphy->n_vendor_commands = sizeof(mtk_p2p_vendor_ops)
 		/ sizeof(struct wiphy_vendor_command);
-	prWiphy->vendor_events = mtk_p2p_vendor_events;
-	prWiphy->n_vendor_events = ARRAY_SIZE(mtk_p2p_vendor_events);
 #endif
 
 #ifdef CONFIG_PM
 #if KERNEL_VERSION(3, 9, 0) > CFG80211_VERSION_CODE
 	prWiphy->wowlan = &mtk_p2p_wowlan_support;
 #endif
-#endif
-
-#if KERNEL_VERSION(3, 14, 0) < CFG80211_VERSION_CODE
-		prWiphy->max_ap_assoc_sta = P2P_MAXIMUM_CLIENT_COUNT;
 #endif
 
 	cfg80211_regd_set_wiphy(prWiphy);
@@ -1598,7 +1522,7 @@ u_int8_t glUnregisterP2P(struct GLUE_INFO *prGlueInfo, uint8_t ucIdx)
 
 		if (prP2PInfo->prDevHandler) {
 			/* don't free the dev that share with the AIS */
-			if (wlanIsAisDev(prP2PInfo->prDevHandler))
+			if (prP2PInfo->prDevHandler == gprWdev->netdev)
 				gprP2pRoleWdev[ucRoleIdx] = NULL;
 			else {
 				if (prP2PInfo->prDevHandler->reg_state
@@ -1619,6 +1543,7 @@ u_int8_t glUnregisterP2P(struct GLUE_INFO *prGlueInfo, uint8_t ucIdx)
 		if (!p2PFreeInfo(prGlueInfo, ucRoleIdx)) {
 			/* FALSE: (fgIsP2PRegistered!=FALSE)||(ucRoleIdx err) */
 			DBGLOG(INIT, ERROR, "p2PFreeInfo FAILED\n");
+			ASSERT(0);
 			return FALSE;
 		}
 	}
@@ -1797,6 +1722,8 @@ static void p2pSetMulticastList(IN struct net_device *prDev)
 		? *((struct GLUE_INFO **) netdev_priv(prDev))
 		: NULL;
 
+	ASSERT(prDev);
+	ASSERT(prGlueInfo);
 	if (!prDev || !prGlueInfo) {
 		DBGLOG(INIT, WARN,
 			" abnormal dev or skb: prDev(0x%p), prGlueInfo(0x%p)\n",
@@ -1832,6 +1759,8 @@ void mtk_p2p_wext_set_Multicastlist(struct GLUE_INFO *prGlueInfo)
 		? *((struct GLUE_INFO **) netdev_priv(prDev))
 		: NULL;
 
+	ASSERT(prDev);
+	ASSERT(prGlueInfo);
 	if (!prDev || !prGlueInfo) {
 		DBGLOG(INIT, WARN,
 			" abnormal dev or skb: prDev(0x%p), prGlueInfo(0x%p)\n",
@@ -2126,11 +2055,8 @@ int p2pSetMACAddress(IN struct net_device *prDev, void *addr)
 {
 	struct ADAPTER *prAdapter = NULL;
 	struct GLUE_INFO *prGlueInfo = NULL;
-	struct sockaddr *sa = NULL;
-	struct BSS_INFO *prBssInfo = NULL;
-	struct BSS_INFO *prDevBssInfo = NULL;
-	uint8_t ucRoleIdx = 0, ucBssIdx = 0;
-	struct GL_P2P_INFO *prP2pInfo = NULL;
+
+	ASSERT(prDev);
 
 	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prDev));
 	ASSERT(prGlueInfo);
@@ -2138,66 +2064,7 @@ int p2pSetMACAddress(IN struct net_device *prDev, void *addr)
 	prAdapter = prGlueInfo->prAdapter;
 	ASSERT(prAdapter);
 
-	if (!prDev || !addr) {
-		DBGLOG(INIT, ERROR, "Set macaddr with ndev(%d) and addr(%d)\n",
-		       (prDev == NULL) ? 0 : 1, (addr == NULL) ? 0 : 1);
-		return -EINVAL;
-	}
-
-	if (mtk_Netdev_To_RoleIdx(prGlueInfo, prDev, &ucRoleIdx) != 0) {
-		DBGLOG(INIT, ERROR, "can't find the matched dev");
-		return -EINVAL;
-	}
-
-	if (p2pFuncRoleToBssIdx(prGlueInfo->prAdapter,
-		ucRoleIdx, &ucBssIdx) != WLAN_STATUS_SUCCESS) {
-		DBGLOG(INIT, ERROR, "can't find the matched bss");
-		return -EINVAL;
-	}
-
-	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIdx);
-	if (!prBssInfo) {
-		DBGLOG(INIT, ERROR, "bss is not active\n");
-		return -EINVAL;
-	}
-
-	prDevBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter,
-		prAdapter->ucP2PDevBssIdx);
-	if (!prDevBssInfo) {
-		DBGLOG(INIT, ERROR, "dev bss is not active\n");
-		return -EINVAL;
-	}
-
-	prP2pInfo = prGlueInfo->prP2PInfo[0];
-	if (!prP2pInfo) {
-		DBGLOG(INIT, ERROR, "p2p info is null\n");
-		return -EINVAL;
-	}
-
-	sa = (struct sockaddr *)addr;
-
-	COPY_MAC_ADDR(prBssInfo->aucOwnMacAddr, sa->sa_data);
-	COPY_MAC_ADDR(prDev->dev_addr, sa->sa_data);
-	COPY_MAC_ADDR(prAdapter->rWifiVar.aucInterfaceAddress[ucRoleIdx],
-			sa->sa_data);
-
-	if ((prP2pInfo->prDevHandler == prDev)
-		&& mtk_IsP2PNetDevice(prGlueInfo, prDev)) {
-		COPY_MAC_ADDR(prAdapter->rWifiVar.aucDeviceAddress,
-			sa->sa_data);
-		COPY_MAC_ADDR(prDevBssInfo->aucOwnMacAddr, sa->sa_data);
-		DBGLOG(INIT, INFO,
-			"[%d][%d] Set random macaddr to " MACSTR ".\n",
-			ucBssIdx,
-			prDevBssInfo->ucBssIndex,
-			MAC2STR(prDevBssInfo->aucOwnMacAddr));
-	} else {
-		DBGLOG(INIT, INFO,
-			"[%d] Set random macaddr to " MACSTR ".\n",
-			ucBssIdx,
-			MAC2STR(prBssInfo->aucOwnMacAddr));
-	}
-
-	return WLAN_STATUS_SUCCESS;
+	/* @FIXME */
+	return eth_mac_addr(prDev, addr);
 }
 

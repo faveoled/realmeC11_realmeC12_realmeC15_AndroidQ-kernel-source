@@ -97,7 +97,6 @@ const long channel_freq[] = {
 #define NUM_CHANNELS (ARRAY_SIZE(channel_freq))
 
 #define MAX_SSID_LEN    32
-#define COUNTRY_CODE_LEN	10	/* country code length */
 
 /*******************************************************************************
 *                             D A T A   T Y P E S
@@ -125,17 +124,13 @@ static const struct iw_priv_args rIwPrivTable[] = {
 	{IOCTL_GET_INT, 0, IW_PRIV_TYPE_INT | 50, ""},
 
 	/* added for set_oid and get_oid */
-	{IOCTL_SET_STRUCT, IW_PRIV_TYPE_CHAR | sizeof(NDIS_TRANSPORT_STRUCT), 0,
-	""},
-	{IOCTL_GET_STRUCT, 0, IW_PRIV_TYPE_CHAR | sizeof(NDIS_TRANSPORT_STRUCT),
-	""},
+	{IOCTL_SET_STRUCT, 256, 0, ""},
+	{IOCTL_GET_STRUCT, 0, 256, ""},
 
 	{IOCTL_GET_DRIVER, IW_PRIV_TYPE_CHAR | 2000, IW_PRIV_TYPE_CHAR | 2000, "driver"},
 
 #if CFG_SUPPORT_QA_TOOL
 	/* added for ATE iwpriv Command */
-	{IOCTL_QA_TOOL_DAEMON, IW_PRIV_TYPE_BYTE | sizeof(HQA_CMD_FRAME),
-		0, ""},
 	{IOCTL_IWPRIV_ATE, IW_PRIV_TYPE_CHAR | 2000, 0, ""},
 #endif
 
@@ -216,19 +211,18 @@ static const iw_handler rIwPrivHandler[] = {
 	[IOCTL_GET_DRIVER - SIOCIWFIRSTPRIV] = priv_set_driver,
 
 #if CFG_SUPPORT_QA_TOOL
-	[IOCTL_QA_TOOL_DAEMON - SIOCIWFIRSTPRIV] = priv_qa_agent,
 	[IOCTL_IWPRIV_ATE - SIOCIWFIRSTPRIV] = priv_ate_set
 #endif
 };
 
 const struct iw_handler_def wext_handler_def = {
 	.num_standard = 0,
-#if defined(CONFIG_WEXT_PRIV) || LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 32)
+#if defined(CONFIG_WEXT_PRIV)
 	.num_private = (__u16) sizeof(rIwPrivHandler) / sizeof(iw_handler),
 	.num_private_args = (__u16) sizeof(rIwPrivTable) / sizeof(struct iw_priv_args),
 #endif /* CONFIG_WEXT_PRIV || LINUX_VERSION_CODE <= 2.6.32 */
 	.standard = (iw_handler *) NULL,
-#if defined(CONFIG_WEXT_PRIV) || LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 32)
+#if defined(CONFIG_WEXT_PRIV)
 	.private = rIwPrivHandler,
 	.private_args = rIwPrivTable,
 #endif /* CONFIG_WEXT_PRIV || LINUX_VERSION_CODE <= 2.6.32 */
@@ -258,6 +252,162 @@ wext_support_ioctl_SIOCSIWPMKSA_Action(IN struct net_device *prDev, IN char *prE
 *                              F U N C T I O N S
 ********************************************************************************
 */
+
+void MAP_CHANNEL_ID_TO_KHZ(UINT_32 ch, UINT_32 khz)
+{
+	switch (ch) {
+	case 1:
+		khz = 2412000;
+		break;
+	case 2:
+		khz = 2417000;
+		break;
+	case 3:
+		khz = 2422000;
+		break;
+	case 4:
+		khz = 2427000;
+		break;
+	case 5:
+		khz = 2432000;
+		break;
+	case 6:
+		khz = 2437000;
+		break;
+	case 7:
+		khz = 2442000;
+		break;
+	case 8:
+		khz = 2447000;
+		break;
+	case 9:
+		khz = 2452000;
+		break;
+	case 10:
+		khz = 2457000;
+		break;
+	case 11:
+		khz = 2462000;
+		break;
+	case 12:
+		khz = 2467000;
+		break;
+	case 13:
+		khz = 2472000;
+		break;
+	case 14:
+		khz = 2484000;
+		break;
+	case 36:   /* UNII */
+		khz = 5180000;
+		break;
+	case 40:   /* UNII */
+		khz = 5200000;
+		break;
+	case 44:
+		khz = 5220000;
+		break;
+	case 48:
+		khz = 5240000;
+		break;
+	case 52:
+		khz = 5260000;
+		break;
+	case 56:
+		khz = 5280000;
+		break;
+	case 60:
+		khz = 5300000;
+		break;
+	case 64:
+		khz = 5320000;
+		break;
+	case 149:
+		khz = 5745000;
+		break;
+	case 153:
+		khz = 5765000;
+		break;
+	case 157:
+		khz = 5785000;
+		break;
+	case 161:   /* UNII */
+		khz = 5805000;
+		break;
+	case 165:   /* UNII */
+		khz = 5825000;
+		break;
+	case 100:   /* HiperLAN2 */
+		khz = 5500000;
+		break;
+	case 104:   /* HiperLAN2 */
+		khz = 5520000;
+		break;
+	case 108:   /* HiperLAN2 */
+		khz = 5540000;
+		break;
+	case 112:   /* HiperLAN2 */
+		khz = 5560000;
+		break;
+	case 116:   /* HiperLAN2 */
+		khz = 5580000;
+		break;
+	case 120:   /* HiperLAN2 */
+		khz = 5600000;
+		break;
+	case 124:   /* HiperLAN2 */
+		khz = 5620000;
+		break;
+	case 128:   /* HiperLAN2 */
+		khz = 5640000;
+		break;
+	case 132:   /* HiperLAN2 */
+		khz = 5660000;
+		break;
+	case 136:   /* HiperLAN2 */
+		khz = 5680000;
+		break;
+	case 140:   /* HiperLAN2 */
+		khz = 5700000;
+		break;
+	case 34:   /* Japan MMAC */
+		khz = 5170000;
+		break;
+	case 38:  /* Japan MMAC */
+		khz = 5190000;
+		break;
+	case 42:   /* Japan MMAC */
+		khz = 5210000;
+		break;
+	case 46:   /* Japan MMAC */
+		khz = 5230000;
+		break;
+	case 184:   /* Japan */
+		khz = 4920000;
+		break;
+	case 188:   /* Japan */
+		khz = 4940000;
+		break;
+	case 192:   /* Japan */
+		khz = 4960000;
+		break;
+	case 196:   /* Japan */
+		khz = 4980000;
+		break;
+	case 208:   /* Japan, means J08 */
+		khz = 5040000;
+		break;
+	case 212:   /* Japan, means J12 */
+		khz = 5060000;
+		break;
+	case 216:   /* Japan, means J16 */
+		khz = 5080000;
+		break;
+	default:
+		khz = 2412000;
+		break;
+	}
+}
 
 /*----------------------------------------------------------------------------*/
 /*!
@@ -1193,7 +1343,7 @@ wext_get_ap(IN struct net_device *prNetDev,
 	/* } */
 
 	if (prGlueInfo->eParamMediaStateIndicated == PARAM_MEDIA_STATE_DISCONNECTED) {
-		memset(prAddr, 0, sizeof(*prAddr));
+		memset(prAddr, 0, 6);
 		return 0;
 	}
 
@@ -1443,8 +1593,7 @@ wext_get_scan(IN struct net_device *prNetDev,
 	}
 
 	if (prList->u4NumberOfItems > CFG_MAX_NUM_BSS_LIST) {
-		DBGLOG(INIT, INFO, "[wifi] strange scan result count:%d\n",
-		      prList->u4NumberOfItems);
+		DBGLOG(INIT, INFO, "[wifi] strange scan result count:%ld\n", prList->u4NumberOfItems);
 		goto error;
 	}
 
@@ -1915,7 +2064,7 @@ wext_get_essid(IN struct net_device *prNetDev,
 
 	kalMemFree(prSsid, VIR_MEM_TYPE, sizeof(PARAM_SSID_T));
 
-	return rStatus;
+	return 0;
 }				/* wext_get_essid */
 
 #if 0
@@ -2232,7 +2381,7 @@ wext_set_txpow(IN struct net_device *prNetDev,
 		wlanSetAcpiState(prGlueInfo->prAdapter, ePowerState);
 	}
 
-		prGlueInfo->ePowerState = ParamDeviceStateD0;
+	prGlueInfo->ePowerState = ePowerState;
 
 	return ret;
 }				/* wext_set_txpow */
@@ -2429,8 +2578,7 @@ wext_set_encode(IN struct net_device *prNetDev,
 				   wlanoidSetAddWep, prWepKey, prWepKey->u4Length, FALSE, FALSE, TRUE, &u4BufLen);
 
 		if (rStatus != WLAN_STATUS_SUCCESS) {
-			DBGLOG(INIT, INFO, "wlanoidSetAddWep fail 0x%x\n",
-			       rStatus);
+			DBGLOG(INIT, INFO, "wlanoidSetAddWep fail 0x%lx\n", rStatus);
 			return -EFAULT;
 		}
 
@@ -2809,8 +2957,7 @@ wext_set_encode_ext(IN struct net_device *prNetDev,
 		}
 
 		/* PN */
-		memcpy(&prWpiKey->aucPN[0], &prIWEncExt->tx_seq[0], IW_ENCODE_SEQ_MAX_SIZE);
-		memcpy(&prWpiKey->aucPN[8], &prIWEncExt->rx_seq[0], IW_ENCODE_SEQ_MAX_SIZE);
+		memcpy(&prWpiKey->aucPN[0], &prIWEncExt->tx_seq[0], IW_ENCODE_SEQ_MAX_SIZE * 2);
 
 		/* BSSID */
 		memcpy(prWpiKey->aucAddrIndex, prIWEncExt->addr.sa_data, 6);
@@ -2846,8 +2993,7 @@ wext_set_encode_ext(IN struct net_device *prNetDev,
 					   prRemoveKey, prRemoveKey->u4Length, FALSE, FALSE, TRUE, &u4BufLen);
 
 			if (rStatus != WLAN_STATUS_SUCCESS)
-				DBGLOG(INIT, INFO, "remove key error:%x\n",
-				       rStatus);
+				DBGLOG(INIT, INFO, "remove key error:%lx\n", rStatus);
 			return 0;
 		}
 		/* return 0; */
@@ -2881,9 +3027,7 @@ wext_set_encode_ext(IN struct net_device *prNetDev,
 						   prWepKey, prWepKey->u4Length, FALSE, FALSE, TRUE, &u4BufLen);
 
 				if (rStatus != WLAN_STATUS_SUCCESS) {
-					DBGLOG(INIT, INFO,
-					       "wlanoidSetAddWep fail 0x%x\n",
-					       rStatus);
+					DBGLOG(INIT, INFO, "wlanoidSetAddWep fail 0x%lx\n", rStatus);
 					return -EFAULT;
 				}
 
@@ -2896,9 +3040,7 @@ wext_set_encode_ext(IN struct net_device *prNetDev,
 						   &eAuthMode, sizeof(eAuthMode), FALSE, FALSE, FALSE, &u4BufLen);
 
 				if (rStatus != WLAN_STATUS_SUCCESS) {
-					DBGLOG(INIT, INFO,
-					"wlanoidSetAuthMode fail 0x%x\n",
-					rStatus);
+					DBGLOG(INIT, INFO, "wlanoidSetAuthMode fail 0x%lx\n", rStatus);
 					return -EFAULT;
 				}
 
@@ -2914,9 +3056,7 @@ wext_set_encode_ext(IN struct net_device *prNetDev,
 						   FALSE, FALSE, FALSE, &u4BufLen);
 
 				if (rStatus != WLAN_STATUS_SUCCESS) {
-					DBGLOG(INIT, INFO,
-					"wlanoidSetEncryptionStatus fail 0x%x\n",
-					rStatus);
+					DBGLOG(INIT, INFO, "wlanoidSetEncryptionStatus fail 0x%lx\n", rStatus);
 					return -EFAULT;
 				}
 
@@ -2941,9 +3081,7 @@ wext_set_encode_ext(IN struct net_device *prNetDev,
 #else
 				if (prKey->u4KeyIndex > 3) {
 #endif
-					DBGLOG(INIT, INFO,
-					       "key index error:0x%x\n",
-					       prKey->u4KeyIndex);
+					DBGLOG(INIT, INFO, "key index error:0x%lx\n", prKey->u4KeyIndex);
 					/* key id is out of range */
 					return -EINVAL;
 				}
@@ -2977,12 +3115,6 @@ wext_set_encode_ext(IN struct net_device *prNetDev,
 				memcpy(((PUINT_8) prKey->aucKeyMaterial) + 16, prIWEncExt->key + 24, 8);
 				memcpy((prKey->aucKeyMaterial) + 24, prIWEncExt->key + 16, 8);
 			} else {
-				/* aucKeyMaterial is defined as a 32-elements array */
-				if (prIWEncExt->key_len > 32) {
-					DBGLOG(REQ, ERROR, "prIWEncExt->key_len: %d is too long!\n",
-						prIWEncExt->key_len);
-					return -EFAULT;
-				}
 				memcpy(prKey->aucKeyMaterial, prIWEncExt->key, prIWEncExt->key_len);
 			}
 
@@ -2993,8 +3125,7 @@ wext_set_encode_ext(IN struct net_device *prNetDev,
 					   wlanoidSetAddKey, prKey, prKey->u4Length, FALSE, FALSE, TRUE, &u4BufLen);
 
 			if (rStatus != WLAN_STATUS_SUCCESS) {
-				DBGLOG(INIT, INFO,
-				       "add key error:%x\n", rStatus);
+				DBGLOG(INIT, INFO, "add key error:%lx\n", rStatus);
 				return -EFAULT;
 			}
 			break;
@@ -3023,27 +3154,22 @@ static int wext_set_country(IN struct net_device *prNetDev, IN struct iw_point *
 	P_GLUE_INFO_T prGlueInfo;
 	WLAN_STATUS rStatus;
 	UINT_32 u4BufLen;
-	UINT_8 aucCountry[COUNTRY_CODE_LEN];
+	UINT_8 aucCountry[2];
 
 	ASSERT(prNetDev);
 
 	/* prData->pointer should be like "COUNTRY US", "COUNTRY EU"
 	 * and "COUNTRY JP"
 	 */
-	if (GLUE_CHK_PR2(prNetDev, prData) == FALSE
-	|| !prData->pointer
-	|| prData->length < COUNTRY_CODE_LEN)
+	if (GLUE_CHK_PR2(prNetDev, prData) == FALSE || !prData->pointer || prData->length < 10)
 		return -EINVAL;
 
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
 
-	if (copy_from_user(aucCountry, prData->pointer, COUNTRY_CODE_LEN))
-		return -EFAULT;
+	aucCountry[0] = *((PUINT_8)prData->pointer + 8);
+	aucCountry[1] = *((PUINT_8)prData->pointer + 9);
 
-	rStatus = kalIoctl(prGlueInfo,
-			   wlanoidSetCountryCode,
-			   &aucCountry[COUNTRY_CODE_LEN-2],
-			2, FALSE, FALSE, TRUE, &u4BufLen);
+	rStatus = kalIoctl(prGlueInfo, wlanoidSetCountryCode, &aucCountry[0], 2, FALSE, FALSE, TRUE, &u4BufLen);
 	if (rStatus != WLAN_STATUS_SUCCESS) {
 		DBGLOG(REQ, ERROR, "Set country code error: %x\n", rStatus);
 		return -EFAULT;
@@ -3247,20 +3373,14 @@ int wext_support_ioctl(IN struct net_device *prDev, IN struct ifreq *prIfReq, IN
 			ret = wext_set_scan(prDev, NULL, NULL, NULL);
 #if WIRELESS_EXT > 17
 		else if (iwr->u.data.length == sizeof(struct iw_scan_req)) {
-			struct iw_scan_req *req;
-
 			prExtraBuf = kalMemAlloc(MAX_SSID_LEN, VIR_MEM_TYPE);
 			if (!prExtraBuf) {
 				ret = -ENOMEM;
 				break;
 			}
-
-			req = (struct iw_scan_req *)(iwr->u.data.pointer);
-
-			if (req->essid_len > MAX_SSID_LEN) {
-				ret = -EFAULT;
-			} else if (copy_from_user
-			    (prExtraBuf, req->essid, req->essid_len)) {
+			if (copy_from_user
+			    (prExtraBuf, ((struct iw_scan_req *)(iwr->u.data.pointer))->essid,
+			     ((struct iw_scan_req *)(iwr->u.data.pointer))->essid_len)) {
 				ret = -EFAULT;
 			} else {
 				ret = wext_set_scan(prDev, NULL, (union iwreq_data *)&(iwr->u.data), prExtraBuf);
@@ -3298,7 +3418,7 @@ int wext_support_ioctl(IN struct net_device *prDev, IN struct ifreq *prIfReq, IN
 			ASSERT(iwr->u.data.length <= u4ExtraSize);
 			if (iwr->u.data.length > u4ExtraSize) {
 				DBGLOG(INIT, INFO,
-				       "Updated result length is larger than allocated (%d > %d)\n",
+				       "Updated result length is larger than allocated (%d > %ld)\n",
 				       iwr->u.data.length, u4ExtraSize);
 				iwr->u.data.length = u4ExtraSize;
 			}
@@ -3365,12 +3485,11 @@ int wext_support_ioctl(IN struct net_device *prDev, IN struct ifreq *prIfReq, IN
 			break;
 		}
 
-		kalMemZero(prExtraBuf, IW_ESSID_MAX_SIZE);
 		/* iwr->u.essid.length is updated by wext_get_essid() */
 
 		ret = wext_get_essid(prDev, NULL, &iwr->u.essid, prExtraBuf);
 		if (ret == 0) {
-			if (copy_to_user(iwr->u.essid.pointer, prExtraBuf, IW_ESSID_MAX_SIZE))
+			if (copy_to_user(iwr->u.essid.pointer, prExtraBuf, iwr->u.essid.length))
 				ret = -EFAULT;
 		}
 
@@ -3503,19 +3622,13 @@ int wext_support_ioctl(IN struct net_device *prDev, IN struct ifreq *prIfReq, IN
 	case SIOCSIWENCODEEXT:	/* 0x8B34, set extended encoding token & mode */
 		if (iwr->u.encoding.pointer) {
 			u4ExtraSize = iwr->u.encoding.length;
-
-			if (u4ExtraSize > sizeof(struct iw_encode_ext)) {
-				ret = -EINVAL;
-				break;
-			}
-
 			prExtraBuf = kalMemAlloc(u4ExtraSize, VIR_MEM_TYPE);
 			if (!prExtraBuf) {
 				ret = -ENOMEM;
 				break;
 			}
 
-			if (copy_from_user(prExtraBuf, iwr->u.encoding.pointer, u4ExtraSize))
+			if (copy_from_user(prExtraBuf, iwr->u.encoding.pointer, iwr->u.encoding.length))
 				ret = -EFAULT;
 		} else if (iwr->u.encoding.length != 0) {
 			ret = -EINVAL;
@@ -3663,7 +3776,7 @@ wext_support_ioctl_SIOCSIWPMKSA_Action(IN struct net_device *prDev, IN char *prE
 		rStatus = kalIoctl(prGlueInfo,
 				   wlanoidSetPmkid, prPmkid, sizeof(PARAM_PMKID_T), FALSE, FALSE, TRUE, &u4BufLen);
 		if (rStatus != WLAN_STATUS_SUCCESS)
-			DBGLOG(INIT, INFO, "add pmkid error:%x\n", rStatus);
+			DBGLOG(INIT, INFO, "add pmkid error:%lx\n", rStatus);
 
 		kalMemFree(prPmkid, VIR_MEM_TYPE, 8 + sizeof(PARAM_BSSID_INFO_T));
 		break;
@@ -3681,7 +3794,7 @@ wext_support_ioctl_SIOCSIWPMKSA_Action(IN struct net_device *prDev, IN char *prE
 		rStatus = kalIoctl(prGlueInfo,
 				   wlanoidSetPmkid, prPmkid, sizeof(PARAM_PMKID_T), FALSE, FALSE, TRUE, &u4BufLen);
 		if (rStatus != WLAN_STATUS_SUCCESS)
-			DBGLOG(INIT, INFO, "flush pmkid error:%x\n", rStatus);
+			DBGLOG(INIT, INFO, "flush pmkid error:%lx\n", rStatus);
 
 		kalMemFree(prPmkid, VIR_MEM_TYPE, 8);
 		break;

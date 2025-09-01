@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -188,15 +186,10 @@ typedef enum _ENUM_TESTMODE_LINK_DETECTION_ATTR {
 ********************************************************************************
 */
 /* cfg80211 hooks */
-#if KERNEL_VERSION(4, 12, 0) <= CFG80211_VERSION_CODE
-int
-mtk_cfg80211_change_iface(struct wiphy *wiphy,
-			  struct net_device *ndev, enum nl80211_iftype type, struct vif_params *params);
-#else
 int
 mtk_cfg80211_change_iface(struct wiphy *wiphy,
 			  struct net_device *ndev, enum nl80211_iftype type, u32 *flags, struct vif_params *params);
-#endif
+
 int
 mtk_cfg80211_add_key(struct wiphy *wiphy,
 		     struct net_device *ndev,
@@ -277,13 +270,7 @@ int
 mtk_cfg80211_sched_scan_start(IN struct wiphy *wiphy,
 			      IN struct net_device *ndev, IN struct cfg80211_sched_scan_request *request);
 
-#if KERNEL_VERSION(4, 12, 0) <= CFG80211_VERSION_CODE
-int mtk_cfg80211_sched_scan_stop(IN struct wiphy *wiphy,
-				 IN struct net_device *ndev,
-				 IN u64 reqid);
-#else
 int mtk_cfg80211_sched_scan_stop(IN struct wiphy *wiphy, IN struct net_device *ndev);
-#endif
 
 #if CONFIG_NL80211_TESTMODE
 int
@@ -319,11 +306,6 @@ int mtk_cfg80211_update_ft_ies(struct wiphy *wiphy, struct net_device *dev,
 			       struct cfg80211_update_ft_ies_params *ftie);
 
 INT_32 mtk_cfg80211_process_str_cmd(P_GLUE_INFO_T prGlueInfo, PUINT_8 cmd, INT_32 len);
-
-#if CFG_SUPPORT_WPA3
-int mtk_cfg80211_external_auth(struct wiphy *wiphy, struct net_device *dev,
-			       struct cfg80211_external_auth_params *params);
-#endif
 
 /*******************************************************************************
 *                              F U N C T I O N S

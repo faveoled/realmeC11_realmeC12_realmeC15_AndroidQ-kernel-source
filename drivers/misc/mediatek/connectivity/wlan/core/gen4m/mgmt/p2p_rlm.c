@@ -195,24 +195,14 @@ void rlmBssInitForAP(struct ADAPTER *prAdapter, struct BSS_INFO *prBssInfo)
 		}
 	}
 
-	/* We may limit AP/GO Nss by RfBand in some case, ex CoAnt.
-	 * Recalculte Nss when channel is selected.
-	 */
-	cnmGetOpTRxNss(prAdapter,
-		prBssInfo->ucBssIndex,
-		&prBssInfo->ucOpRxNss,
-		&prBssInfo->ucOpTxNss);
-
 	DBGLOG(RLM, INFO,
-		"WLAN AP SCO=%d BW=%d S1=%d S2=%d CH=%d Band=%d TxN=%d RxN=%d\n",
+		"WLAN AP SCO=%d BW=%d S1=%d S2=%d CH=%d Band=%d\n",
 		prBssInfo->eBssSCO,
 		prBssInfo->ucVhtChannelWidth,
 		prBssInfo->ucVhtChannelFrequencyS1,
 		prBssInfo->ucVhtChannelFrequencyS2,
 		prBssInfo->ucPrimaryChannel,
-		prBssInfo->eBand,
-		prBssInfo->ucOpTxNss,
-		prBssInfo->ucOpRxNss);
+		prBssInfo->eBand);
 
 }
 
@@ -372,6 +362,7 @@ void rlmProcessPublicAction(struct ADAPTER *prAdapter,
 	prStaRec = cnmGetStaRecByIndex(prAdapter, prSwRfb->ucStaRecIdx);
 
 	if (!(prSwRfb->prStaRec)) {
+		DBGLOG(P2P, ERROR, "prSwRfb->prStaRec is null.\n");
 		return;
 	}
 

@@ -972,7 +972,7 @@ p2pFuncStartGO(IN P_ADAPTER_T prAdapter,
 						(prP2pConnReqInfo->eConnRequest ==
 						 P2P_CONNECTION_TYPE_PURE_AP) ? TRUE : FALSE, prBssInfo);
 
-		DBGLOG(P2P, INFO, "AP Channel=%d, Band=%d, SCO=%d, Phy=0x%02x\n",
+		DBGLOG(P2P, INFO, "AP Channel=%d, Band=%d, SCO=%d, Phy=%d\n",
 		       prBssInfo->ucPrimaryChannel,
 		       prBssInfo->eBand,
 		       prBssInfo->eBssSCO,
@@ -982,6 +982,7 @@ p2pFuncStartGO(IN P_ADAPTER_T prAdapter,
 		prBssInfo->ucBeaconTimeoutCount = 0;
 
 		/* 3 <2> Update BSS-INFO parameters */
+		prBssInfo->fgIsProtection = FALSE;
 		if (prP2pConnReqInfo->eConnRequest == P2P_CONNECTION_TYPE_GO) {
 			prBssInfo->fgIsProtection = TRUE;	/* Always enable protection at P2P GO */
 			/* kalP2PSetCipher(prAdapter->prGlueInfo, IW_AUTH_CIPHER_CCMP); */
@@ -989,8 +990,6 @@ p2pFuncStartGO(IN P_ADAPTER_T prAdapter,
 			ASSERT(prP2pConnReqInfo->eConnRequest == P2P_CONNECTION_TYPE_PURE_AP);
 			if (kalP2PGetCipher(prAdapter->prGlueInfo))
 				prBssInfo->fgIsProtection = TRUE;
-			else
-				prBssInfo->fgIsProtection = FALSE;
 		}
 
 		bssInitForAP(prAdapter, prBssInfo, TRUE);
@@ -1000,9 +999,6 @@ p2pFuncStartGO(IN P_ADAPTER_T prAdapter,
 			    secPrivacySeekForBcEntry(prAdapter, prBssInfo->ucBssIndex,
 						     prBssInfo->aucBSSID, 0xff, CIPHER_SUITE_NONE, 0xff, 0x0, BIT(0));
 		}
-
-		SET_NET_ACTIVE(prAdapter, prBssInfo->ucBssIndex);
-		nicActivateNetwork(prAdapter, prBssInfo->ucBssIndex);
 
 		/* 3 <3> Set MAC HW */
 		/* 4 <3.1> Setup SCO and Bandwidth */
@@ -1092,7 +1088,7 @@ p2pFuncSwitchOPMode(IN P_ADAPTER_T prAdapter,
 		ASSERT_BREAK((prAdapter != NULL) && (prP2pBssInfo != NULL) && (eOpMode < OP_MODE_NUM));
 
 		if (prP2pBssInfo->eCurrentOPMode != eOpMode) {
-			DBGLOG(P2P, INFO,
+			DBGLOG(P2P, TRACE,
 			       "Switch OP mode from %d to %d\n",
 			       prP2pBssInfo->eCurrentOPMode, eOpMode);
 
@@ -1116,27 +1112,9 @@ p2pFuncSwitchOPMode(IN P_ADAPTER_T prAdapter,
 			case OP_MODE_INFRASTRUCTURE:
 			case OP_MODE_ACCESS_POINT:
 				/* Change interface address. */
-				if ((prAdapter->prGlueInfo == NULL)
-					|| (prAdapter->prGlueInfo->prP2PInfo == NULL)
-					|| (prAdapter->prGlueInfo->prP2PInfo->prWdev == NULL)) {
-					DBGLOG(P2P, ERROR, " prGlueInfo || prP2PInfo || prWdev == NULLL\n");
-					break;
-				}
-				if (prAdapter->prGlueInfo->prP2PInfo->prWdev->iftype == NL80211_IFTYPE_AP) {
-					COPY_MAC_ADDR(prP2pBssInfo->aucOwnMacAddr,
-						prAdapter->rWifiVar.aucInterfaceAddress[1]);
-					COPY_MAC_ADDR(prP2pBssInfo->aucBSSID,
-						prAdapter->rWifiVar.aucInterfaceAddress[1]);
-					DBGLOG(INIT, INFO, "Swith Mode AP aucOwnMacAddr %pM\n",
-						prP2pBssInfo->aucOwnMacAddr);
-				} else {
-					COPY_MAC_ADDR(prP2pBssInfo->aucOwnMacAddr,
-						prAdapter->rWifiVar.aucInterfaceAddress[0]);
-					COPY_MAC_ADDR(prP2pBssInfo->aucBSSID,
-						prAdapter->rWifiVar.aucInterfaceAddress[0]);
-					DBGLOG(INIT, INFO, "Swith Mode STA aucOwnMacAddr %pM\n",
-						prP2pBssInfo->aucOwnMacAddr);
-				}
+				COPY_MAC_ADDR(prP2pBssInfo->aucOwnMacAddr, prAdapter->rWifiVar.aucInterfaceAddress);
+				COPY_MAC_ADDR(prP2pBssInfo->aucBSSID, prAdapter->rWifiVar.aucInterfaceAddress);
+
 				break;
 			case OP_MODE_P2P_DEVICE:
 				p2pChangeMediaState(prAdapter, prP2pBssInfo, PARAM_MEDIA_STATE_DISCONNECTED);
@@ -1279,14 +1257,23 @@ p2pFuncProcessBeacon(IN P_ADAPTER_T prAdapter,
 
 		prBcnMsduInfo = prP2pBssInfo->prBeacon;
 		prBcnFrame = (P_WLAN_BEACON_FRAME_T) ((ULONG) prBcnMsduInfo->prPacket + MAC_TX_RESERVED_FIELD);
+#if DBG
+		if (prBcnUpdateInfo->pucBcnHdr != NULL) {
+			ASSERT(prBcnUpdateInfo->pucBcnHdr == (PUINT_8)prBcnFrame);
+		}
 
-		if (!pucNewBcnBody) {
-			/* If no Beacon body update, cache the old body to use */
+		if (prBcnUpdateInfo->pucBcnBody != NULL) {
 			ASSERT(prBcnUpdateInfo->pucBcnBody ==
 			       (prBcnUpdateInfo->pucBcnHdr + prBcnUpdateInfo->u4BcnHdrLen));
+		}
+#endif
+		if (!pucNewBcnBody) {
+			/* Old body. */
 			pucNewBcnBody = prBcnUpdateInfo->pucBcnBody;
 			ASSERT(u4NewBodyLen == 0);
 			u4NewBodyLen = prBcnUpdateInfo->u4BcnBodyLen;
+		} else {
+			prBcnUpdateInfo->u4BcnBodyLen = u4NewBodyLen;
 		}
 
 		pucCachedIEBuf = kalMemAlloc(MAX_IE_LENGTH, VIR_MEM_TYPE);
@@ -1295,15 +1282,14 @@ p2pFuncProcessBeacon(IN P_ADAPTER_T prAdapter,
 			return WLAN_STATUS_FAILURE;
 		}
 
+
+		/* Temp buffer body part. */
 		kalMemCopy(pucCachedIEBuf, pucNewBcnBody, u4NewBodyLen);
 
 		if (pucNewBcnHdr) {
 			kalMemCopy(prBcnFrame, pucNewBcnHdr, u4NewHdrLen);
 			prBcnUpdateInfo->pucBcnHdr = (PUINT_8) prBcnFrame;
 			prBcnUpdateInfo->u4BcnHdrLen = u4NewHdrLen;
-		} else {
-			/* If no Beacon header update, should have the old header */
-			ASSERT(prBcnUpdateInfo->pucBcnHdr == (PUINT_8) prBcnFrame);
 		}
 
 		prBcnUpdateInfo->pucBcnBody = prBcnUpdateInfo->pucBcnHdr + prBcnUpdateInfo->u4BcnHdrLen;
@@ -3839,367 +3825,3 @@ VOID p2pFuncGenerateP2P_IE_NoA(IN P_ADAPTER_T prAdapter, IN P_MSDU_INFO_T prMsdu
 	prMsduInfo->u2FrameLength += (ELEM_HDR_LEN + prIeP2P->ucLength);
 
 }
-
-UINT_8 p2pFunGetAcsBestCh(IN P_ADAPTER_T prAdapter,
-		IN ENUM_BAND_T eBand,
-		IN ENUM_MAX_BANDWIDTH_SETTING eChnlBw,
-		IN UINT_32 u4LteSafeChnMask_2G,
-		IN UINT_32 u4LteSafeChnMask_5G_1,
-		IN UINT_32 u4LteSafeChnMask_5G_2)
-{
-	RF_CHANNEL_INFO_T aucChannelList[MAX_CHN_NUM] = { { 0 } };
-	UINT_8 ucNumOfChannel;
-	P_PARAM_GET_CHN_INFO prGetChnLoad;
-	UINT_8 i;
-	PARAM_PREFER_CHN_INFO rPreferChannel = { 0, 0xFFFF, 0 };
-
-	rlmDomainGetChnlList(prAdapter, eBand, TRUE, MAX_CHN_NUM,
-			&ucNumOfChannel, aucChannelList);
-
-	/*
-	 * 2. Calculate each channel's dirty score
-	 */
-	prGetChnLoad = &(prAdapter->rWifiVar.rChnLoadInfo);
-
-	DBGLOG(P2P, INFO, "2g mask=0x%08x\n", u4LteSafeChnMask_2G);
-	DBGLOG(P2P, INFO, "5g_1 mask=0x%08x\n", u4LteSafeChnMask_5G_1);
-	DBGLOG(P2P, INFO, "5g_2 mask=0x%08x\n", u4LteSafeChnMask_5G_2);
-
-	for (i = 0; i < ucNumOfChannel; i++) {
-		UINT_8 ucIdx;
-		P_PARAM_CHN_LOAD_INFO prEachChnLoad;
-
-		ucIdx = wlanGetChannelIndex(aucChannelList[i].ucChannelNum);
-		if (ucIdx >= MAX_CHN_NUM)
-			continue;
-		prEachChnLoad = &prGetChnLoad->rEachChnLoad[ucIdx];
-
-		DBGLOG(P2P, INFO, "idx: %u, ch: %u, s: %d\n",
-				ucIdx,
-				aucChannelList[i].ucChannelNum,
-				prEachChnLoad->u2APNumScore);
-
-		if (aucChannelList[i].ucChannelNum <= 14) {
-			if (!(u4LteSafeChnMask_2G & BIT(
-					aucChannelList[i].ucChannelNum)))
-				continue;
-		} else if ((aucChannelList[i].ucChannelNum >= 36) &&
-				(aucChannelList[i].ucChannelNum <= 144)) {
-			if (!(u4LteSafeChnMask_5G_1 & BIT(
-				(aucChannelList[i].ucChannelNum - 36) / 4)))
-				continue;
-		} else if ((aucChannelList[i].ucChannelNum >= 149) &&
-				(aucChannelList[i].ucChannelNum <= 181)) {
-			if (!(u4LteSafeChnMask_5G_2 & BIT(
-				(aucChannelList[i].ucChannelNum - 149) / 4)))
-				continue;
-		}
-		if (eBand == BAND_5G && eChnlBw >= MAX_BW_80MHZ &&
-				nicGetVhtS1(aucChannelList[i].ucChannelNum) == 0)
-			continue;
-		if (rPreferChannel.u2APNumScore > prEachChnLoad->u2APNumScore) {
-			rPreferChannel.u2APNumScore =
-				prEachChnLoad->u2APNumScore;
-			rPreferChannel.ucChannel =
-				prEachChnLoad->ucChannel;
-		}
-	}
-
-	return rPreferChannel.ucChannel;
-}
-
-void p2pFunProcessAcsReport(IN P_ADAPTER_T prAdapter,
-		IN UINT_8 ucRoleIndex,
-		IN P_PARAM_GET_CHN_INFO prLteSafeChnInfo,
-		IN struct P2P_ACS_REQ_INFO *prAcsReqInfo)
-{
-	ENUM_BAND_T eBand;
-	UINT_32 u4LteSafeChnMask_2G = -1;
-
-	if (!prAdapter || !prAcsReqInfo)
-		return;
-
-	if (prAcsReqInfo->eHwMode == P2P_VENDOR_ACS_HW_MODE_11B ||
-			prAcsReqInfo->eHwMode == P2P_VENDOR_ACS_HW_MODE_11G)
-		eBand = BAND_2G4;
-	else
-		eBand = BAND_5G;
-
-	/* TODO: Add support for 5G FW mask */
-	if (prLteSafeChnInfo && (eBand == BAND_2G4)) {
-		P_CMD_LTE_SAFE_CHN_INFO_T prLteSafeChnList;
-		RF_CHANNEL_INFO_T aucChannelList[MAX_2G_BAND_CHN_NUM] = { { 0 } };
-		UINT_8 ucNumOfChannel;
-		UINT_8 i;
-		BOOLEAN fgIsMaskValid = FALSE;
-
-		rlmDomainGetChnlList(prAdapter, eBand, TRUE,
-			MAX_2G_BAND_CHN_NUM, &ucNumOfChannel, aucChannelList);
-
-		prLteSafeChnList = &(prLteSafeChnInfo->rLteSafeChnList);
-		u4LteSafeChnMask_2G = prLteSafeChnList->au4SafeChannelBitmask[
-			NL80211_TESTMODE_AVAILABLE_CHAN_ATTR_2G_BASE_1 - 1];
-
-		prAcsReqInfo->u4LteSafeChnMask_2G &= u4LteSafeChnMask_2G;
-		for (i = 0; i < ucNumOfChannel; i++) {
-			if ((prAcsReqInfo->u4LteSafeChnMask_2G &
-					BIT(aucChannelList[i].ucChannelNum)))
-				fgIsMaskValid = TRUE;
-		}
-		if (!fgIsMaskValid) {
-			DBGLOG(P2P, WARN,
-				"All mask invalid, mark all as valid\n");
-			prAcsReqInfo->u4LteSafeChnMask_2G = BITS(1, 14);
-		}
-	}
-
-	prAcsReqInfo->ucPrimaryCh = p2pFunGetAcsBestCh(prAdapter,
-			eBand,
-			prAcsReqInfo->eChnlBw,
-			prAcsReqInfo->u4LteSafeChnMask_2G,
-			prAcsReqInfo->u4LteSafeChnMask_5G_1,
-			prAcsReqInfo->u4LteSafeChnMask_5G_2);
-
-	p2pFunIndicateAcsResult(prAdapter->prGlueInfo,
-			prAcsReqInfo);
-}
-
-ENUM_CHNL_EXT_T p2pFunGetSco(IN P_ADAPTER_T prAdapter,
-		ENUM_BAND_T eBand, UINT_8 ucPrimaryCh) {
-	ENUM_CHNL_EXT_T eSCO = CHNL_EXT_SCN;
-
-	if (eBand == BAND_2G4) {
-		if (ucPrimaryCh != 14)
-			eSCO = (ucPrimaryCh > 7) ? CHNL_EXT_SCB : CHNL_EXT_SCA;
-	} else {
-		P_DOMAIN_INFO_ENTRY prDomainInfo = rlmDomainGetDomainInfo(
-				prAdapter);
-		P_DOMAIN_SUBBAND_INFO prSubband;
-		UINT_8 i, j;
-
-		for (i = 0; i < MAX_SUBBAND_NUM; i++) {
-			prSubband = &prDomainInfo->rSubBand[i];
-			if (prSubband->ucBand != eBand)
-				continue;
-			for (j = 0; j < prSubband->ucNumChannels; j++) {
-				if ((prSubband->ucFirstChannelNum +
-					j * prSubband->ucChannelSpan) ==
-					ucPrimaryCh) {
-					eSCO = (j & 1) ?
-						CHNL_EXT_SCB :
-						CHNL_EXT_SCA;
-					break;
-				}
-			}
-
-			if (j < prSubband->ucNumChannels)
-				break;	/* Found */
-		}
-	}
-
-	return eSCO;
-}
-
-UINT_8 p2pFunGetSecCh(IN P_ADAPTER_T prAdapter,
-		IN ENUM_BAND_T eBand,
-		IN ENUM_CHNL_EXT_T eSCO,
-		IN UINT_8 ucPrimaryCh)
-{
-	UINT_8 ucSecondCh;
-
-	if (eSCO == CHNL_EXT_SCN)
-		return 0;
-
-	if (eSCO == CHNL_EXT_SCA)
-		ucSecondCh = ucPrimaryCh + CHNL_SPAN_20;
-	else
-		ucSecondCh = ucPrimaryCh - CHNL_SPAN_20;
-
-	if (!rlmDomainIsLegalChannel(prAdapter, eBand, ucSecondCh))
-		ucSecondCh = 0;
-
-	return ucSecondCh;
-}
-
-void p2pFunIndicateAcsResult(IN P_GLUE_INFO_T prGlueInfo,
-		IN struct P2P_ACS_REQ_INFO *prAcsReqInfo)
-{
-	UINT_8 ucVhtBw = VHT_OP_CHANNEL_WIDTH_20_40;
-
-	if (prAcsReqInfo->ucPrimaryCh == 0) {
-		if (prAcsReqInfo->eHwMode == P2P_VENDOR_ACS_HW_MODE_11B ||
-				prAcsReqInfo->eHwMode ==
-					P2P_VENDOR_ACS_HW_MODE_11G) {
-			prAcsReqInfo->ucPrimaryCh = AP_DEFAULT_CHANNEL_2G;
-		} else {
-			prAcsReqInfo->ucPrimaryCh = AP_DEFAULT_CHANNEL_5G;
-		}
-		DBGLOG(P2P, WARN, "No chosed channel, use default channel %d\n",
-				prAcsReqInfo->ucPrimaryCh);
-	}
-
-	if (prAcsReqInfo->eChnlBw > MAX_BW_20MHZ) {
-		ENUM_BAND_T eBand;
-		ENUM_CHNL_EXT_T eSCO;
-
-		eBand = prAcsReqInfo->ucPrimaryCh <= 14 ? BAND_2G4 : BAND_5G;
-		eSCO = p2pFunGetSco(prGlueInfo->prAdapter,
-				eBand,
-				prAcsReqInfo->ucPrimaryCh);
-
-		prAcsReqInfo->ucSecondCh = p2pFunGetSecCh(
-				prGlueInfo->prAdapter,
-				eBand,
-				eSCO,
-				prAcsReqInfo->ucPrimaryCh);
-	}
-
-	switch (prAcsReqInfo->eChnlBw) {
-	case MAX_BW_20MHZ:
-	case MAX_BW_40MHZ:
-		ucVhtBw = VHT_OP_CHANNEL_WIDTH_20_40;
-		break;
-	case MAX_BW_80MHZ:
-		ucVhtBw = VHT_OP_CHANNEL_WIDTH_80;
-		break;
-	case MAX_BW_160MHZ:
-		ucVhtBw = VHT_OP_CHANNEL_WIDTH_160;
-		break;
-	case MAX_BW_80_80_MHZ:
-		ucVhtBw = VHT_OP_CHANNEL_WIDTH_80P80;
-		break;
-	default:
-		ucVhtBw = VHT_OP_CHANNEL_WIDTH_20_40;
-		break;
-	}
-
-	prAcsReqInfo->ucCenterFreqS1 = nicGetVhtS1(prAcsReqInfo->ucPrimaryCh);
-
-	if (prAcsReqInfo->eChnlBw != VHT_OP_CHANNEL_WIDTH_80P80)
-		prAcsReqInfo->ucCenterFreqS2 = 0;
-	else
-		DBGLOG(P2P, ERROR, "Not support 80+80 bw.\n");
-
-	prAcsReqInfo->fgIsProcessing = FALSE;
-	kalP2pIndicateAcsResult(prGlueInfo,
-			prAcsReqInfo->ucRoleIdx,
-			prAcsReqInfo->ucPrimaryCh,
-			prAcsReqInfo->ucSecondCh,
-			prAcsReqInfo->ucCenterFreqS1,
-			prAcsReqInfo->ucCenterFreqS2,
-			prAcsReqInfo->eChnlBw);
-}
-
-void p2pFunCalAcsChnScores(IN P_ADAPTER_T prAdapter,
-		IN ENUM_BAND_T eBand)
-{
-	UINT_8 ucNumOfChannel;
-	RF_CHANNEL_INFO_T aucChannelList[MAX_CHN_NUM] = { { 0 } };
-	P_PARAM_GET_CHN_INFO prGetChnLoad;
-	UINT_8 i, ucIdx;
-
-	if (!prAdapter)
-		return;
-
-	prGetChnLoad = &(prAdapter->rWifiVar.rChnLoadInfo);
-
-	if (eBand == BAND_2G4) {
-		P_LINK_T prBSSDescList = (P_LINK_T) NULL;
-		P_BSS_DESC_T prBssDesc = (P_BSS_DESC_T) NULL;
-		UINT_16 u2APNumScore = 0, u2UpThreshold = 0;
-		UINT_16 u2LowThreshold = 0, ucInnerIdx = 0;
-
-		prBSSDescList = &(prAdapter->rWifiVar.rScanInfo.rBSSDescList);
-
-		LINK_FOR_EACH_ENTRY(prBssDesc, prBSSDescList, rLinkEntry,
-				BSS_DESC_T) {
-			/* Record channel loading with channel's AP number */
-			UINT_8 ucIdx = 0;
-
-			if (prBssDesc->eBand != eBand)
-				continue;
-			ucIdx = wlanGetChannelIndex(prBssDesc->ucChannelNum);
-			if (ucIdx >= MAX_CHN_NUM)
-				continue;
-			prGetChnLoad->rEachChnLoad[ucIdx].u2APNum++;
-		}
-
-		rlmDomainGetChnlList(prAdapter,
-				BAND_2G4,
-				TRUE,
-				MAX_2G_BAND_CHN_NUM,
-				&ucNumOfChannel,
-				aucChannelList);
-
-#define CHN_DIRTY_WEIGHT_UPPERBOUND 4
-		for (i = 0; i < ucNumOfChannel && i < MAX_2G_BAND_CHN_NUM; i++) {
-			P_PARAM_CHN_LOAD_INFO prEachChnLoad;
-
-			ucIdx = wlanGetChannelIndex(
-					aucChannelList[i].ucChannelNum);
-
-			if (ucIdx >= MAX_CHN_NUM)
-				continue;
-
-			prEachChnLoad = &prGetChnLoad->rEachChnLoad[ucIdx];
-
-			/* Current channel's dirty score */
-			u2APNumScore = prEachChnLoad->u2APNum *
-					CHN_DIRTY_WEIGHT_UPPERBOUND;
-			u2LowThreshold = u2UpThreshold = 3;
-
-			if (ucIdx < 3) {
-				u2LowThreshold = ucIdx;
-				u2UpThreshold = 3;
-			} else if (ucIdx >= (ucNumOfChannel - 3)) {
-				u2LowThreshold = 3;
-				u2UpThreshold = ucNumOfChannel - (ucIdx + 1);
-			}
-
-			/* Lower channel's dirty score */
-			for (ucInnerIdx = 0; ucInnerIdx < u2LowThreshold;
-					ucInnerIdx++) {
-				u2APNumScore += (prGetChnLoad->rEachChnLoad[ucIdx - ucInnerIdx - 1].u2APNum *
-					(CHN_DIRTY_WEIGHT_UPPERBOUND - 1 - ucInnerIdx));
-			}
-
-			/* Upper channel's dirty score */
-			for (ucInnerIdx = 0; ucInnerIdx < u2UpThreshold;
-					ucInnerIdx++) {
-				u2APNumScore +=
-					(prGetChnLoad->rEachChnLoad[ucIdx + ucInnerIdx + 1].u2APNum *
-					(CHN_DIRTY_WEIGHT_UPPERBOUND - 1 - ucInnerIdx));
-			}
-
-			prEachChnLoad->u2APNumScore = u2APNumScore;
-			prEachChnLoad->ucChannel =
-					aucChannelList[i].ucChannelNum;
-		}
-	} else {
-		rlmDomainGetChnlList(prAdapter,
-				BAND_5G,
-				TRUE,
-				MAX_CHN_NUM - MAX_2G_BAND_CHN_NUM,
-				&ucNumOfChannel,
-				aucChannelList);
-
-		for (i = 0; i < ucNumOfChannel; i++) {
-			P_PARAM_CHN_LOAD_INFO prEachChnLoad;
-
-			ucIdx = wlanGetChannelIndex(
-					aucChannelList[i].ucChannelNum);
-
-			if (ucIdx >= MAX_CHN_NUM)
-				continue;
-
-			prEachChnLoad = &prGetChnLoad->rEachChnLoad[ucIdx];
-			get_random_bytes(&prEachChnLoad->u2APNumScore,
-					sizeof(UINT_16));
-			prEachChnLoad->u2APNumScore %= 100;
-			prEachChnLoad->ucChannel =
-					aucChannelList[i].ucChannelNum;
-		}
-	}
-}
-
-

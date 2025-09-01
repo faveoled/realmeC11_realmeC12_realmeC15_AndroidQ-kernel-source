@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -425,7 +423,6 @@ VOID cnmStaRecInit(P_ADAPTER_T prAdapter)
 
 		prStaRec->ucIndex = (UINT_8) i;
 		prStaRec->fgIsInUse = FALSE;
-		prStaRec->qosMapSet = NULL;
 	}
 }
 
@@ -506,6 +503,9 @@ P_STA_RECORD_T cnmStaRecAlloc(P_ADAPTER_T prAdapter, UINT_8 ucNetTypeIndex)
 			for (k = 0; k < NUM_OF_PER_STA_TX_QUEUES; k++)
 				QUEUE_INITIALIZE(&prStaRec->arTxQueue[k]);
 
+#if DSCP_SUPPORT
+			qosMapSetInit(prStaRec);
+#endif
 			break;
 		}
 	}
@@ -545,11 +545,6 @@ VOID cnmStaRecFree(P_ADAPTER_T prAdapter, P_STA_RECORD_T prStaRec, BOOLEAN fgSyn
 		cnmStaSendRemoveCmd(prAdapter, prStaRec);
 
 	prStaRec->fgIsInUse = FALSE;
-
-	if (prStaRec->qosMapSet) {
-		QosMapSetRelease(prStaRec);
-		prStaRec->qosMapSet = NULL;
-	}
 }
 
 /*----------------------------------------------------------------------------*/

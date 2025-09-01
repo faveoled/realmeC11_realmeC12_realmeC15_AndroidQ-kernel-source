@@ -53,7 +53,7 @@
 #define STP_DBG_LOG_WARN                 1
 #define STP_DBG_LOG_ERR                  0
 
-extern INT32 gStpDbgDbgLevel;
+extern UINT32 gStpDbgDbgLevel;
 
 #define STP_DBG_PR_LOUD(fmt, arg...) \
 do { \
@@ -410,8 +410,6 @@ VOID stp_dbg_set_keyword(PINT8 keyword);
 UINT32 stp_dbg_get_host_trigger_assert(VOID);
 INT32 stp_dbg_set_fw_info(PUINT8 issue_info, UINT32 len, ENUM_STP_FW_ISSUE_TYPE issue_type);
 INT32 stp_dbg_cpupcr_infor_format(PUINT8 buf, UINT32 max_len);
-INT32 stp_dbg_dump_cpupcr_reg_info(PUINT8 buf, UINT32 consys_lp_reg);
-VOID stp_dbg_clear_cpupcr_reg_info(VOID);
 PUINT8 stp_dbg_id_to_task(UINT32 id);
 VOID stp_dbg_reset(VOID);
 

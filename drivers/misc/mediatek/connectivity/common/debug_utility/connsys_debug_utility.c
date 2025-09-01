@@ -24,7 +24,7 @@
 #include "connsys_debug_utility.h"
 #include "ring_emi.h"
 #include "ring.h"
-#include "wmt_exp.h"
+
 #include <linux/alarmtimer.h>
 #include <linux/suspend.h>
 
@@ -169,7 +169,7 @@ void *connlog_cache_allocate(size_t size)
 {
 	void *pBuffer = NULL;
 
-	pBuffer = vmalloc(size);
+	pBuffer = kmalloc(size, GFP_KERNEL);
 	if (!pBuffer)
 		return NULL;
 	return pBuffer;
@@ -274,9 +274,6 @@ static void connlog_ring_emi_to_cache(int conn_type)
 		connsys_dedicated_log_dump_emi(CONNLOG_EMI_BT_BASE_OFFESET, 0x20);
 		/* 32 byte gps read/write pointer */
 		connsys_dedicated_log_dump_emi(CONNLOG_EMI_GPS_BASE_OFFESET, 0x20);
-		/* Trigger Connsys Assert */
-		mtk_wcn_wmt_assert(WMTDRV_TYPE_WMT, 46);
-		return;
 	}
 
 	RING_EMI_READ_ALL_FOR_EACH(ring_emi_seg, ring_emi) {
@@ -423,9 +420,6 @@ static void connlog_ring_print(int conn_type)
 		connsys_dedicated_log_dump_emi(CONNLOG_EMI_BT_BASE_OFFESET, 0x20);
 		/* 32 byte gps read/write pointer */
 		connsys_dedicated_log_dump_emi(CONNLOG_EMI_GPS_BASE_OFFESET, 0x20);
-		/* Trigger Connsys Assert */
-		mtk_wcn_wmt_assert(WMTDRV_TYPE_WMT, 46);
-		return;
 	}
 
 	RING_EMI_READ_ALL_FOR_EACH(ring_emi_seg, ring_emi) {
@@ -699,9 +693,7 @@ static void connlog_log_data_handler(struct work_struct *work)
 {
 	int ret = 0;
 	int i;
-	int module = 0;
 	static DEFINE_RATELIMIT_STATE(_rs, 10 * HZ, 1);
-	static DEFINE_RATELIMIT_STATE(_rs2, 2 * HZ, 1);
 
 	do {
 		ret = 0;
@@ -713,8 +705,6 @@ static void connlog_log_data_handler(struct work_struct *work)
 					connlog_ring_print(i);
 
 				connlog_event_set(i);
-				/* Set module bit */
-				module |= (1 << i);
 				/* ret++; */
 			} else {
 				if (__ratelimit(&_rs))
@@ -723,9 +713,6 @@ static void connlog_log_data_handler(struct work_struct *work)
 		}
 	} while (ret);
 
-	if (__ratelimit(&_rs2))
-		pr_info("[connlog] irq counter=%d module=0x%04x\n",
-			EMI_READ32(gDev.virAddrEmiLogBase + CONNLOG_IRQ_COUNTER_BASE), module);
 	spin_lock_irqsave(&gDev.irq_lock, gDev.flags);
 	if (gDev.eirqOn)
 		mod_timer(&gDev.workTimer, jiffies + 1);
@@ -915,10 +902,10 @@ static void connlog_ring_buffer_deinit(void)
 	int i = 0;
 
 	for (i = 0; i < CONNLOG_TYPE_END; i++) {
-		kvfree(connlog_buffer_table[i].cache_base);
+		kfree(connlog_buffer_table[i].cache_base);
 		connlog_buffer_table[i].cache_base = NULL;
 	}
-	kvfree(gDev.log_data);
+	kfree(gDev.log_data);
 	gDev.log_data = NULL;
 }
 

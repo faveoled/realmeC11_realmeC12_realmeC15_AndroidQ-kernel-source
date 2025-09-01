@@ -68,8 +68,7 @@
  *******************************************************************************
  */
 
-#define EMI_BUILD_TIME_OFFSET	0x68340
-#define EMI_BUILD_TIME_MAX_LEN	190
+
 /*******************************************************************************
  *                            P U B L I C   D A T A
  *******************************************************************************
@@ -285,10 +284,11 @@ uint32_t wlanDownloadEMISection(IN struct ADAPTER
 	}
 
 	request_mem_region(gConEmiPhyBase, gConEmiSize, "WIFI-EMI");
-	kalSetEmiMpuProtection(gConEmiPhyBase, false);
+	kalSetEmiMpuProtection(gConEmiPhyBase, WIFI_EMI_MEM_OFFSET,
+			       WIFI_EMI_MEM_SIZE, false);
 	pucEmiBaseAddr = ioremap_nocache(gConEmiPhyBase, gConEmiSize);
 	DBGLOG(INIT, INFO,
-	       "EmiPhyBase:0x%llx offset:0x%x, ioremap region 0x%llX @ 0x%lX\n",
+	       "EmiPhyBase:0x%llx offset:0x%x, ioremap region 0x%lX @ 0x%lX\n",
 	       (uint64_t)gConEmiPhyBase, u4Offset, gConEmiSize, pucEmiBaseAddr);
 	if (!pucEmiBaseAddr) {
 		DBGLOG(INIT, ERROR, "ioremap failed\n");
@@ -297,7 +297,8 @@ uint32_t wlanDownloadEMISection(IN struct ADAPTER
 
 	kalMemCopy((pucEmiBaseAddr + u4Offset), pucStartPtr, u4Len);
 
-	kalSetEmiMpuProtection(gConEmiPhyBase, true);
+	kalSetEmiMpuProtection(gConEmiPhyBase, WIFI_EMI_MEM_OFFSET,
+			       WIFI_EMI_MEM_SIZE, true);
 	iounmap(pucEmiBaseAddr);
 	release_mem_region(gConEmiPhyBase, gConEmiSize);
 
@@ -449,7 +450,7 @@ uint32_t wlanImageSectionDownloadStage(
 					     &u4Offset, &u4Addr,
 					     &u4Len, &u4DataMode);
 
-		DBGLOG(INIT, TRACE,
+		DBGLOG(INIT, INFO,
 		       "DL Offset[%u] addr[0x%08x] len[%u] datamode[0x%08x]\n",
 		       u4Offset, u4Addr, u4Len, u4DataMode);
 
@@ -464,7 +465,7 @@ uint32_t wlanImageSectionDownloadStage(
 				eDlIdx, &u4Addr,
 				&u4Len, &u4DataMode, &fgIsEMIDownload);
 
-			DBGLOG(INIT, TRACE,
+			DBGLOG(INIT, INFO,
 			       "DL Offset[%u] addr[0x%08x] len[%u] datamode[0x%08x]\n",
 			       u4Offset, u4Addr, u4Len, u4DataMode);
 
@@ -1163,7 +1164,7 @@ uint32_t wlanConfigWifiFuncStatus(IN struct ADAPTER
 	ASSERT(prAdapter);
 	prChipInfo = prAdapter->chip_info;
 
-	u4EventSize = INIT_EVENT_RXD_LEN + prChipInfo->init_event_size +
+	u4EventSize = prChipInfo->rxd_size + prChipInfo->init_event_size +
 		sizeof(struct INIT_EVENT_CMD_RESULT);
 	aucBuffer = kalMemAlloc(u4EventSize, PHY_MEM_TYPE);
 	if (aucBuffer == NULL) {
@@ -1182,7 +1183,7 @@ uint32_t wlanConfigWifiFuncStatus(IN struct ADAPTER
 			u4Status = WLAN_STATUS_FAILURE;
 		} else {
 			prInitEvent = (struct INIT_WIFI_EVENT *)
-				(aucBuffer + INIT_EVENT_RXD_LEN);
+				(aucBuffer + prChipInfo->rxd_size);
 
 			/* EID / SeqNum check */
 			if (prInitEvent->ucEID != INIT_EVENT_ID_CMD_RESULT)
@@ -1838,7 +1839,7 @@ uint32_t wlanDownloadFW(IN struct ADAPTER *prAdapter)
 	if (prFwDlOps->downloadPatch)
 		prFwDlOps->downloadPatch(prAdapter);
 
-	DBGLOG_LIMITED(INIT, INFO, "FW download Start\n");
+	DBGLOG(INIT, INFO, "FW download Start\n");
 
 	if (prFwDlOps->downloadFirmware) {
 		rStatus = prFwDlOps->downloadFirmware(prAdapter,
@@ -1850,7 +1851,7 @@ uint32_t wlanDownloadFW(IN struct ADAPTER *prAdapter)
 	} else
 		DBGLOG(INIT, WARN, "Without downlaod firmware Ops\n");
 
-	DBGLOG_LIMITED(INIT, INFO, "FW download End\n");
+	DBGLOG(INIT, INFO, "FW download End\n");
 
 	HAL_ENABLE_FWDL(prAdapter, FALSE);
 
@@ -1996,7 +1997,6 @@ void fwDlGetReleaseInfoSection(struct ADAPTER *prAdapter, uint8_t *pucStartPtr)
 	struct HEADER_RELEASE_INFO *prRelInfo;
 	uint8_t *pucCurPtr = pucStartPtr + RELEASE_INFO_SEPARATOR_LEN;
 	uint16_t u2Len = 0, u2Offset = 0;
-	uint8_t ucManifestExist = 0;
 
 	prFirstInfo = (struct HEADER_RELEASE_INFO *)pucCurPtr;
 	DBGLOG(INIT, INFO, "Release info tag[%u] len[%u]\n",
@@ -2005,7 +2005,7 @@ void fwDlGetReleaseInfoSection(struct ADAPTER *prAdapter, uint8_t *pucStartPtr)
 	pucCurPtr += sizeof(struct HEADER_RELEASE_INFO);
 	while (u2Offset < prFirstInfo->u2Len) {
 		prRelInfo = (struct HEADER_RELEASE_INFO *)pucCurPtr;
-		DBGLOG(INIT, LOUD, "Release info tag[%u] len[%u] padding[%u]\n",
+		DBGLOG(INIT, INFO, "Release info tag[%u] len[%u] padding[%u]\n",
 		       prRelInfo->ucTag, prRelInfo->u2Len,
 		       prRelInfo->ucPaddingLen);
 
@@ -2013,12 +2013,6 @@ void fwDlGetReleaseInfoSection(struct ADAPTER *prAdapter, uint8_t *pucStartPtr)
 		switch (prRelInfo->ucTag) {
 		case 0x01:
 			fwDlGetReleaseManifest(prAdapter, prRelInfo, pucCurPtr);
-			ucManifestExist = 1;
-			break;
-		case 0x02:
-			if (!ucManifestExist)
-				fwDlGetReleaseManifest(prAdapter,
-					prRelInfo, pucCurPtr);
 			break;
 		default:
 			DBGLOG(INIT, WARN, "Not support release info tag[%u]\n",
@@ -2035,27 +2029,10 @@ void fwDlGetReleaseManifest(struct ADAPTER *prAdapter,
 			    struct HEADER_RELEASE_INFO *prRelInfo,
 			    uint8_t *pucStartPtr)
 {
-	uint8_t *pucAddr;
-	uint16_t u2Len;
-
 	kalMemZero(&prAdapter->rVerInfo.aucReleaseManifest,
 		   sizeof(prAdapter->rVerInfo.aucReleaseManifest));
 	kalMemCopy(&prAdapter->rVerInfo.aucReleaseManifest,
 		   pucStartPtr, prRelInfo->u2Len);
-
-	if (prRelInfo->u2Len) {
-		pucAddr = ioremap_nocache(
-			(gConEmiPhyBase + EMI_BUILD_TIME_OFFSET),
-			EMI_BUILD_TIME_MAX_LEN);
-		if (pucAddr) {
-			u2Len = prRelInfo->u2Len > EMI_BUILD_TIME_MAX_LEN ?
-				EMI_BUILD_TIME_MAX_LEN : prRelInfo->u2Len;
-			memcpy_toio(pucAddr,
-				&prAdapter->rVerInfo.aucReleaseManifest, u2Len);
-			iounmap(pucAddr);
-		} else
-			 DBGLOG(INIT, WARN, "ioremap_nocache failed.\n");
-	}
 	DBGLOG(INIT, INFO, "Release manifest: %s\n",
 	       prAdapter->rVerInfo.aucReleaseManifest);
 }

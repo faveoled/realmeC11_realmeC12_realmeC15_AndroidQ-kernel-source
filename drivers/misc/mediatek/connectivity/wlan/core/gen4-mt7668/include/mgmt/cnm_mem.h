@@ -341,10 +341,7 @@ struct _STA_RECORD_T {
 
 	UINT_8 ucTxAuthAssocRetryCount;	/* For Infra Mode, the Retry Count of TX Auth/Assod Frame(SAA) */
 	UINT_8 ucTxAuthAssocRetryLimit;	/* For Infra Mode, the Retry Limit of TX Auth/Assod Frame(SAA) */
-#if CFG_SUPPORT_CFG80211_AUTH
-	/* Record what we sent for retry TX Auth/Assoc without SAA FSM */
-	enum ENUM_AA_SENT_T eAuthAssocSent;
-#endif
+
 	UINT_16 u2StatusCode;	/* Status of Auth/Assoc Req */
 	UINT_16 u2ReasonCode;	/* Reason that been Deauth/Disassoc */
 
@@ -546,10 +543,6 @@ struct _STA_RECORD_T {
 	UINT_32 u4RxVector3;
 	UINT_32 u4RxVector4;
 #endif
-#if CFG_SUPPORT_LAST_SEC_MCS_INFO
-	UINT_32 au4RxVect0Que[MCS_INFO_SAMPLE_CNT];
-	UINT_32 au4RxVect1Que[MCS_INFO_SAMPLE_CNT];
-#endif
 	UINT_8 ucSmDialogToken;	/* Spectrum Mngt Dialog Token */
 	UINT_8 ucSmMsmtRequestMode; /* Measurement Request Mode */
 	UINT_8 ucSmMsmtToken; /* Measurement Request Token */
@@ -557,7 +550,6 @@ struct _STA_RECORD_T {
 	/* AP PMF */
 	struct STA_PMF_CFG rPmfCfg;
 #endif
-	UINT_8 eapol_re_enqueue_cnt;
 };
 
 #if 0
@@ -850,9 +842,6 @@ VOID cnmStaFreeAllStaByNetwork(P_ADAPTER_T prAdapter, UINT_8 ucBssIndex, UINT_8 
 P_STA_RECORD_T cnmGetStaRecByIndex(IN P_ADAPTER_T prAdapter, IN UINT_8 ucIndex);
 
 P_STA_RECORD_T cnmGetStaRecByAddress(P_ADAPTER_T prAdapter, UINT_8 ucBssIndex, UINT_8 aucPeerMACAddress[]);
-
-P_STA_RECORD_T cnmGetAnyStaRecByAddress(P_ADAPTER_T prAdapter,
-					PUINT_8 pucPeerMacAddr);
 
 VOID cnmStaRecChangeState(IN P_ADAPTER_T prAdapter, IN OUT P_STA_RECORD_T prStaRec, IN UINT_8 ucNewState);
 

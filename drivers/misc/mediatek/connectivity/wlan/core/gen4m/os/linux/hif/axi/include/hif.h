@@ -80,7 +80,6 @@ struct MTK_WCN_WMT_WLAN_CB_INFO;
 extern int mtk_wcn_wmt_wlan_reg(
 	struct MTK_WCN_WMT_WLAN_CB_INFO *pWmtWlanCbInfo);
 extern int mtk_wcn_wmt_wlan_unreg(void);
-extern int mtk_wcn_consys_hw_wifi_paldo_ctrl(unsigned int enable);
 #endif
 
 extern phys_addr_t gWifiRsvMemPhyBase;
@@ -205,15 +204,12 @@ struct BUS_INFO {
 	const struct PCIE_CHIP_CR_MAPPING *bus2chip;
 	const unsigned int tx_ring_cmd_idx;
 	const unsigned int tx_ring_fwdl_idx;
-	const unsigned int tx_ring0_data_idx;
-	const unsigned int tx_ring1_data_idx;
-	const unsigned int max_static_map_addr;
+	const unsigned int tx_ring_data_idx;
 	const bool fgCheckDriverOwnInt;
 	const bool fgInitPCIeInt;
 	const uint32_t u4DmaMask;
+
 	void (*pdmaSetup)(struct GLUE_INFO *prGlueInfo, u_int8_t enable);
-	uint32_t (*updateTxRingMaxQuota)(struct ADAPTER *prAdapter,
-		uint16_t u2Port, uint32_t u4MaxQuota);
 	void (*enableInterrupt)(struct ADAPTER *prAdapter);
 	void (*disableInterrupt)(struct ADAPTER *prAdapter);
 	void (*lowPowerOwnRead)(struct ADAPTER *prAdapter, u_int8_t *pfgResult);
@@ -254,7 +250,6 @@ struct MTK_WCN_WMT_WLAN_CB_INFO {
 	int (*wlan_bus_cnt_get_cb)(void);
 	int (*wlan_bus_cnt_clr_cb)(void);
 	int (*wlan_emi_mpu_set_protection_cb)(bool);
-	int (*wlan_is_wifi_drv_own_cb)(void);
 };
 #endif
 
@@ -281,6 +276,7 @@ struct MTK_WCN_WMT_WLAN_CB_INFO {
  *                   F U N C T I O N   D E C L A R A T I O N S
  *******************************************************************************
  */
+
 uint32_t glRegisterBus(probe_card pfProbe, remove_card pfRemove);
 
 void glUnregisterBus(remove_card pfRemove);

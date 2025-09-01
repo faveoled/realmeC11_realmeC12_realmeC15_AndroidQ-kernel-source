@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -456,7 +454,6 @@ VOID aisFsmStateInit_JOIN(IN P_ADAPTER_T prAdapter, P_BSS_DESC_T prBssDesc)
 		case AUTH_MODE_WPA2:
 		case AUTH_MODE_WPA2_PSK:
 		case AUTH_MODE_WPA_OSEN:
-		case AUTH_MODE_WPA3_OWE:
 			prAisFsmInfo->ucAvailableAuthTypes = (UINT_8) AUTH_TYPE_OPEN_SYSTEM;
 			break;
 
@@ -467,13 +464,6 @@ VOID aisFsmStateInit_JOIN(IN P_ADAPTER_T prAdapter, P_BSS_DESC_T prBssDesc)
 		case AUTH_MODE_AUTO_SWITCH:
 			DBGLOG(AIS, LOUD, "JOIN INIT: eAuthMode == AUTH_MODE_AUTO_SWITCH\n");
 			prAisFsmInfo->ucAvailableAuthTypes = (UINT_8) (AUTH_TYPE_OPEN_SYSTEM | AUTH_TYPE_SHARED_KEY);
-			break;
-
-		case AUTH_MODE_WPA3_SAE:
-			DBGLOG(AIS, LOUD,
-			       "JOIN INIT: eAuthMode == AUTH_MODE_SAE\n");
-			prAisFsmInfo->ucAvailableAuthTypes =
-			    (uint8_t) AUTH_TYPE_SAE;
 			break;
 
 		default:
@@ -501,22 +491,13 @@ VOID aisFsmStateInit_JOIN(IN P_ADAPTER_T prAdapter, P_BSS_DESC_T prBssDesc)
 
 		/* TODO(Kevin): We may call a sub function to acquire the Roaming Auth Type */
 		/* FT and FT Resource Request Protocol should use FT AA(Auth Algorithm) */
-		switch (prConnSettings->eAuthMode) {
-		case AUTH_MODE_WPA2_FT:
-		case AUTH_MODE_WPA2_FT_PSK:
-		case AUTH_MODE_NON_RSN_FT:
-			prAisFsmInfo->ucAvailableAuthTypes =
-			    (uint8_t) AUTH_TYPE_FAST_BSS_TRANSITION;
-			break;
-		case AUTH_MODE_WPA3_SAE:
-			prAisFsmInfo->ucAvailableAuthTypes =
-			    (uint8_t) AUTH_TYPE_SAE;
-			break;
-		default:
-			prAisFsmInfo->ucAvailableAuthTypes =
-			    prAisSpecificBssInfo->ucRoamingAuthTypes;
-			break;
-		}
+		if (prConnSettings->eAuthMode == AUTH_MODE_WPA2_FT ||
+			prConnSettings->eAuthMode == AUTH_MODE_WPA2_FT_PSK ||
+			prConnSettings->eAuthMode == AUTH_MODE_NON_RSN_FT) {
+			prAisFsmInfo->ucAvailableAuthTypes = (UINT_8) AUTH_TYPE_FAST_BSS_TRANSITION;
+		} else
+			prAisFsmInfo->ucAvailableAuthTypes = prAisSpecificBssInfo->ucRoamingAuthTypes;
+
 
 		prStaRec->ucTxAuthAssocRetryLimit = TX_AUTH_ASSOCI_RETRY_LIMIT_FOR_ROAMING;
 	}
@@ -542,15 +523,8 @@ VOID aisFsmStateInit_JOIN(IN P_ADAPTER_T prAdapter, P_BSS_DESC_T prBssDesc)
 		prAisFsmInfo->ucAvailableAuthTypes &= ~(UINT_8) AUTH_TYPE_FAST_BSS_TRANSITION;
 
 		prStaRec->ucAuthAlgNum = (UINT_8) AUTH_ALGORITHM_NUM_FAST_BSS_TRANSITION;
-	} else if (prAisFsmInfo->ucAvailableAuthTypes & (uint8_t)
-		   AUTH_TYPE_SAE) {
-		DBGLOG(AIS, LOUD,
-		       "JOIN INIT: Try to do Authentication with AuthType == SAE.\n");
-		prStaRec->ucAuthAlgNum = (uint8_t) AUTH_ALGORITHM_NUM_SAE;
 	} else {
-		DBGLOG(AIS, ERROR,
-		       "JOIN INIT: No available AuthType found, %d\n",
-		       prAisFsmInfo->ucAvailableAuthTypes);
+		ASSERT(0);
 	}
 
 	/* 4 <5> Overwrite Connection Setting for eConnectionPolicy == ANY (Used by Assoc Req) */
@@ -5687,7 +5661,6 @@ VOID aisRemoveTimeoutBlacklist(P_ADAPTER_T prAdapter)
 	P_LINK_T prBlackList = &prConnSettings->rBlackList.rUsingLink;
 	P_LINK_T prFreeList = &prConnSettings->rBlackList.rFreeLink;
 	OS_SYSTIME rCurrent;
-	P_BSS_DESC_T prBssDesc = NULL;
 
 	GET_CURRENT_SYSTIME(&rCurrent);
 
@@ -5696,14 +5669,6 @@ VOID aisRemoveTimeoutBlacklist(P_ADAPTER_T prAdapter)
 			continue;
 		if (!CHECK_FOR_TIMEOUT(rCurrent, prEntry->rAddTime, SEC_TO_MSEC(AIS_BLACKLIST_TIMEOUT)))
 			continue;
-
-		prBssDesc = scanSearchBssDescByBssid(prAdapter,
-						     prEntry->aucBSSID);
-		if (prBssDesc) {
-			prBssDesc->prBlack = NULL;
-			DBGLOG(AIS, INFO, "Remove Timeout %pM from blacklist\n",
-			       prBssDesc->aucBSSID);
-		}
 		LINK_REMOVE_KNOWN_ENTRY(prBlackList, &prEntry->rLinkEntry);
 		LINK_INSERT_HEAD(prFreeList, &prEntry->rLinkEntry);
 	}
@@ -5733,15 +5698,8 @@ static VOID aisRemoveDisappearedBlacklist(P_ADAPTER_T prAdapter)
 		}
 		if (!fgDisappeared || (u4Current - prEntry->u4DisapperTime) < 600 * USEC_PER_SEC)
 			continue;
-
-		prBssDesc = scanSearchBssDescByBssid(prAdapter,
-						     prEntry->aucBSSID);
-		if (prBssDesc) {
-			prBssDesc->prBlack = NULL;
-			DBGLOG(AIS, INFO,
-			       "Remove disappeared blacklist %s %pM\n",
-			       prEntry->aucSSID, prEntry->aucBSSID);
-		}
+		DBGLOG(AIS, INFO, "Remove disappeared blacklist %s %pM\n",
+			prEntry->aucSSID, prEntry->aucBSSID);
 		LINK_REMOVE_KNOWN_ENTRY(prBlackList, &prEntry->rLinkEntry);
 		LINK_INSERT_HEAD(prFreeList, &prEntry->rLinkEntry);
 	}

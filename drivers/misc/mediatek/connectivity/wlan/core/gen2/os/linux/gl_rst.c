@@ -1,6 +1,4 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
 * published by the Free Software Foundation.
@@ -133,7 +131,6 @@ static void *glResetCallback(ENUM_WMTDRV_TYPE_T eSrcType,
 			switch (*prRstMsg) {
 			case WMTRSTMSG_RESET_START:
 				DBGLOG(INIT, WARN, "Whole chip reset start!\n");
-				fgResetTriggered = FALSE;
 				fgIsResetting = TRUE;
 				wifi_reset_start();
 				break;
