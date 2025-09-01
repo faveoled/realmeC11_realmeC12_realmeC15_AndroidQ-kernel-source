@@ -1,13 +1,13 @@
 ###############################################################################
 # Necessary Check
 
-ifeq ($(AUTOCONF_H),)
-    $(error AUTOCONF_H is not defined)
-endif
+ccflags-y += -imacros $(KERNEL_OUT)/include/generated/autoconf.h
+
+
 
 ifneq ($(CONFIG_MTK_COMBO),)
 
-ccflags-y += -imacros $(AUTOCONF_H)
+#ccflags-y += -imacros $(AUTOCONF_H)
 
 ifeq ($(CONFIG_MTK_COMBO_CHIP),)
     $(error CONFIG_MTK_COMBO_CHIP not defined)
