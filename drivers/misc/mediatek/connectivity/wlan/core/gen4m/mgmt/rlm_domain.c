@@ -3441,6 +3441,10 @@ void txPwrCtrlCfgFileToList(struct ADAPTER *prAdapter)
 		    WLAN_CFG_FILE_BUF_SIZE, &u4ConfigReadLen,
 		    prAdapter->prGlueInfo->prDev) == 0) {
 			/* ToDo:: Nothing */
+		} else if (kalRequestFirmware("txpowerctrl_132769.cfg", pucConfigBuf,
+		    WLAN_CFG_FILE_BUF_SIZE, &u4ConfigReadLen,
+		    prAdapter->prGlueInfo->prDev) == 0) {
+			/* ToDo:: Nothing */
 		} else if (kalReadToFile("/data/misc/wifi/txpowerctrl.cfg",
 			   pucConfigBuf, WLAN_CFG_FILE_BUF_SIZE,
 			   &u4ConfigReadLen) == 0) {
