@@ -55,7 +55,7 @@ endif
     export WIFI_IP_SET=1
     export WIFI_ECO_VER=1
     # Do build-in for Makefile checking
-     export CONFIG_WLAN_DRV_BUILD_IN=y
+    export CONFIG_WLAN_DRV_BUILD_IN=y
 
 
 # Otherwise we were called directly from the command line;
