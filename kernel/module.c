@@ -70,7 +70,7 @@
 #ifndef ARCH_SHF_SMALL
 #define ARCH_SHF_SMALL 0
 #endif
-
+#define pr_warn pr_info
 /*
  * Modules' sections will be aligned on page boundaries
  * to ensure complete separation of code and data, but
