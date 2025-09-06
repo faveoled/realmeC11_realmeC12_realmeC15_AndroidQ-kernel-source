@@ -960,6 +960,8 @@ KBUILD_CFLAGS	+= $(call cc-disable-warning, attribute-alias)
 KBUILD_CFLAGS += $(call cc-disable-warning, zero-length-bounds)
 KBUILD_CFLAGS += $(call cc-disable-warning, array-bounds)
 KBUILD_CFLAGS += $(call cc-disable-warning, stringop-overflow)
+KBUILD_CFLAGS += $(call cc-disable-warning, void-pointer-to-int-cast)
+
 # warn about C99 declaration after statement
 KBUILD_CFLAGS += $(call cc-disable-warning,declaration-after-statement)
 
